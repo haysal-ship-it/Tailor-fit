@@ -265,6 +265,14 @@ export const SAMPLE_CLIENTS: Client[] = [
     notes: 'Bespoke structured senator ensemble with high collar.',
     createdAt: '2026-09-02T11:45:00.000Z',
   },
+  {
+    id: 'c-6',
+    name: 'Amanda Billings',
+    phone: '+234 805 771 9922',
+    email: 'amanda.billings@vogue.co.uk',
+    notes: 'Bespoke Tuxedo Suit with hand-stitched silk faille peak lapel and tailored cigarette trousers.',
+    createdAt: '2026-09-10T08:30:00.000Z',
+  },
 ];
 
 export const SAMPLE_SNAPSHOTS: MeasurementSnapshot[] = [
@@ -353,6 +361,26 @@ export const SAMPLE_SNAPSHOTS: MeasurementSnapshot[] = [
 
 export const SAMPLE_ORDERS: Order[] = [
   {
+    id: 'ord-9021',
+    clientId: 'c-1',
+    garmentType: 'Bespoke Tuxedo Suit',
+    measurementSnapshotId: 'ms-1',
+    referenceImages: [
+      {
+        id: 'img-9021',
+        url: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?auto=format&fit=crop&w=600&q=80',
+        title: 'Midnight Navy Super 150s Wool',
+        note: 'Super 150s worsted wool with silk grosgrain peak lapel.',
+      },
+    ],
+    price: 120000,
+    paidAmount: 85000,
+    notes: 'Hand-stitched silk faille peak lapel, custom horn buttons, double vent.',
+    status: 'In Progress',
+    pickupDateTime: '2026-10-14T15:00:00.000Z',
+    createdAt: '2026-09-18T10:00:00.000Z',
+  },
+  {
     id: 'ord-101',
     clientId: 'c-1',
     garmentType: 'Bespoke African Gown',
@@ -372,6 +400,7 @@ export const SAMPLE_ORDERS: Order[] = [
       },
     ],
     price: 185000,
+    paidAmount: 185000,
     notes: 'Hand-stitched, monogram design on wrist and gold buttons.',
     status: 'Pending',
     pickupDateTime: '2026-09-23T16:00:00.000Z',

@@ -27,25 +27,39 @@ const LANDMARKS: LandmarkData[] = [
     color: '#00d2b4',
     zone: 'Collar Band',
     dotX: 200,
-    dotY: 102,
+    dotY: 104,
     anchorX: 195,
-    anchorY: 102,
-    labelX: 52,
-    labelY: 96,
+    anchorY: 104,
+    labelX: 120,
+    labelY: 104,
+    side: 'left',
+  },
+  {
+    key: 'waist',
+    name: 'Waist',
+    defaultValCm: 72,
+    color: '#1e3a8a',
+    zone: 'Natural Midriff',
+    dotX: 195,
+    dotY: 250,
+    anchorX: 172,
+    anchorY: 250,
+    labelX: 120,
+    labelY: 250,
     side: 'left',
   },
   {
     key: 'shoulder',
     name: 'Shoulder',
     defaultValCm: 42,
-    color: '#10b981',
+    color: '#00d2b4',
     zone: 'Acromion Span',
-    dotX: 258,
+    dotX: 254,
     dotY: 132,
-    anchorX: 260,
+    anchorX: 254,
     anchorY: 132,
-    labelX: 348,
-    labelY: 125,
+    labelX: 290,
+    labelY: 100,
     side: 'right',
   },
   {
@@ -54,41 +68,27 @@ const LANDMARKS: LandmarkData[] = [
     defaultValCm: 92,
     color: '#00bfa5',
     zone: 'Full Bodice',
-    dotX: 190,
+    dotX: 236,
     dotY: 182,
-    anchorX: 160,
+    anchorX: 238,
     anchorY: 182,
-    labelX: 52,
-    labelY: 178,
-    side: 'left',
-  },
-  {
-    key: 'arm',
-    name: 'Arm',
-    defaultValCm: 60,
-    color: '#f59e0b',
-    zone: 'Sleeve Length',
-    dotX: 268,
-    dotY: 265,
-    anchorX: 275,
-    anchorY: 265,
-    labelX: 348,
-    labelY: 258,
+    labelX: 290,
+    labelY: 175,
     side: 'right',
   },
   {
-    key: 'waist',
-    name: 'Waist',
-    defaultValCm: 72,
-    color: '#1e3a8a',
-    zone: 'Natural Midriff',
-    dotX: 200,
-    dotY: 248,
-    anchorX: 168,
-    anchorY: 248,
-    labelX: 52,
-    labelY: 246,
-    side: 'left',
+    key: 'sleeve',
+    name: 'Sleeve',
+    defaultValCm: 60,
+    color: '#f59e0b',
+    zone: 'Sleeve Length',
+    dotX: 275,
+    dotY: 260,
+    anchorX: 278,
+    anchorY: 260,
+    labelX: 290,
+    labelY: 260,
+    side: 'right',
   },
   {
     key: 'thigh',
@@ -96,13 +96,13 @@ const LANDMARKS: LandmarkData[] = [
     defaultValCm: 54,
     color: '#0ea5e9',
     zone: 'Upper Leg',
-    dotX: 180,
+    dotX: 235,
     dotY: 375,
-    anchorX: 162,
+    anchorX: 238,
     anchorY: 375,
-    labelX: 52,
-    labelY: 372,
-    side: 'left',
+    labelX: 290,
+    labelY: 420,
+    side: 'right',
   },
 ];
 
@@ -333,6 +333,7 @@ export function AtelierMannequin({
 
           {/* === CYAN DASHED LEADER LINES & ANCHOR DOTS === */}
           {LANDMARKS.map((lm) => {
+            const isLeft = lm.side === 'left';
             return (
               <g key={`leader-${lm.key}`} className="pointer-events-none">
                 {/* Body Anchor Dot */}
@@ -348,20 +349,20 @@ export function AtelierMannequin({
                 <line
                   x1={lm.anchorX}
                   y1={lm.anchorY}
-                  x2={lm.side === 'left' ? lm.labelX + 54 : lm.labelX - 10}
-                  y2={lm.labelY + 2}
-                  stroke="#00e5ff"
+                  x2={isLeft ? lm.labelX + 8 : lm.labelX - 8}
+                  y2={lm.labelY - 5}
+                  stroke="#38bdf8"
                   strokeWidth="1.5"
-                  strokeDasharray="4 4"
+                  strokeDasharray="3 3"
                   opacity="0.9"
                 />
 
                 {/* Outer Connection Dot */}
                 <circle
-                  cx={lm.side === 'left' ? lm.labelX + 54 : lm.labelX - 10}
-                  cy={lm.labelY + 2}
+                  cx={isLeft ? lm.labelX + 8 : lm.labelX - 8}
+                  cy={lm.labelY - 5}
                   r="2.5"
-                  fill="#00e5ff"
+                  fill="#0284c7"
                 />
               </g>
             );
@@ -370,7 +371,6 @@ export function AtelierMannequin({
           {/* Landmark Text Display on Canvas for Perfect Scale Positioning */}
           {LANDMARKS.map((lm) => {
             const isLeft = lm.side === 'left';
-            const displayVal = formatValue(lm.key, lm.defaultValCm);
 
             return (
               <g
@@ -378,25 +378,14 @@ export function AtelierMannequin({
                 className="cursor-pointer group"
                 onClick={() => handleStartEdit(lm.key, lm.defaultValCm)}
               >
-                {/* Fashion Serif Label Name */}
+                {/* Fashion Serif Label Name matching design mockup */}
                 <text
                   x={lm.labelX}
                   y={lm.labelY}
                   textAnchor={isLeft ? 'end' : 'start'}
-                  className="font-serif text-[17px] font-medium fill-gray-900 tracking-wide select-none group-hover:fill-[#1d4ed8] transition-colors"
-                  style={{ fontFamily: 'var(--font-serif)' }}
+                  className="font-serif text-[18px] font-normal fill-gray-900 tracking-wide select-none group-hover:fill-[#1d4ed8] transition-colors"
                 >
                   {lm.name}
-                </text>
-
-                {/* Measurement Value Pill */}
-                <text
-                  x={lm.labelX}
-                  y={lm.labelY + 16}
-                  textAnchor={isLeft ? 'end' : 'start'}
-                  className="font-sans text-[11px] font-semibold fill-gray-500 tracking-normal select-none group-hover:fill-gray-900 transition-colors"
-                >
-                  {displayVal}
                 </text>
               </g>
             );

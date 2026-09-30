@@ -36,6 +36,7 @@ export interface Order {
   measurementSnapshotId?: string;
   referenceImages: ReferenceImage[];
   price: number;
+  paidAmount?: number;
   notes: string;
   status: OrderStatus;
   pickupDateTime: string;

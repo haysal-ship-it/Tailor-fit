@@ -2,407 +2,407 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@/lib/store';
-import { HotspotDefinition, GarmentTemplate } from '@/types';
-import { 
-  Ruler, 
-  Scissors, 
-  Layers, 
-  Plus, 
-  Trash2, 
-  Download, 
-  RotateCcw, 
-  Check, 
-  Coins,
-  Sparkles,
-  X
-} from 'lucide-react';
+import { Plus, Check, X } from 'lucide-react';
 
 export function SettingsScreen() {
-  const {
-    settings,
-    allHotspots,
-    updateSettings,
-    addCustomField,
-    deleteCustomField,
-    addTemplate,
-    resetToDemoData,
-    exportDataJson,
-  } = useStore();
+  const { settings, updateSettings, addTemplate, allHotspots } = useStore();
 
-  // Custom Field form
-  const [showAddFieldModal, setShowAddFieldModal] = useState(false);
-  const [newFieldLabel, setNewFieldLabel] = useState('');
-  const [newFieldRegion, setNewFieldRegion] = useState<'upper_body' | 'lower_body' | 'arms' | 'head_neck'>('upper_body');
-  const [newFieldSide, setNewFieldSide] = useState<'front' | 'back' | 'both'>('front');
-  const [newFieldHint, setNewFieldHint] = useState('');
+  const [activeTab, setActiveTab] = useState<'billing' | 'blueprints' | 'sizing'>('billing');
+  const [selectedCurrency, setSelectedCurrency] = useState('NGN (₦)');
+  const [unit, setUnit] = useState<'cm' | 'in'>('cm');
 
-  // New Template form
+  // Blueprints list matching Settings.png
+  const [blueprints, setBlueprints] = useState([
+    {
+      id: 'bp-1',
+      title: 'Bespoke African Gown',
+      description:
+        'Traditional african couture gown, bridal styles corset-backed silhouettes and embellished trains',
+      tags: ['neck', 'sleeves', 'bust', 'waist'],
+      moreCount: '+3 more',
+    },
+    {
+      id: 'bp-2',
+      title: 'Shirt/Blouse',
+      description:
+        'Essential measurements for bespoke dress shirts, casual button downs and tailored blouses',
+      tags: ['neck', 'sleeves', 'bust', 'waist'],
+      moreCount: '+4 more',
+    },
+    {
+      id: 'bp-3',
+      title: 'Trousers',
+      description:
+        'Fittings for tailored pants, pleated trouses and custom chinos/pants',
+      tags: ['neck', 'sleeves', 'bust', 'waist'],
+      moreCount: '+3 more',
+    },
+    {
+      id: 'bp-4',
+      title: 'Bespoke African Gown',
+      description:
+        'Traditional african couture gown, bridal styles corset-backed silhouettes and embellished trains',
+      tags: ['neck', 'sleeves', 'bust', 'waist'],
+      moreCount: '+3 more',
+    },
+  ]);
+
+  // Sizing measurements list matching Settings.png
+  const [sizingItems, setSizingItems] = useState([
+    { id: 'sz-1', title: 'Shoulder width', category: 'Upper Body' },
+    { id: 'sz-2', title: 'Neck Circumference', category: 'Head/Neck' },
+    { id: 'sz-3', title: 'Bust/Chest', category: 'Upper Body' },
+    { id: 'sz-4', title: 'Waist Circumference', category: 'Upper Body' },
+    { id: 'sz-5', title: 'Hip Circumference', category: 'Lower Body' },
+    { id: 'sz-6', title: 'Inseam Length', category: 'Lower Body' },
+    { id: 'sz-7', title: 'Nape to Waist', category: 'Upper Body' },
+    { id: 'sz-8', title: 'Back Width', category: 'Upper Body' },
+  ]);
+
   const [showAddTemplateModal, setShowAddTemplateModal] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [newTemplateDesc, setNewTemplateDesc] = useState('');
-  const [selectedFieldKeys, setSelectedFieldKeys] = useState<string[]>(['waist', 'bust', 'shoulder']);
 
-  const currencies = [
-    { code: '₦', label: 'Nigerian Naira (₦)' },
-    { code: '$', label: 'US Dollar ($)' },
-    { code: '£', label: 'British Pound (£)' },
-    { code: '€', label: 'Euro (€)' },
-    { code: '₵', label: 'Ghanaian Cedi (₵)' },
-  ];
-
-  const handleCreateField = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newFieldLabel.trim()) return;
-
-    const key = newFieldLabel.toLowerCase().replace(/[^a-z0-9]/g, '_');
-    const field: HotspotDefinition = {
-      key,
-      label: newFieldLabel.trim(),
-      category: newFieldRegion,
-      view: newFieldSide,
-      frontX: 150,
-      frontY: 200,
-      backX: 150,
-      backY: 200,
-      hint: newFieldHint.trim() || `Measure ${newFieldLabel.toLowerCase()} with tape flat.`,
-      isCustom: true,
-    };
-
-    addCustomField(field);
-    setNewFieldLabel('');
-    setNewFieldHint('');
-    setShowAddFieldModal(false);
-  };
+  const [showAddMeasurementModal, setShowAddMeasurementModal] = useState(false);
+  const [newMeasurementName, setNewMeasurementName] = useState('');
+  const [newMeasurementCategory, setNewMeasurementCategory] = useState('Upper Body');
 
   const handleCreateTemplate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTemplateName.trim()) return;
 
-    const newTemplate: GarmentTemplate = {
-      id: newTemplateName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-      name: newTemplateName.trim(),
-      description: newTemplateDesc.trim() || 'Custom bespoke garment template',
-      fieldKeys: selectedFieldKeys,
-    };
-
-    addTemplate(newTemplate);
+    setBlueprints((prev) => [
+      ...prev,
+      {
+        id: `bp-${Date.now()}`,
+        title: newTemplateName.trim(),
+        description: newTemplateDesc.trim() || 'Custom bespoke garment blueprint',
+        tags: ['neck', 'bust', 'waist'],
+        moreCount: '+2 more',
+      },
+    ]);
     setNewTemplateName('');
     setNewTemplateDesc('');
-    setSelectedFieldKeys(['waist', 'bust', 'shoulder']);
     setShowAddTemplateModal(false);
   };
 
-  const toggleFieldSelection = (key: string) => {
-    setSelectedFieldKeys((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    );
+  const handleCreateMeasurement = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMeasurementName.trim()) return;
+
+    setSizingItems((prev) => [
+      ...prev,
+      {
+        id: `sz-${Date.now()}`,
+        title: newMeasurementName.trim(),
+        category: newMeasurementCategory,
+      },
+    ]);
+    setNewMeasurementName('');
+    setShowAddMeasurementModal(false);
   };
 
   return (
-    <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-4 space-y-6">
-      {/* Settings Header */}
-      <div className="bg-white rounded-3xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/90 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-950 tracking-tight font-sans">
-            Atelier Settings
-          </h1>
-          <p className="text-xs text-gray-400 mt-1">
-            Units, currency standards, garment blueprint catalog & studio backups
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={exportDataJson}
-            className="px-4 py-2 rounded-full border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-1.5 shadow-xs"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export Atelier JSON</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (confirm('Reset atelier to factory sample data? Custom inputs will be cleared.')) {
-                resetToDemoData();
-              }
-            }}
-            className="px-4 py-2 rounded-full border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-1.5 shadow-xs"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset Demo</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Bento-Grid Layout for Settings Modules */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-4">
+      {/* 2-Column Layout matching Settings.png */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* =========================================================================
-            BENTO ITEM 1: Measurement Unit & Currency Standards
+            LEFT COLUMN: "Settings" Navigation Card (3 Columns on Desktop)
             ========================================================================= */}
-        <div className="bg-white rounded-3xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/90 space-y-5">
-          <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
-            <div className="w-9 h-9 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-800">
-              <Ruler className="w-4 h-4" />
-            </div>
+        <div className="lg:col-span-3 bg-white rounded-3xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/90 space-y-4">
+          <h2 className="text-sm font-bold text-gray-950 font-sans tracking-tight">
+            Settings
+          </h2>
+
+          <div className="space-y-1">
+            <button
+              type="button"
+              onClick={() => setActiveTab('billing')}
+              className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-colors border ${
+                activeTab === 'billing'
+                  ? 'bg-blue-50/70 text-[#1d4ed8] border-blue-100'
+                  : 'text-gray-500 hover:text-gray-800 border-transparent'
+              }`}
+            >
+              Measurement &amp; Billing Standards
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('blueprints')}
+              className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-colors border ${
+                activeTab === 'blueprints'
+                  ? 'bg-blue-50/70 text-[#1d4ed8] border-blue-100'
+                  : 'text-gray-500 hover:text-gray-800 border-transparent'
+              }`}
+            >
+              Garment Blueprints
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('sizing')}
+              className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-colors border ${
+                activeTab === 'sizing'
+                  ? 'bg-blue-50/70 text-[#1d4ed8] border-blue-100'
+                  : 'text-gray-500 hover:text-gray-800 border-transparent'
+              }`}
+            >
+              Sizing/measurements
+            </button>
+          </div>
+        </div>
+
+        {/* =========================================================================
+            RIGHT COLUMN: Settings Sections (9 Columns on Desktop)
+            ========================================================================= */}
+        <div className="lg:col-span-9 bg-white rounded-3xl p-6 sm:p-8 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/90 space-y-8">
+          {/* SECTION 1: Measurement & Billing Standards */}
+          <div className="space-y-5">
             <div>
-              <h3 className="text-base font-bold text-gray-950 font-sans">
-                Measurement & Billing Standards
-              </h3>
-              <p className="text-xs text-gray-400">Atelier units and currency symbol</p>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                DEFAULT UNITS AND CURRENCY SYMBOLS
+              </span>
+              <h1 className="text-base font-bold text-gray-950 font-sans tracking-tight">
+                Measurement &amp; Billing Standards
+              </h1>
             </div>
-          </div>
 
-          {/* Unit Toggle */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-2">
-              Default Measurement Unit
-            </label>
-            <div className="inline-flex bg-gray-100 p-1 rounded-full border border-gray-200/60">
-              <button
-                type="button"
-                onClick={() => updateSettings({ defaultUnit: 'cm' })}
-                className={`px-5 py-2 rounded-full text-xs font-semibold transition-all ${
-                  settings.defaultUnit === 'cm'
-                    ? 'bg-[#1d4ed8] text-white shadow-xs'
-                    : 'text-gray-600 hover:text-gray-950'
-                }`}
-              >
-                Centimeters (cm)
-              </button>
-              <button
-                type="button"
-                onClick={() => updateSettings({ defaultUnit: 'in' })}
-                className={`px-5 py-2 rounded-full text-xs font-semibold transition-all ${
-                  settings.defaultUnit === 'in'
-                    ? 'bg-[#1d4ed8] text-white shadow-xs'
-                    : 'text-gray-600 hover:text-gray-950'
-                }`}
-              >
-                Inches (&quot;)
-              </button>
+            {/* Default Mesurement Unit */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-900 block">
+                Default Mesurement Unit
+              </label>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setUnit('cm')}
+                  className={`px-6 py-2 rounded-full text-xs font-semibold transition-all ${
+                    unit === 'cm'
+                      ? 'bg-[#1d4ed8] text-white shadow-xs'
+                      : 'bg-white text-gray-700 border border-gray-200'
+                  }`}
+                >
+                  Centimeteres (cm)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUnit('in')}
+                  className={`px-6 py-2 rounded-full text-xs font-semibold transition-all ${
+                    unit === 'in'
+                      ? 'bg-[#1d4ed8] text-white shadow-xs'
+                      : 'bg-white text-gray-700 border border-gray-200'
+                  }`}
+                >
+                  Inches (“)
+                </button>
+              </div>
             </div>
-          </div>
 
-          {/* Currency Selection */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-2">
-              Studio Currency
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {currencies.map((curr) => {
-                const isSelected = settings.currency === curr.code;
-                return (
-                  <button
-                    key={curr.code}
-                    type="button"
-                    onClick={() => updateSettings({ currency: curr.code })}
-                    className={`p-3 rounded-2xl border text-left transition-all flex items-center justify-between ${
-                      isSelected
-                        ? 'border-[#1d4ed8] bg-[#1d4ed8]/5 text-[#1d4ed8] font-bold shadow-2xs'
-                        : 'border-gray-100 bg-[#f7f8fa] text-gray-700 hover:border-gray-200'
-                    }`}
-                  >
-                    <span className="text-xs">{curr.label}</span>
-                    {isSelected && <Check className="w-3.5 h-3.5 text-[#1d4ed8]" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+            {/* Preferred Currency */}
+            <div className="space-y-2 pt-1">
+              <label className="text-xs font-bold text-gray-900 block">
+                Preferred Currency
+              </label>
 
-        {/* =========================================================================
-            BENTO ITEM 2: Garment Blueprint Templates
-            ========================================================================= */}
-        <div className="bg-white rounded-3xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/90 space-y-4 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-800">
-                  <Scissors className="w-4 h-4" />
+              {/* 4 Cards in a single row matching Settings.png */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* 1. NGN (₦) */}
+                <div
+                  onClick={() => setSelectedCurrency('NGN (₦)')}
+                  className={`py-3 px-4 rounded-xl border text-center cursor-pointer transition-all ${
+                    selectedCurrency === 'NGN (₦)'
+                      ? 'border-[#1d4ed8] bg-blue-50/30 shadow-xs'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <span className="text-xs font-bold text-[#1d4ed8]">NGN (₦)</span>
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-gray-950 font-sans">
-                    Garment Blueprints
-                  </h3>
-                  <p className="text-xs text-gray-400">
-                    {settings.templates.length} tailoring templates active
-                  </p>
+
+                {/* 2. US Dollar ($) */}
+                <div
+                  onClick={() => setSelectedCurrency('US Dollar ($)')}
+                  className={`py-3 px-4 rounded-xl border text-center cursor-pointer transition-all ${
+                    selectedCurrency === 'US Dollar ($)'
+                      ? 'border-[#1d4ed8] bg-blue-50/30 shadow-xs'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <span className="text-xs font-bold text-gray-800">US Dollar ($)</span>
                 </div>
+
+                {/* 3. Euro () */}
+                <div
+                  onClick={() => setSelectedCurrency('Euro ()')}
+                  className={`py-3 px-4 rounded-xl border text-center cursor-pointer transition-all ${
+                    selectedCurrency === 'Euro ()'
+                      ? 'border-[#1d4ed8] bg-blue-50/30 shadow-xs'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <span className="text-xs font-bold text-gray-800">Euro ()</span>
+                </div>
+
+                {/* 4. Pounds ( */}
+                <div
+                  onClick={() => setSelectedCurrency('Pounds (')}
+                  className={`py-3 px-4 rounded-xl border text-center cursor-pointer transition-all ${
+                    selectedCurrency === 'Pounds ('
+                      ? 'border-[#1d4ed8] bg-blue-50/30 shadow-xs'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <span className="text-xs font-bold text-gray-800">Pounds (</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 2: Garments Blueprints */}
+          <div className="space-y-4 pt-4 border-t border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                  TAILORING TEMPLATES
+                </span>
+                <h2 className="text-base font-bold text-gray-950 font-sans tracking-tight">
+                  Garments Blueprints
+                </h2>
               </div>
 
               <button
                 type="button"
                 onClick={() => setShowAddTemplateModal(true)}
-                className="px-3.5 py-1.5 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold hover:bg-[#1e40af] shadow-xs flex items-center gap-1.5"
+                className="px-5 py-2 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Template</span>
+                Add Template
               </button>
             </div>
 
-            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-              {settings.templates.map((tpl) => (
+            {/* 2x2 Grid of Blueprint Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              {blueprints.map((bp) => (
                 <div
-                  key={tpl.id}
-                  className="p-3.5 rounded-2xl bg-[#f7f8fa] border border-gray-100 flex items-center justify-between"
+                  key={bp.id}
+                  className="p-4 rounded-2xl bg-[#f4f5f7] border border-gray-100 flex flex-col justify-between space-y-3"
                 >
                   <div>
-                    <h4 className="text-xs font-bold text-gray-900">{tpl.name}</h4>
-                    <p className="text-[11px] text-gray-400">{tpl.description}</p>
-                    <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                      {tpl.fieldKeys.slice(0, 4).map((k) => (
-                        <span
-                          key={k}
-                          className="px-2 py-0.5 rounded-md bg-white text-gray-600 text-[10px] font-medium border border-gray-200/60"
-                        >
-                          {k}
-                        </span>
-                      ))}
-                      {tpl.fieldKeys.length > 4 && (
-                        <span className="text-[10px] text-gray-400">
-                          +{tpl.fieldKeys.length - 4} more
-                        </span>
-                      )}
-                    </div>
+                    <h3 className="text-xs font-bold text-gray-950 mb-1">{bp.title}</h3>
+                    <p className="text-[11px] text-gray-500 leading-snug">{bp.description}</p>
+                  </div>
+
+                  {/* Badges row */}
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {bp.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="px-2.5 py-0.5 rounded-full bg-white text-[10px] font-semibold text-gray-600 border border-gray-200/60"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                    <span className="px-2 py-0.5 text-[10px] font-bold text-gray-500">
+                      {bp.moreCount}
+                    </span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-        </div>
 
-        {/* =========================================================================
-            BENTO ITEM 3: Custom Anatomical Landmarks & Hotspots
-            ========================================================================= */}
-        <div className="md:col-span-2 bg-white rounded-3xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/90 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-800">
-                <Layers className="w-4 h-4" />
-              </div>
+          {/* SECTION 3: Sizing/Measurements */}
+          <div className="space-y-4 pt-4 border-t border-gray-100">
+            <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-gray-950 font-sans">
-                  Anatomical Landmarks Catalog
-                </h3>
-                <p className="text-xs text-gray-400">
-                  {allHotspots.length} standard & bespoke tape measurements
-                </p>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                  Standard Tape Measurements
+                </span>
+                <h2 className="text-base font-bold text-gray-950 font-sans tracking-tight">
+                  Sizing/Measurements
+                </h2>
               </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAddMeasurementModal(true)}
+                className="px-5 py-2 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+              >
+                Add Measurement
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowAddFieldModal(true)}
-              className="px-4 py-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold transition-colors flex items-center gap-1.5"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Landmark</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {allHotspots.map((h) => (
-              <div
-                key={h.key}
-                className="p-3 rounded-2xl bg-[#f7f8fa] border border-gray-100 text-center relative group"
-              >
-                <p className="text-xs font-bold text-gray-900">{h.label}</p>
-                <p className="text-[10px] text-gray-400 uppercase tracking-wider mt-0.5">
-                  {h.category.replace(/_/g, ' ')}
-                </p>
-                {h.isCustom && (
-                  <button
-                    type="button"
-                    onClick={() => deleteCustomField(h.key)}
-                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Remove custom landmark"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            ))}
+            {/* 4x2 Grid of Sizing Cards matching Settings.png */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {sizingItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="p-3.5 rounded-2xl bg-[#f4f5f7] border border-gray-100 text-center space-y-1"
+                >
+                  <h4 className="text-xs font-bold text-gray-950">{item.title}</h4>
+                  <p className="text-[10px] text-gray-500">{item.category}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Add Custom Landmark Modal */}
-      {showAddFieldModal && (
+      {/* Add Template Modal */}
+      {showAddTemplateModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-gray-100 animate-in zoom-in-95">
-            <div className="flex items-center justify-between pb-4 border-b border-gray-100">
-              <h3 className="text-lg font-bold text-gray-950 font-sans">
-                Add Anatomical Landmark
-              </h3>
+          <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-gray-100">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <h3 className="text-sm font-bold text-gray-950">Add Garment Blueprint</h3>
               <button
                 type="button"
-                onClick={() => setShowAddFieldModal(false)}
-                className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 hover:text-gray-900 flex items-center justify-center"
+                onClick={() => setShowAddTemplateModal(false)}
+                className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-900"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateField} className="space-y-4 pt-4">
+            <form onSubmit={handleCreateTemplate} className="space-y-4 pt-4">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Landmark Label *
+                <label className="block text-xs font-bold text-gray-900 mb-1">
+                  Template Name
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Wrist Circumference"
-                  value={newFieldLabel}
-                  onChange={(e) => setNewFieldLabel(e.target.value)}
-                  className="w-full h-11 px-4 rounded-xl bg-[#f7f8fa] border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-[#1d4ed8] focus:bg-white"
+                  placeholder="e.g. Bespoke Safari Jacket"
+                  value={newTemplateName}
+                  onChange={(e) => setNewTemplateName(e.target.value)}
+                  className="w-full h-10 px-3.5 rounded-xl bg-[#f4f5f7] text-xs text-gray-900 focus:outline-none focus:bg-white"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Anatomical Zone
-                </label>
-                <select
-                  value={newFieldRegion}
-                  onChange={(e) => setNewFieldRegion(e.target.value as any)}
-                  className="w-full h-11 px-4 rounded-xl bg-[#f7f8fa] border border-gray-200 text-xs text-gray-900 focus:outline-none focus:border-[#1d4ed8]"
-                >
-                  <option value="upper_body">Upper Body (Torso / Chest)</option>
-                  <option value="arms">Arms / Sleeves</option>
-                  <option value="lower_body">Lower Body (Hips / Legs)</option>
-                  <option value="head_neck">Head & Neck</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Measurement Instructions / Hint
+                <label className="block text-xs font-bold text-gray-900 mb-1">
+                  Description
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="Tape wrapped comfortably over wrist bone..."
-                  value={newFieldHint}
-                  onChange={(e) => setNewFieldHint(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-[#f7f8fa] border border-gray-200 text-xs text-gray-900 focus:outline-none focus:border-[#1d4ed8] resize-none"
+                  placeholder="e.g. Tailored outerwear with pleated bellow pockets..."
+                  value={newTemplateDesc}
+                  onChange={(e) => setNewTemplateDesc(e.target.value)}
+                  className="w-full p-3 rounded-xl bg-[#f4f5f7] text-xs text-gray-900 focus:outline-none focus:bg-white resize-none"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+              <div className="pt-2 flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowAddFieldModal(false)}
-                  className="px-4 py-2 rounded-full border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                  onClick={() => setShowAddTemplateModal(false)}
+                  className="px-4 py-2 rounded-full text-xs text-gray-600 hover:bg-gray-100"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold hover:bg-[#1e40af] shadow-xs"
+                  className="px-5 py-2 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold"
                 >
-                  Save Landmark
+                  Save
                 </button>
               </div>
             </form>
@@ -410,90 +410,65 @@ export function SettingsScreen() {
         </div>
       )}
 
-      {/* Add Custom Garment Template Modal */}
-      {showAddTemplateModal && (
+      {/* Add Measurement Modal */}
+      {showAddMeasurementModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white rounded-3xl p-6 shadow-2xl border border-gray-100 animate-in zoom-in-95">
-            <div className="flex items-center justify-between pb-4 border-b border-gray-100">
-              <h3 className="text-lg font-bold text-gray-950 font-sans">
-                Create Garment Blueprint
-              </h3>
+          <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-gray-100">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <h3 className="text-sm font-bold text-gray-950">Add Measurement</h3>
               <button
                 type="button"
-                onClick={() => setShowAddTemplateModal(false)}
-                className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 hover:text-gray-900 flex items-center justify-center"
+                onClick={() => setShowAddMeasurementModal(false)}
+                className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-900"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateTemplate} className="space-y-4 pt-4">
+            <form onSubmit={handleCreateMeasurement} className="space-y-4 pt-4">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Template Name *
+                <label className="block text-xs font-bold text-gray-900 mb-1">
+                  Measurement Label
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Kaftan & Trouser Set"
-                  value={newTemplateName}
-                  onChange={(e) => setNewTemplateName(e.target.value)}
-                  className="w-full h-11 px-4 rounded-xl bg-[#f7f8fa] border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-[#1d4ed8] focus:bg-white"
+                  placeholder="e.g. Bicep Circumference"
+                  value={newMeasurementName}
+                  onChange={(e) => setNewMeasurementName(e.target.value)}
+                  className="w-full h-10 px-3.5 rounded-xl bg-[#f4f5f7] text-xs text-gray-900 focus:outline-none focus:bg-white"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Description
+                <label className="block text-xs font-bold text-gray-900 mb-1">
+                  Body Region
                 </label>
-                <input
-                  type="text"
-                  placeholder="Traditional Nigerian embroidered attire"
-                  value={newTemplateDesc}
-                  onChange={(e) => setNewTemplateDesc(e.target.value)}
-                  className="w-full h-11 px-4 rounded-xl bg-[#f7f8fa] border border-gray-200 text-xs text-gray-900 focus:outline-none focus:border-[#1d4ed8]"
-                />
+                <select
+                  value={newMeasurementCategory}
+                  onChange={(e) => setNewMeasurementCategory(e.target.value)}
+                  className="w-full h-10 px-3.5 rounded-xl bg-[#f4f5f7] text-xs text-gray-900 focus:outline-none focus:bg-white"
+                >
+                  <option value="Upper Body">Upper Body</option>
+                  <option value="Lower Body">Lower Body</option>
+                  <option value="Head/Neck">Head/Neck</option>
+                  <option value="Arms">Arms</option>
+                </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-2">
-                  Select Required Measurements for this Blueprint
-                </label>
-                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 bg-[#f7f8fa] rounded-2xl border border-gray-100">
-                  {allHotspots.map((h) => {
-                    const isSelected = selectedFieldKeys.includes(h.key);
-                    return (
-                      <button
-                        key={h.key}
-                        type="button"
-                        onClick={() => toggleFieldSelection(h.key)}
-                        className={`p-2 rounded-xl text-left text-xs font-medium flex items-center justify-between border transition-all ${
-                          isSelected
-                            ? 'bg-white border-[#1d4ed8] text-[#1d4ed8] shadow-2xs font-semibold'
-                            : 'bg-transparent border-transparent text-gray-600 hover:bg-white/60'
-                        }`}
-                      >
-                        <span className="truncate">{h.label}</span>
-                        {isSelected && <Check className="w-3.5 h-3.5 text-[#1d4ed8]" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+              <div className="pt-2 flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowAddTemplateModal(false)}
-                  className="px-4 py-2 rounded-full border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                  onClick={() => setShowAddMeasurementModal(false)}
+                  className="px-4 py-2 rounded-full text-xs text-gray-600 hover:bg-gray-100"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold hover:bg-[#1e40af] shadow-xs"
+                  className="px-5 py-2 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold"
                 >
-                  Save Blueprint
+                  Save
                 </button>
               </div>
             </form>

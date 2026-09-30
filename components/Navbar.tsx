@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useStore } from '@/lib/store';
-import { Bell, Plus } from 'lucide-react';
+import { Bell, Home, Users, Settings as SettingsIcon } from 'lucide-react';
 
 // Precision Origami Folded "T" Icon matching mockup
 export function OrigamiTailorFitLogo({ className = 'w-8 h-8' }: { className?: string }) {
@@ -47,16 +47,8 @@ export function OrigamiTailorFitLogo({ className = 'w-8 h-8' }: { className?: st
   );
 }
 
-export function Navbar({ 
-  onNewClientClick, 
-  onNewOrderClick 
-}: { 
-  onNewClientClick: () => void; 
-  onNewOrderClick: () => void 
-}) {
-  const { activeScreen, setActiveScreen, getOrdersDueToday, getOrdersOverdue } = useStore();
-
-  const urgentCount = getOrdersDueToday().length + getOrdersOverdue().length;
+export function Navbar() {
+  const { activeScreen, setActiveScreen } = useStore();
 
   const isOverview = activeScreen === 'overview' || activeScreen === 'dashboard' || activeScreen === 'new-measurement' || activeScreen === 'edit-measurement';
   const isClients = activeScreen === 'clients' || activeScreen === 'client-profile';
@@ -66,15 +58,15 @@ export function Navbar({
     <>
       {/* Desktop Floating Navbar */}
       <div className="w-full px-4 sm:px-6 pt-4 pb-2">
-        <header className="max-w-[1400px] mx-auto bg-white rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-gray-100/90 px-5 py-3 flex items-center justify-between">
+        <header className="max-w-[1440px] mx-auto bg-white rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/90 px-6 py-3 flex items-center justify-between">
           {/* Brand Logo */}
           <div 
             onClick={() => setActiveScreen('overview')}
             className="flex items-center gap-3 cursor-pointer select-none group"
             id="brand-logo-button"
           >
-            <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center p-1 border border-gray-100 transition-transform group-hover:scale-105">
-              <OrigamiTailorFitLogo className="w-7 h-7" />
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105">
+              <OrigamiTailorFitLogo className="w-8 h-8" />
             </div>
             <span className="text-xl font-bold tracking-tight text-gray-950 font-sans">
               TailorFit
@@ -83,81 +75,59 @@ export function Navbar({
 
           {/* Central Black Pill Capsule Navigation */}
           <nav 
-            className="hidden md:flex items-center bg-[#0a0a0a] rounded-full p-1 shadow-inner gap-1"
+            className="hidden md:flex items-center bg-[#0a0a0a] rounded-full p-1 shadow-md gap-1"
             aria-label="Main Navigation"
           >
             <button
               type="button"
               id="nav-pill-overview"
               onClick={() => setActiveScreen('overview')}
-              className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer ${
+              className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer ${
                 isOverview
-                  ? 'bg-white text-gray-950 font-semibold shadow-xs'
+                  ? 'bg-white text-gray-950 font-bold shadow-xs'
                   : 'text-gray-300 hover:text-white'
               }`}
             >
-              Overview
+              <Home className="w-4 h-4" />
+              <span>Overview</span>
             </button>
             <button
               type="button"
               id="nav-pill-clients"
               onClick={() => setActiveScreen('clients')}
-              className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer ${
+              className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer ${
                 isClients
-                  ? 'bg-white text-gray-950 font-semibold shadow-xs'
+                  ? 'bg-white text-gray-950 font-bold shadow-xs'
                   : 'text-gray-300 hover:text-white'
               }`}
             >
-              Clients
+              <Users className="w-4 h-4" />
+              <span>Clients</span>
             </button>
             <button
               type="button"
               id="nav-pill-settings"
               onClick={() => setActiveScreen('settings')}
-              className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer ${
+              className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer ${
                 isSettings
-                  ? 'bg-white text-gray-950 font-semibold shadow-xs'
+                  ? 'bg-white text-gray-950 font-bold shadow-xs'
                   : 'text-gray-300 hover:text-white'
               }`}
             >
-              Settings
+              <SettingsIcon className="w-4 h-4" />
+              <span>Settings</span>
             </button>
           </nav>
 
-          {/* Right Actions: Quick Actions + Notification Bell */}
-          <div className="flex items-center gap-2.5">
-            <button
-              id="header-btn-new-order"
-              type="button"
-              onClick={onNewOrderClick}
-              className="hidden lg:inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold hover:bg-[#1e40af] transition-colors shadow-xs"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>New Order</span>
-            </button>
-
-            <button
-              id="header-btn-new-client"
-              type="button"
-              onClick={onNewClientClick}
-              className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-gray-200 bg-white text-gray-800 text-xs font-semibold hover:bg-gray-50 transition-colors shadow-xs"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>New Client</span>
-            </button>
-
-            {/* Notification Bell with Badge */}
+          {/* Right Action: Single Circular Notification Bell Button matching mockup */}
+          <div className="flex items-center">
             <button
               type="button"
               id="header-bell-button"
-              onClick={() => setActiveScreen('overview')}
-              className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-700 hover:bg-gray-50 transition-colors relative shadow-xs"
+              className="w-10 h-10 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-900 hover:bg-gray-50 transition-colors shadow-xs cursor-pointer"
               aria-label="Studio Alerts"
             >
-              <Bell className="w-4 h-4 text-gray-600" />
-              {urgentCount > 0 && (
-                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white" />
-              )}
+              <Bell className="w-4 h-4 fill-gray-950 text-gray-950" />
             </button>
           </div>
         </header>
@@ -169,29 +139,32 @@ export function Navbar({
           <button
             type="button"
             onClick={() => setActiveScreen('overview')}
-            className={`flex-1 py-2 rounded-full text-xs font-medium text-center transition-all ${
+            className={`flex-1 py-2 rounded-full text-xs font-medium text-center transition-all flex items-center justify-center gap-1.5 ${
               isOverview ? 'bg-white text-black font-semibold shadow-xs' : 'text-gray-300'
             }`}
           >
-            Overview
+            <Home className="w-3.5 h-3.5" />
+            <span>Overview</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveScreen('clients')}
-            className={`flex-1 py-2 rounded-full text-xs font-medium text-center transition-all ${
+            className={`flex-1 py-2 rounded-full text-xs font-medium text-center transition-all flex items-center justify-center gap-1.5 ${
               isClients ? 'bg-white text-black font-semibold shadow-xs' : 'text-gray-300'
             }`}
           >
-            Clients
+            <Users className="w-3.5 h-3.5" />
+            <span>Clients</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveScreen('settings')}
-            className={`flex-1 py-2 rounded-full text-xs font-medium text-center transition-all ${
+            className={`flex-1 py-2 rounded-full text-xs font-medium text-center transition-all flex items-center justify-center gap-1.5 ${
               isSettings ? 'bg-white text-black font-semibold shadow-xs' : 'text-gray-300'
             }`}
           >
-            Settings
+            <SettingsIcon className="w-3.5 h-3.5" />
+            <span>Settings</span>
           </button>
         </nav>
       </div>

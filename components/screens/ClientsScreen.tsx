@@ -2,18 +2,16 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@/lib/store';
+import { AtelierMannequin } from '@/components/AtelierMannequin';
 import { 
   Search, 
-  Plus, 
+  ChevronRight, 
   Phone, 
   Mail, 
-  Calendar, 
-  Scissors, 
-  ArrowRight, 
-  X,
-  UserPlus,
-  Sparkles,
-  Check
+  User, 
+  List,
+  Check,
+  X
 } from 'lucide-react';
 
 interface ClientsScreenProps {
@@ -27,295 +25,388 @@ export function ClientsScreen({
   onNewMeasurement, 
   onNewOrder 
 }: ClientsScreenProps) {
-  const { clients, orders, snapshots, addClient, settings, setActiveScreen, setSelectedClientId } = useStore();
+  const { clients } = useStore();
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [showNewClientModal, setShowNewClientModal] = useState(false);
-  const currency = settings.currency || '₦';
+  const [mannequinView, setMannequinView] = useState<'mannequin' | 'table'>('mannequin');
+  const [showAddPointModal, setShowAddPointModal] = useState(false);
+  const [newPointLabel, setNewPointLabel] = useState('');
 
-  // New Client form state
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('+234 - ');
-  const [email, setEmail] = useState('');
-  const [notes, setNotes] = useState('');
-
-  // Filter clients by query
-  const filteredClients = clients.filter((client) => {
-    const q = searchQuery.toLowerCase();
-    return (
-      client.name.toLowerCase().includes(q) ||
-      client.phone.toLowerCase().includes(q) ||
-      client.email.toLowerCase().includes(q) ||
-      (client.notes && client.notes.toLowerCase().includes(q))
-    );
+  const [selectedClientProfile, setSelectedClientProfile] = useState({
+    id: 'c-1',
+    initials: 'CD',
+    name: 'Chloe Dallas',
+    since: 'Client since Jun 2025',
+    phone: '+234 8141 432 211',
+    email: 'chloedallas@email.com',
   });
 
-  const handleCreateClient = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
+  const recentClients = [
+    {
+      id: 'c-6',
+      initials: 'CD',
+      name: 'Amanda Billings',
+      phone: '+23740930299',
+      email: 'a.billings@couture.com',
+      since: 'Client since Aug 2025',
+    },
+    {
+      id: 'c-2',
+      initials: 'TR',
+      name: 'Taylor Razaq',
+      phone: '+44740930509',
+      email: 'taylor.razaq@londoncouture.co.uk',
+      since: 'Client since May 2025',
+    },
+    {
+      id: 'c-1',
+      initials: 'CD',
+      name: 'Chloe Dallas',
+      phone: '+234 8141 432 211',
+      email: 'chloedallas@email.com',
+      since: 'Client since Jun 2025',
+    },
+  ];
 
-    const newClient = addClient({
-      name: name.trim(),
-      phone: phone.trim() || '+234 000 000 0000',
-      email: email.trim() || `${name.toLowerCase().replace(/\s+/g, '.')}@client.ng`,
-      notes: notes.trim(),
-    });
+  // Exact measurements from design
+  const [measurements, setMeasurements] = useState<Record<string, number | string>>({
+    shoulder: 42,
+    neck: 36,
+    bust: 92,
+    waist: 72,
+    sleeve: 60,
+    thigh: 54,
+  });
 
-    setName('');
-    setPhone('+234 - ');
-    setEmail('');
-    setNotes('');
-    setShowNewClientModal(false);
-    onOpenClient(newClient.id);
+  const handleMeasurementChange = (key: string, value: number) => {
+    setMeasurements((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
   };
 
-  const getClientInitials = (clientName: string) => {
-    return clientName
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
-  };
+  // Curated reference photos for the 3 Order History cards matching Clients.png
+  const orderHistoryCards = [
+    {
+      id: 'ord-hist-1',
+      title: 'Gown/ Dress',
+      badge: 'Urgent',
+      badgeClass: 'bg-orange-500 text-white',
+      date: 'Size taken on 09-10-2025',
+      price: '₦130,000',
+      images: [
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+        'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=300&q=80',
+        'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=300&q=80',
+      ],
+    },
+    {
+      id: 'ord-hist-2',
+      title: 'Oxford Three Piece Suit',
+      badge: 'Completed',
+      badgeClass: 'bg-emerald-600 text-white',
+      date: 'Size taken on 09-10-2025',
+      price: '₦230,000',
+      images: [
+        'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=300&q=80',
+        'https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?auto=format&fit=crop&w=300&q=80',
+        'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?auto=format&fit=crop&w=300&q=80',
+      ],
+    },
+    {
+      id: 'ord-hist-3',
+      title: 'Gown/ Dress',
+      badge: 'Pending',
+      badgeClass: 'bg-lime-500 text-white',
+      date: 'Size taken on 09-10-2025',
+      price: '₦130,000',
+      images: [
+        'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=300&q=80',
+        'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=300&q=80',
+        'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=300&q=80',
+      ],
+    },
+  ];
 
   return (
-    <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-4 space-y-6">
-      {/* Top Banner & Search Bar */}
-      <div className="bg-white rounded-3xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/90 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-950 tracking-tight font-sans">
+    <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-4">
+      {/* 2-Column Cockpit strictly matching Clients.png */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        {/* =========================================================================
+            LEFT COLUMN: "Client Directory" Card (3.5 Columns on Desktop)
+            ========================================================================= */}
+        <div className="lg:col-span-3 bg-white rounded-3xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/90 space-y-4">
+          <h2 className="text-sm font-bold text-gray-950 font-sans tracking-tight">
             Client Directory
-          </h1>
-          <p className="text-xs text-gray-400 mt-1">
-            {clients.length} active atelier clientele & bespoke measurement dossiers
-          </p>
-        </div>
+          </h2>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
           {/* Search Bar */}
-          <div className="relative flex-1 md:w-80">
-            <Search className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <div className="relative">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search clients by name, phone..."
-              className="w-full h-11 pl-11 pr-8 rounded-full bg-[#f7f8fa] border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-[#1d4ed8] focus:bg-white transition-all placeholder:text-gray-400"
+              placeholder="Search clients by name, phone number, email..."
+              className="w-full h-10 pl-9 pr-3.5 rounded-xl bg-[#f4f5f7] text-[11px] text-gray-900 placeholder:text-gray-400 focus:outline-none"
             />
-            {searchQuery && (
+          </div>
+
+          {/* Subheading: Recently Viewed Clients */}
+          <div className="space-y-2 pt-1">
+            <h3 className="text-xs font-bold text-gray-900">Recently Viewed Clients</h3>
+
+            <div className="space-y-2">
+              {recentClients
+                .filter((c) =>
+                  searchQuery
+                    ? c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      c.phone.includes(searchQuery) ||
+                      c.email.toLowerCase().includes(searchQuery.toLowerCase())
+                    : true
+                )
+                .map((client) => {
+                  const isSelected = selectedClientProfile.id === client.id;
+                  return (
+                    <div
+                      key={client.id}
+                      onClick={() => setSelectedClientProfile(client)}
+                      className={`p-3 rounded-2xl transition-all flex items-center justify-between cursor-pointer border ${
+                        isSelected
+                          ? 'bg-blue-50/60 border-blue-200 shadow-xs'
+                          : 'bg-[#f4f5f7] border-transparent hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center border ${
+                          isSelected ? 'bg-[#1d4ed8] text-white border-[#1d4ed8]' : 'bg-white text-gray-800 border-gray-200'
+                        }`}>
+                          {client.initials}
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-gray-950">{client.name}</h4>
+                          <p className="text-[10px] text-gray-500">{client.phone}</p>
+                        </div>
+                      </div>
+                      <ChevronRight className={`w-4 h-4 ${isSelected ? 'text-[#1d4ed8]' : 'text-gray-400'}`} />
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        </div>
+
+        {/* =========================================================================
+            RIGHT COLUMN: Client Profile Dossier (8.5 Columns on Desktop)
+            ========================================================================= */}
+        <div className="lg:col-span-9 bg-white rounded-3xl p-6 sm:p-8 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/90 space-y-8">
+          {/* Top Bar: Subtitle & Title & "New Order" Action */}
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                CLIENT PROFILE
+              </span>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-950 font-sans tracking-tight">
+                {selectedClientProfile.name}
+              </h1>
+            </div>
+
+            <button
+              type="button"
+              id="btn-client-new-order"
+              onClick={() => onNewOrder(selectedClientProfile.id)}
+              className="px-5 py-2 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            >
+              New Order
+            </button>
+          </div>
+
+          {/* Centered Client Profile Hero */}
+          <div className="flex flex-col items-center justify-center text-center space-y-2 py-1">
+            <div className="w-16 h-16 rounded-full bg-black text-white font-bold text-lg flex items-center justify-center shadow-sm">
+              {selectedClientProfile.initials}
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-gray-950">{selectedClientProfile.name}</h2>
+              <p className="text-[11px] text-gray-400">{selectedClientProfile.since}</p>
+            </div>
+            <div className="flex items-center gap-4 text-[11px] text-gray-600 font-medium">
+              <span className="flex items-center gap-1">
+                <Phone className="w-3.5 h-3.5 text-gray-700" />
+                {selectedClientProfile.phone}
+              </span>
+              <span className="flex items-center gap-1">
+                <Mail className="w-3.5 h-3.5 text-gray-700" />
+                {selectedClientProfile.email}
+              </span>
+            </div>
+          </div>
+
+          {/* Section: Body Measurement History */}
+          <div className="space-y-4 pt-2">
+            <h3 className="text-sm font-bold text-gray-950">Body Measurement History</h3>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-xs font-bold text-gray-900">Mannequin</h4>
+                <p className="text-[10px] text-gray-400">All available points • Feminine Form</p>
+              </div>
+
+              {/* Add Point Button & Toggle */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddPointModal(true)}
+                  className="px-4 py-1.5 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold hover:bg-[#1e40af] transition-colors cursor-pointer"
+                >
+                  Add Point
+                </button>
+
+                <div className="flex items-center bg-[#f4f5f7] p-1 rounded-full border border-gray-200/50">
+                  <button
+                    type="button"
+                    onClick={() => setMannequinView('mannequin')}
+                    className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                      mannequinView === 'mannequin'
+                        ? 'bg-[#1d4ed8] text-white shadow-xs'
+                        : 'text-gray-500'
+                    }`}
+                  >
+                    <User className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMannequinView('table')}
+                    className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                      mannequinView === 'table'
+                        ? 'bg-[#1d4ed8] text-white shadow-xs'
+                        : 'text-gray-500'
+                    }`}
+                  >
+                    <List className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Color-blocked Mannequin Graphic */}
+            <div className="w-full flex items-center justify-center py-2">
+              <AtelierMannequin
+                gender="F"
+                unit="cm"
+                measurements={measurements}
+                onMeasurementChange={handleMeasurementChange}
+              />
+            </div>
+          </div>
+
+          {/* Section: Order History */}
+          <div className="space-y-4 pt-4 border-t border-gray-100">
+            <h3 className="text-sm font-bold text-gray-950">Order History</h3>
+
+            {/* 3 Horizontal Cards in a row matching Clients.png */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {orderHistoryCards.map((card) => (
+                <div
+                  key={card.id}
+                  className="rounded-2xl border border-gray-200 overflow-hidden flex flex-col justify-between bg-white shadow-xs"
+                >
+                  {/* Card Header */}
+                  <div className="p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-gray-950">{card.title}</h4>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${card.badgeClass}`}>
+                        {card.badge}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-gray-400">{card.date}</p>
+
+                    {/* Style references photos */}
+                    <div className="pt-2">
+                      <span className="text-[10px] text-gray-500 block mb-1.5">Style references</span>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {card.images.map((img, idx) => (
+                          <div key={idx} className="aspect-square rounded-lg overflow-hidden bg-gray-100 border border-gray-100">
+                            <img
+                              src={img}
+                              alt="Style reference"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dark Price Footer matching Clients.png */}
+                  <div className="bg-[#111827] text-white px-4 py-2.5 flex items-center justify-between text-xs">
+                    <span className="text-gray-400 text-[11px]">Price</span>
+                    <span className="font-bold font-mono">{card.price}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Add Landmark Point Modal */}
+      {showAddPointModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-gray-100 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <h3 className="text-sm font-bold text-gray-950">Add Measurement Point</h3>
               <button
                 type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                onClick={() => setShowAddPointModal(false)}
+                className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-900"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
-            )}
-          </div>
+            </div>
 
-          {/* New Client Button */}
-          <button
-            type="button"
-            id="btn-add-client-page"
-            onClick={() => setShowNewClientModal(true)}
-            className="px-5 py-2.5 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-semibold shadow-xs transition-colors shrink-0 flex items-center gap-1.5"
-          >
-            <Plus className="w-4 h-4" />
-            <span>New Client</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Clients Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filteredClients.map((client) => {
-          const clientOrders = orders.filter((o) => o.clientId === client.id);
-          const clientSnapshots = snapshots.filter((s) => s.clientId === client.id);
-          const activeOrders = clientOrders.filter((o) => o.status !== 'Completed' && o.status !== 'Picked Up');
-          const initials = getClientInitials(client.name);
-
-          return (
-            <div
-              key={client.id}
-              className="bg-white rounded-3xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/90 hover:shadow-md transition-all flex flex-col justify-between group"
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (newPointLabel.trim()) {
+                  const key = newPointLabel.toLowerCase().replace(/\s+/g, '_');
+                  setMeasurements((prev) => ({
+                    ...prev,
+                    [key]: 50,
+                  }));
+                  setNewPointLabel('');
+                  setShowAddPointModal(false);
+                }
+              }}
+              className="space-y-4"
             >
               <div>
-                {/* Header: Avatar + Client Name */}
-                <div className="flex items-center gap-3.5 pb-3 border-b border-gray-100">
-                  <div className="w-12 h-12 rounded-full bg-[#e5e7eb] text-gray-800 font-bold text-sm flex items-center justify-center shrink-0 border border-gray-200/60 group-hover:bg-[#1d4ed8] group-hover:text-white transition-colors">
-                    {initials}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-base font-bold text-gray-900 truncate">
-                      {client.name}
-                    </h3>
-                    <p className="text-xs text-gray-400 truncate">
-                      {client.phone}
-                    </p>
-                  </div>
-                  {activeOrders.length > 0 ? (
-                    <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-[11px] font-semibold border border-amber-200/60 shrink-0">
-                      ● {activeOrders.length} In Progress
-                    </span>
-                  ) : (
-                    <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 text-[11px] font-medium shrink-0">
-                      No active orders
-                    </span>
-                  )}
-                </div>
-
-                {/* Body Details */}
-                <div className="py-3.5 space-y-2 text-xs text-gray-600">
-                  <div className="flex items-center gap-2 text-gray-500">
-                    <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                    <span className="truncate">{client.email}</span>
-                  </div>
-
-                  {client.notes && (
-                    <p className="text-[11px] text-gray-500 bg-[#f7f8fa] p-2.5 rounded-xl border border-gray-100 line-clamp-2 italic">
-                      &ldquo;{client.notes}&rdquo;
-                    </p>
-                  )}
-
-                  {/* Summary Metric Chips */}
-                  <div className="flex items-center gap-2 pt-1">
-                    <span className="px-2.5 py-1 rounded-lg bg-gray-50 text-gray-700 text-[11px] font-medium border border-gray-100">
-                      {clientSnapshots.length} Body Snapshot{clientSnapshots.length === 1 ? '' : 's'}
-                    </span>
-                    <span className="px-2.5 py-1 rounded-lg bg-gray-50 text-gray-700 text-[11px] font-medium border border-gray-100">
-                      {clientOrders.length} Commission{clientOrders.length === 1 ? '' : 's'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => onOpenClient(client.id)}
-                  className="flex-1 py-2 px-3 rounded-full border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors text-center"
-                >
-                  View Dossier
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedClientId(client.id);
-                    setActiveScreen('overview');
-                  }}
-                  className="py-2 px-4 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold hover:bg-[#1e40af] transition-colors flex items-center gap-1.5 shadow-xs"
-                  title="Load to 3D Mannequin Workstation"
-                >
-                  <Scissors className="w-3.5 h-3.5" />
-                  <span>Measure</span>
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {filteredClients.length === 0 && (
-        <div className="bg-white rounded-3xl p-12 text-center border border-gray-100/90 shadow-xs">
-          <p className="text-gray-500 text-sm">No clients matched &quot;{searchQuery}&quot;</p>
-          <button
-            type="button"
-            onClick={() => setSearchQuery('')}
-            className="mt-3 text-xs font-semibold text-[#1d4ed8] hover:underline"
-          >
-            Clear search filters
-          </button>
-        </div>
-      )}
-
-      {/* New Client Modal */}
-      {showNewClientModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between pb-4 border-b border-gray-100">
-              <div>
-                <h3 className="text-lg font-bold text-gray-950 font-sans">
-                  New Client Profile
-                </h3>
-                <p className="text-xs text-gray-400">Add client to atelier records</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowNewClientModal(false)}
-                className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 hover:text-gray-900 flex items-center justify-center"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateClient} className="space-y-4 pt-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Full Name *
+                <label className="block text-xs font-bold text-gray-900 mb-1">
+                  Landmark Point Label
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Adriana Kunle"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full h-11 px-4 rounded-xl bg-[#f7f8fa] border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-[#1d4ed8] focus:bg-white"
+                  placeholder="e.g. Bicep, Wrist, Calf"
+                  value={newPointLabel}
+                  onChange={(e) => setNewPointLabel(e.target.value)}
+                  className="w-full h-10 px-3.5 rounded-xl bg-[#f4f5f7] text-xs text-gray-900 focus:outline-none focus:bg-white"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  placeholder="+234 - "
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full h-11 px-4 rounded-xl bg-[#f7f8fa] border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-[#1d4ed8] focus:bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full h-11 px-4 rounded-xl bg-[#f7f8fa] border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-[#1d4ed8] focus:bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Bespoke Notes / Style Preferences
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="e.g. Silk lining preference, monogram cuff..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-[#f7f8fa] border border-gray-200 text-xs text-gray-900 focus:outline-none focus:border-[#1d4ed8] focus:bg-white resize-none"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+              <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowNewClientModal(false)}
-                  className="px-4 py-2 rounded-full border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                  onClick={() => setShowAddPointModal(false)}
+                  className="px-4 py-2 rounded-full text-xs text-gray-600 hover:bg-gray-100"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold hover:bg-[#1e40af] shadow-xs"
+                  className="px-5 py-2 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold"
                 >
-                  Save Profile
+                  Add Point
                 </button>
               </div>
             </form>

@@ -82,11 +82,8 @@ function TailorFitApp() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f0f2f5] text-gray-950">
-      {/* Navigation Header with urgent order badge & black capsule pill */}
-      <Navbar
-        onNewClientClick={() => setIsNewClientModalOpen(true)}
-        onNewOrderClick={() => handleOpenNewOrder()}
-      />
+      {/* Navigation Header */}
+      <Navbar />
 
       {/* Main Content Area */}
       <main className="flex-1 w-full pb-16">
