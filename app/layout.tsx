@@ -38,7 +38,7 @@ export const metadata: Metadata = {
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="en" className={`${inter.variable} ${geistMono.variable} ${playfair.variable}`}>
-      <body className="font-sans antialiased bg-[#f0f2f5] text-[#111827] min-h-screen selection:bg-[#1d4ed8]/10 selection:text-[#1d4ed8]" suppressHydrationWarning>
+      <body className="font-sans antialiased bg-[#eaedf0] text-[#111827] min-h-screen selection:bg-[#1d4ed8]/10 selection:text-[#1d4ed8]" suppressHydrationWarning>
         {children}
       </body>
     </html>

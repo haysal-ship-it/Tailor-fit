@@ -9,12 +9,84 @@ import {
   Check, 
   ChevronRight, 
   Save, 
-  Plus, 
   X,
   User,
-  List,
-  CheckCircle2
+  List
 } from 'lucide-react';
+
+export interface GarmentTemplate {
+  id: string;
+  title: string;
+  description: string;
+  presets: Record<string, number>;
+  tableItems: Array<{ id: string; label: string; value: string }>;
+}
+
+export const GARMENT_TEMPLATES: GarmentTemplate[] = [
+  {
+    id: 'shirt_blouse',
+    title: 'Shirt/Blouse',
+    description: 'Essential measurements for bespoke dress shirts/blouses',
+    presets: { neck: 38, shoulder: 44, bust: 96, waist: 76, sleeve: 62, thigh: 52 },
+    tableItems: [
+      { id: 'neck', label: 'Neck', value: '38.0' },
+      { id: 'shoulder_width', label: 'Shoulder width', value: '44.0' },
+      { id: 'bust_chest', label: 'Bust/Chest', value: '96.0' },
+      { id: 'sleeve', label: 'Sleeve', value: '62.0' },
+      { id: 'waist', label: 'Waist', value: '76.0' },
+      { id: 'wrist', label: 'Wrist', value: '18.0' },
+      { id: 'back', label: 'Back', value: '40.0' },
+      { id: 'neck_to_waist', label: 'Neck to Waist', value: '42.0' },
+    ],
+  },
+  {
+    id: 'trousers_shorts',
+    title: 'Trousers/shorts',
+    description: 'Fittings for tailored pants, trousers, pleated pants and shorts.',
+    presets: { waist: 82, thigh: 58, neck: 36, shoulder: 42, bust: 90, sleeve: 60 },
+    tableItems: [
+      { id: 'waist', label: 'Waist', value: '82.0' },
+      { id: 'hip', label: 'Hip', value: '100.0' },
+      { id: 'thigh', label: 'Thigh', value: '58.0' },
+      { id: 'ankle', label: 'Ankle', value: '26.0' },
+      { id: 'neck_to_ankle', label: 'Waist to Ankle', value: '102.0' },
+      { id: 'knee', label: 'Knee', value: '42.0' },
+    ],
+  },
+  {
+    id: 'gown_dress',
+    title: 'Gown/Dress',
+    description: 'Evening wears, party gowns, wedding dress etc',
+    presets: { bust: 92, waist: 70, thigh: 54, neck: 36, shoulder: 40, sleeve: 58 },
+    tableItems: [
+      { id: 'bust_chest', label: 'Bust/Chest', value: '92.0' },
+      { id: 'waist', label: 'Waist', value: '70.0' },
+      { id: 'hip', label: 'Hip', value: '98.0' },
+      { id: 'neck_to_waist', label: 'Neck to Waist', value: '38.0' },
+      { id: 'neck_to_ankle', label: 'Neck to Ankle', value: '140.0' },
+      { id: 'shoulder_width', label: 'Shoulder width', value: '40.0' },
+      { id: 'sleeve', label: 'Sleeve', value: '58.0' },
+      { id: 'neck', label: 'Neck', value: '36.0' },
+    ],
+  },
+  {
+    id: 'suits_blazers',
+    title: 'Suits/Blazers',
+    description: 'Full bespoke fitting of two piece suits or blazers and trousers',
+    presets: { shoulder: 46, bust: 102, waist: 84, sleeve: 64, neck: 40, thigh: 56 },
+    tableItems: [
+      { id: 'shoulder_width', label: 'Shoulder width', value: '46.0' },
+      { id: 'bust_chest', label: 'Bust/Chest', value: '102.0' },
+      { id: 'waist', label: 'Waist', value: '84.0' },
+      { id: 'sleeve', label: 'Sleeve', value: '64.0' },
+      { id: 'neck', label: 'Neck', value: '40.0' },
+      { id: 'hip', label: 'Hip', value: '102.0' },
+      { id: 'thigh', label: 'Thigh', value: '56.0' },
+      { id: 'neck_to_waist', label: 'Neck to Waist', value: '44.0' },
+      { id: 'ankle', label: 'Ankle', value: '25.0' },
+    ],
+  },
+];
 
 export function OverviewScreen({
   onOpenClient,
@@ -23,13 +95,13 @@ export function OverviewScreen({
   onOpenClient: (clientId: string) => void;
   onOpenOrder: (orderId: string) => void;
 }) {
-  const { clients, orders, addClient, addOrder, addSnapshot, setSelectedClientId } = useStore();
+  const { addClient, addOrder, addSnapshot } = useStore();
 
   // Center card view toggle: 'mannequin' | 'table'
   const [centerView, setCenterView] = useState<'mannequin' | 'table'>('mannequin');
 
-  // Form states matching exact mockup
-  const [selectedTemplate, setSelectedTemplate] = useState('Bespoke African Gown');
+  // Form states - template starts as empty string so button displays "Choose Template"
+  const [selectedTemplate, setSelectedTemplate] = useState('');
   const [gender, setGender] = useState<'M' | 'F'>('M');
   const [clientName, setClientName] = useState('');
   const [garmentType, setGarmentType] = useState('');
@@ -39,11 +111,19 @@ export function OverviewScreen({
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
-  const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
+  
+  // Modals & Bottom Sheets
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [pendingTemplate, setPendingTemplate] = useState('Shirt/Blouse');
+  const [pointModalData, setPointModalData] = useState<{
+    key: string;
+    name: string;
+    value: string;
+    isCustom?: boolean;
+  } | null>(null);
+
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [showAddPointModal, setShowAddPointModal] = useState(false);
-  const [newPointLabel, setNewPointLabel] = useState('');
 
   // Measurement points for the 3x4 list view
   const [measurementList, setMeasurementList] = useState<Array<{ id: string; label: string; value: string }>>([
@@ -112,7 +192,7 @@ export function OverviewScreen({
       clientId: createdClient.id,
       date: new Date().toISOString().slice(0, 10),
       unit: 'cm',
-      garmentType: garmentType.trim() || selectedTemplate,
+      garmentType: garmentType.trim() || selectedTemplate || 'Bespoke African Gown',
       measurements: measurements,
       notes: notes.trim(),
     });
@@ -121,7 +201,7 @@ export function OverviewScreen({
 
     addOrder({
       clientId: createdClient.id,
-      garmentType: garmentType.trim() || selectedTemplate,
+      garmentType: garmentType.trim() || selectedTemplate || 'Bespoke African Gown',
       measurementSnapshotId: snap.id,
       referenceImages: referenceImage ? [{ id: `img-${Date.now()}`, url: referenceImage }] : [],
       price: numericPrice,
@@ -134,13 +214,54 @@ export function OverviewScreen({
     setTimeout(() => setSaveSuccess(false), 3000);
   };
 
-  const templatesList = [
-    'Bespoke African Gown',
-    'Oxford Three Piece Suit',
-    'Traditional Agbada',
-    'Shirt / Blouse',
-    'Tailored Trousers',
-  ];
+  const handleConfirmTemplate = (templateTitle: string) => {
+    const chosen = GARMENT_TEMPLATES.find((t) => t.title === templateTitle);
+    if (chosen) {
+      setSelectedTemplate(chosen.title);
+      setGarmentType(chosen.title);
+      setMeasurements((prev) => ({ ...prev, ...chosen.presets }));
+      if (chosen.tableItems && chosen.tableItems.length > 0) {
+        setMeasurementList(chosen.tableItems);
+      }
+    } else {
+      setSelectedTemplate(templateTitle);
+      setGarmentType(templateTitle);
+    }
+    setIsTemplateModalOpen(false);
+  };
+
+  const handleSavePoint = (key: string, name: string, valStr: string) => {
+    const numVal = parseFloat(valStr);
+    if (!isNaN(numVal) && numVal > 0) {
+      if (key in measurements || ['neck', 'waist', 'shoulder', 'bust', 'sleeve', 'thigh'].includes(key)) {
+        setMeasurements((prev) => ({
+          ...prev,
+          [key]: numVal,
+        }));
+      }
+
+      const existingIdx = measurementList.findIndex(
+        (item) => item.label.toLowerCase() === name.toLowerCase() || item.id === key
+      );
+      if (existingIdx >= 0) {
+        setMeasurementList((prev) =>
+          prev.map((item, idx) =>
+            idx === existingIdx ? { ...item, value: numVal.toFixed(1) } : item
+          )
+        );
+      } else {
+        setMeasurementList((prev) => [
+          ...prev,
+          {
+            id: key || name.toLowerCase().replace(/\s+/g, '_'),
+            label: name,
+            value: numVal.toFixed(1),
+          },
+        ]);
+      }
+    }
+    setPointModalData(null);
+  };
 
   return (
     <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-4 space-y-4">
@@ -150,7 +271,7 @@ export function OverviewScreen({
           <div className="w-6 h-6 rounded-full bg-[#10b981] text-white flex items-center justify-center">
             <Check className="w-3.5 h-3.5 stroke-[3]" />
           </div>
-          <span className="text-sm font-medium">Order & Measurements saved successfully!</span>
+          <span className="text-sm font-medium">Order &amp; Measurements saved successfully!</span>
         </div>
       )}
 
@@ -163,323 +284,329 @@ export function OverviewScreen({
         </div>
       )}
 
-      {/* 3-Column Atelier Cockpit Layout strictly matching Overview.png & table view.png */}
+      {/* Overview Layout: Left Parent White Card (New Client + Mannequin + Save Button) & Right Parent White Card (Calendar) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* =========================================================================
-            LEFT COLUMN: "New Client" Intake Card (4 Columns on Desktop)
+            SHARED PARENT CONTAINER (Fill: #FFFFFF): Houses New Client + Mannequin + Save Container
             ========================================================================= */}
-        <div className="lg:col-span-4 bg-white rounded-3xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/90 space-y-5">
-          {/* Card Title */}
-          <h2 className="text-lg font-bold text-gray-950 font-sans tracking-tight">
-            New Client
-          </h2>
-
-          {/* Top Pill Controls: Choose Template & Gender Segmented Toggle */}
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <button
-                type="button"
-                id="intake-choose-template-btn"
-                onClick={() => setIsTemplateDropdownOpen(!isTemplateDropdownOpen)}
-                className="w-full h-11 px-4 rounded-full bg-[#f4f5f7] text-xs font-semibold text-gray-700 flex items-center justify-between border border-transparent hover:border-gray-200 transition-colors"
-              >
-                <span className="truncate">{selectedTemplate || 'Choose Template'}</span>
-                <ChevronDown className="w-4 h-4 text-gray-500 shrink-0" />
-              </button>
-
-              {isTemplateDropdownOpen && (
-                <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 z-30">
-                  {templatesList.map((tpl) => (
-                    <button
-                      key={tpl}
-                      type="button"
-                      onClick={() => {
-                        setSelectedTemplate(tpl);
-                        setGarmentType(tpl);
-                        setIsTemplateDropdownOpen(false);
-                      }}
-                      className={`w-full px-3 py-2 rounded-xl text-left text-xs font-semibold flex items-center justify-between ${
-                        selectedTemplate === tpl
-                          ? 'bg-blue-50 text-[#1d4ed8]'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <span>{tpl}</span>
-                      {selectedTemplate === tpl && <Check className="w-3.5 h-3.5 text-[#1d4ed8]" />}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Gender Toggle: [ M | F ] */}
-            <div className="flex items-center bg-[#f4f5f7] p-1 rounded-full border border-gray-200/50">
-              <button
-                type="button"
-                onClick={() => setGender('M')}
-                className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center transition-all ${
-                  gender === 'M'
-                    ? 'bg-[#1d4ed8] text-white shadow-xs'
-                    : 'text-gray-700 hover:text-gray-900'
-                }`}
-              >
-                M
-              </button>
-              <button
-                type="button"
-                onClick={() => setGender('F')}
-                className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center transition-all ${
-                  gender === 'F'
-                    ? 'bg-[#1d4ed8] text-white shadow-xs'
-                    : 'text-gray-700 hover:text-gray-900'
-                }`}
-              >
-                F
-              </button>
-            </div>
-          </div>
-
-          {/* Basic Information */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-bold text-gray-900">Basic Information</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] text-gray-500 mb-1">Client</label>
-                <input
-                  type="text"
-                  placeholder="e.g Adriana Kunle"
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  className="w-full h-10 px-3.5 rounded-xl bg-[#f4f5f7] text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:bg-white focus:ring-1 focus:ring-[#1d4ed8]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] text-gray-500 mb-1">Garment Type</label>
-                <input
-                  type="text"
-                  placeholder="Bespoke African Gown"
-                  value={garmentType}
-                  onChange={(e) => setGarmentType(e.target.value)}
-                  className="w-full h-10 px-3.5 rounded-xl bg-[#f4f5f7] text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:bg-white focus:ring-1 focus:ring-[#1d4ed8]"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] text-gray-500 mb-1">Phone Number</label>
-                <input
-                  type="text"
-                  placeholder="+234 - "
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full h-10 px-3.5 rounded-xl bg-[#f4f5f7] text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:bg-white focus:ring-1 focus:ring-[#1d4ed8]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] text-gray-500 mb-1">Email Address</label>
-                <input
-                  type="email"
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full h-10 px-3.5 rounded-xl bg-[#f4f5f7] text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:bg-white focus:ring-1 focus:ring-[#1d4ed8]"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Style References */}
-          <div className="space-y-1.5">
-            <h3 className="text-xs font-bold text-gray-900">Style References</h3>
-            <label className="border-2 border-dashed border-gray-200/90 hover:border-[#1d4ed8] rounded-2xl p-5 flex flex-col items-center justify-center cursor-pointer transition-colors bg-white">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
-              {referenceImage ? (
-                <div className="flex items-center gap-3">
-                  <img
-                    src={referenceImage}
-                    alt="Upload"
-                    className="w-12 h-12 object-cover rounded-xl border border-gray-200"
-                  />
-                  <div className="text-left">
-                    <p className="text-xs font-bold text-gray-900">Image Loaded</p>
-                    <p className="text-[10px] text-gray-400">Click to change</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center gap-1.5 text-gray-500">
-                  <div className="w-8 h-8 rounded-full bg-[#f4f5f7] flex items-center justify-center text-gray-700">
-                    <Upload className="w-4 h-4" />
-                  </div>
-                  <span className="text-xs font-semibold text-gray-700">
-                    Tap to upload image
-                  </span>
-                </div>
-              )}
-            </label>
-          </div>
-
-          {/* Price /Due date */}
-          <div className="space-y-1.5">
-            <h3 className="text-xs font-bold text-gray-900">Price /Due date</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] text-gray-500 mb-1">Price (₦)</label>
-                <input
-                  type="text"
-                  placeholder="₦0.00"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  className="w-full h-10 px-3.5 rounded-xl bg-[#f4f5f7] text-xs font-medium text-gray-900 placeholder:text-gray-400 focus:outline-none focus:bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] text-gray-500 mb-1">Due Date</label>
-                <input
-                  type="text"
-                  placeholder="09/10/2026"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full h-10 px-3.5 rounded-xl bg-[#f4f5f7] text-xs font-medium text-gray-900 placeholder:text-gray-400 focus:outline-none focus:bg-white"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div className="space-y-1.5">
-            <div>
-              <h3 className="text-xs font-bold text-gray-900">Notes</h3>
-              <p className="text-[10px] text-gray-400">Workroom notes and fabric details</p>
-            </div>
-            <textarea
-              rows={3}
-              placeholder="e.g hand stiched, monogram design on wrist and gold buttons"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full p-3.5 rounded-2xl bg-[#f4f5f7] text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:bg-white resize-none"
-            />
-          </div>
-        </div>
-
-        {/* =========================================================================
-            CENTER COLUMN: "Mannequin" OR "Measurement List View" (5 Columns on Desktop)
-            ========================================================================= */}
-        <div className="lg:col-span-5 bg-white rounded-3xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/90 flex flex-col justify-between min-h-[640px] relative overflow-hidden">
-          {/* Card Header */}
-          <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-            <div>
-              <h2 className="text-base font-bold text-gray-950 font-sans tracking-tight">
-                {centerView === 'mannequin' ? 'Mannequin' : 'Measurement List View'}
+        <div className="lg:col-span-8 xl:col-span-9 bg-white rounded-[8px] p-[2px] border border-white shadow-[0_2px_12px_rgba(0,0,0,0.03)] flex flex-col gap-[2px]">
+          
+          {/* Sub-containers Row with gap-2px */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-[2px] items-stretch">
+            
+            {/* -----------------------------------------------------------------------
+                CHILD 1: "New Client" Container (Fill: #F8F8F8, stroke: #FFFFFF)
+                ----------------------------------------------------------------------- */}
+            <div className="lg:col-span-5 bg-[#F8F8F8] border border-white rounded-[8px] p-4 space-y-4 shadow-xs">
+              {/* Card Title */}
+              <h2 className="text-lg font-bold text-gray-950 font-sans tracking-tight">
+                New Client
               </h2>
-              <p className="text-xs text-gray-400">
-                {centerView === 'mannequin'
-                  ? 'All available points • Feminine Form'
-                  : 'Fast keyboard entry for all garment fields'}
-              </p>
-            </div>
 
-            {/* Right Controls: "+ Add Point" & Segmented View Toggle */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowAddPointModal(true)}
-                className="px-4 py-1.5 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold hover:bg-[#1e40af] transition-colors cursor-pointer"
-              >
-                Add Point
-              </button>
+              {/* Combined Top Pill Container (Fill: #FFFFFF): "Choose Template" Button (Centered, No Icon) & Gender Toggle */}
+              <div className="relative bg-white rounded-full p-1 flex items-center gap-1.5 shadow-xs border border-white">
+                <div className="relative flex-1">
+                  <button
+                    type="button"
+                    id="intake-choose-template-btn"
+                    onClick={() => {
+                      setPendingTemplate(selectedTemplate || 'Shirt/Blouse');
+                      setIsTemplateModalOpen(true);
+                    }}
+                    className="w-full h-9 px-4 rounded-full bg-[#F0F2F5] hover:bg-[#E5E7EB] text-xs font-semibold text-gray-700 flex items-center justify-center text-center transition-colors cursor-pointer"
+                  >
+                    <span className="truncate">{selectedTemplate || 'Choose Template'}</span>
+                  </button>
+                </div>
 
-              {/* Segmented Icon Toggle matching mockups */}
-              <div className="flex items-center bg-[#f4f5f7] p-1 rounded-full border border-gray-200/50">
-                <button
-                  type="button"
-                  onClick={() => setCenterView('mannequin')}
-                  className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
-                    centerView === 'mannequin'
-                      ? 'bg-[#1d4ed8] text-white shadow-xs'
-                      : 'text-gray-500 hover:text-gray-900'
-                  }`}
-                  title="Mannequin Body Diagram"
-                >
-                  <User className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCenterView('table')}
-                  className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
-                    centerView === 'table'
-                      ? 'bg-[#1d4ed8] text-white shadow-xs'
-                      : 'text-gray-500 hover:text-gray-900'
-                  }`}
-                  title="Measurement List View"
-                >
-                  <List className="w-3.5 h-3.5" />
-                </button>
+                {/* Gender Toggle: [ M | F ] in same white container */}
+                <div className="flex items-center gap-1 shrink-0 pr-1">
+                  <button
+                    type="button"
+                    onClick={() => setGender('M')}
+                    className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all ${
+                      gender === 'M'
+                        ? 'bg-[#1d4ed8] text-white shadow-xs'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    M
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGender('F')}
+                    className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all ${
+                      gender === 'F'
+                        ? 'bg-[#1d4ed8] text-white shadow-xs'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    F
+                  </button>
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Card Body: Mannequin Canvas OR 3x4 Measurement List Cards */}
-          <div className="flex-1 py-4 flex items-center justify-center">
-            {centerView === 'mannequin' ? (
-              <div className="w-full flex items-center justify-center">
-                <AtelierMannequin
-                  gender={gender}
-                  unit="cm"
-                  measurements={measurements}
-                  onMeasurementChange={handleMeasurementChange}
+              {/* Basic Information */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-gray-900">Basic Information</h3>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">Client</label>
+                    <input
+                      type="text"
+                      placeholder="e.g Adriana Kunle"
+                      value={clientName}
+                      onChange={(e) => setClientName(e.target.value)}
+                      className="w-full h-10 px-3.5 rounded-[8px] bg-white border border-gray-200/60 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#1d4ed8]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">Garment Type</label>
+                    <input
+                      type="text"
+                      placeholder="Bespoke African Gown"
+                      value={garmentType}
+                      onChange={(e) => setGarmentType(e.target.value)}
+                      className="w-full h-10 px-3.5 rounded-[8px] bg-white border border-gray-200/60 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#1d4ed8]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">Phone Number</label>
+                    <input
+                      type="text"
+                      placeholder="+234 - "
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full h-10 px-3.5 rounded-[8px] bg-white border border-gray-200/60 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#1d4ed8]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      placeholder="name@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full h-10 px-3.5 rounded-[8px] bg-white border border-gray-200/60 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#1d4ed8]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Style References */}
+              <div className="space-y-1.5">
+                <h3 className="text-xs font-bold text-gray-900">Style References</h3>
+                <label className="border-2 border-dashed border-gray-200/90 hover:border-[#1d4ed8] rounded-[8px] p-4 flex flex-col items-center justify-center cursor-pointer transition-colors bg-white">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  {referenceImage ? (
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={referenceImage}
+                        alt="Upload"
+                        className="w-12 h-12 object-cover rounded-[8px] border border-gray-200"
+                      />
+                      <div className="text-left">
+                        <p className="text-xs font-bold text-gray-900">Image Loaded</p>
+                        <p className="text-[10px] text-gray-400">Click to change</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1.5 text-gray-500">
+                      <div className="w-8 h-8 rounded-full bg-[#f4f5f7] flex items-center justify-center text-gray-700">
+                        <Upload className="w-4 h-4" />
+                      </div>
+                      <span className="text-xs font-semibold text-gray-700">
+                        Tap to upload image
+                      </span>
+                    </div>
+                  )}
+                </label>
+              </div>
+
+              {/* Price /Due date */}
+              <div className="space-y-1.5">
+                <h3 className="text-xs font-bold text-gray-900">Price /Due date</h3>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">Price (₦)</label>
+                    <input
+                      type="text"
+                      placeholder="₦0.00"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      className="w-full h-10 px-3.5 rounded-[8px] bg-white border border-gray-200/60 text-xs font-medium text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#1d4ed8]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">Due Date</label>
+                    <input
+                      type="text"
+                      placeholder="09/10/2026"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      className="w-full h-10 px-3.5 rounded-[8px] bg-white border border-gray-200/60 text-xs font-medium text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#1d4ed8]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-1.5">
+                <div>
+                  <h3 className="text-xs font-bold text-gray-900">Notes</h3>
+                  <p className="text-[10px] text-gray-400">Workroom notes and fabric details</p>
+                </div>
+                <textarea
+                  rows={3}
+                  placeholder="e.g hand stiched, monogram design on wrist and gold buttons"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full p-3 rounded-[8px] bg-white border border-gray-200/60 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#1d4ed8] resize-none"
                 />
               </div>
-            ) : (
-              /* 3x4 Grid of Measurement Cards matching table view.png */
-              <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 self-start">
-                {measurementList.map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-3.5 rounded-2xl bg-[#f4f5f7] border border-gray-100 flex flex-col justify-between h-24"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-gray-900 truncate">
-                        {item.label}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteListItem(item.id)}
-                        className="text-gray-400 hover:text-gray-700"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+            </div>
 
-                    <div className="flex items-center justify-between bg-white px-3 py-1.5 rounded-xl border border-gray-200">
-                      <input
-                        type="text"
-                        value={item.value}
-                        onChange={(e) => handleListValueChange(item.id, e.target.value)}
-                        className="w-16 text-xs font-semibold text-gray-900 focus:outline-none"
-                      />
-                      <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
-                    </div>
+            {/* -----------------------------------------------------------------------
+                CHILD 2: "Mannequin" OR "Measurement List View" (Fill: #F8F8F8, stroke: #FFFFFF)
+                ----------------------------------------------------------------------- */}
+            <div className="lg:col-span-7 bg-[#F8F8F8] border border-white rounded-[8px] p-4 flex flex-col justify-between min-h-[640px] relative overflow-hidden shadow-xs">
+              {/* Card Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-gray-200/60">
+                <div>
+                  <h2 className="text-base font-bold text-gray-950 font-sans tracking-tight">
+                    {centerView === 'mannequin' ? 'Mannequin' : 'Measurement List View'}
+                  </h2>
+                  <p className="text-xs text-gray-400">
+                    {centerView === 'mannequin'
+                      ? 'All available points • Feminine Form'
+                      : 'Fast keyboard entry for all garment fields'}
+                  </p>
+                </div>
+
+                {/* Right Controls: "+ Add Point" & Segmented View Toggle */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPointModalData({
+                        key: 'sleeve',
+                        name: 'Sleeve',
+                        value: measurements.sleeve ? String(measurements.sleeve) : '60.0',
+                        isCustom: true,
+                      })
+                    }
+                    className="px-4 py-1.5 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold hover:bg-[#1e40af] transition-colors cursor-pointer shadow-xs"
+                  >
+                    Add Point
+                  </button>
+
+                  {/* Segmented Icon Toggle matching mockups */}
+                  <div className="flex items-center bg-[#E5E7EB] p-0.5 rounded-full border border-gray-200/50 shadow-xs">
+                    <button
+                      type="button"
+                      onClick={() => setCenterView('mannequin')}
+                      className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                        centerView === 'mannequin'
+                          ? 'bg-[#1d4ed8] text-white shadow-xs'
+                          : 'text-gray-500 hover:text-gray-900'
+                      }`}
+                      title="Mannequin Body Diagram"
+                    >
+                      <User className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCenterView('table')}
+                      className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                        centerView === 'table'
+                          ? 'bg-[#1d4ed8] text-white shadow-xs'
+                          : 'text-gray-500 hover:text-gray-900'
+                      }`}
+                      title="Measurement List View"
+                    >
+                      <List className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                ))}
+                </div>
               </div>
-            )}
+
+              {/* Card Body: Mannequin Canvas OR 3x4 Measurement List Cards */}
+              <div className="flex-1 py-4 flex items-center justify-center">
+                {centerView === 'mannequin' ? (
+                  <div className="w-full flex items-center justify-center">
+                    <AtelierMannequin
+                      gender={gender}
+                      unit="cm"
+                      measurements={measurements}
+                      onMeasurementChange={handleMeasurementChange}
+                      onSelectLandmark={(key, name, currentVal) => {
+                        setPointModalData({
+                          key,
+                          name,
+                          value: String(currentVal),
+                          isCustom: false,
+                        });
+                      }}
+                    />
+                  </div>
+                ) : (
+                  /* 3x4 Grid of Measurement Cards matching table view.png */
+                  <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 self-start">
+                    {measurementList.map((item) => (
+                      <div
+                        key={item.id}
+                        className="p-3.5 rounded-[8px] bg-white border border-gray-200/70 flex flex-col justify-between h-24 shadow-xs"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-gray-900 truncate">
+                            {item.label}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteListItem(item.id)}
+                            className="text-gray-400 hover:text-gray-700"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <div className="flex items-center justify-between bg-[#F8F8F8] px-3 py-1.5 rounded-[6px] border border-gray-200/80">
+                          <input
+                            type="text"
+                            value={item.value}
+                            onChange={(e) => handleListValueChange(item.id, e.target.value)}
+                            className="w-16 text-xs font-semibold text-gray-900 focus:outline-none bg-transparent"
+                          />
+                          <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Floating Bottom Right Save Button */}
-          <div className="flex justify-end pt-2">
+          {/* -----------------------------------------------------------------------
+              CONTAINER HOUSING THE SAVE BUTTON BELOW THE TWO CONTAINERS
+              (Fill: #F8F8F8, stroke: #FFFFFF, gap-2px from top containers)
+              ----------------------------------------------------------------------- */}
+          <div className="bg-[#F8F8F8] border border-white rounded-[8px] p-2 flex justify-end items-center shadow-xs">
             <button
               type="button"
               onClick={handleSave}
-              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
             >
               <Save className="w-3.5 h-3.5" />
               <span>Save</span>
@@ -488,75 +615,79 @@ export function OverviewScreen({
         </div>
 
         {/* =========================================================================
-            RIGHT COLUMN: "Garment's Calendar" & "Recent Orders" (3 Columns on Desktop)
+            RIGHT PARENT CONTAINER (Fill: #FFFFFF): Garment's Calendar & Recent Orders
             ========================================================================= */}
-        <div className="lg:col-span-3 bg-white rounded-3xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/90 space-y-6">
-          {/* Garment's Calendar */}
-          <div className="space-y-4">
+        <div className="lg:col-span-4 xl:col-span-3 bg-white rounded-[8px] p-[2px] border border-white shadow-[0_2px_12px_rgba(0,0,0,0.03)] flex flex-col gap-[2px]">
+          {/* Garment's Calendar Inner Card */}
+          <div className="bg-[#F8F8F8] border border-white rounded-[8px] p-4 space-y-3.5 shadow-xs">
             <h2 className="text-base font-bold text-gray-950 font-sans tracking-tight">
               Garment&apos;s Calendar
             </h2>
 
-            {/* Weekday Columns */}
-            <div className="grid grid-cols-7 text-center text-[11px] font-semibold text-gray-400">
-              <span>Mon</span>
-              <span>Tue</span>
-              <span className="text-gray-900 font-bold">Wed</span>
-              <span>Thu</span>
-              <span>Fri</span>
-              <span>Sat</span>
-              <span>Sun</span>
+            {/* Weekday Columns (Fill: #FFFFFF, rounded-[4px], gap: 2px) */}
+            <div className="grid grid-cols-7 gap-[2px] text-center text-xs font-medium">
+              <div className="bg-white rounded-[4px] py-1.5 text-gray-400">Mon</div>
+              <div className="bg-white rounded-[4px] py-1.5 text-gray-400">Tue</div>
+              <div className="bg-white rounded-[4px] py-1.5 text-gray-900 font-bold">Wed</div>
+              <div className="bg-white rounded-[4px] py-1.5 text-gray-400">Thu</div>
+              <div className="bg-white rounded-[4px] py-1.5 text-gray-400">Fri</div>
+              <div className="bg-white rounded-[4px] py-1.5 text-gray-400">Sat</div>
+              <div className="bg-white rounded-[4px] py-1.5 text-gray-400">Sun</div>
             </div>
 
-            {/* Calendar Days 1 to 31 */}
-            <div className="grid grid-cols-7 gap-y-2 text-center text-xs text-gray-800">
+            {/* Calendar Days 1 to 31 (Fill: #FFFFFF, rounded-[4px], gap: 2px) */}
+            <div className="grid grid-cols-7 gap-[2px] text-center text-xs">
               {/* Offset for 1st of month: 2 blank days */}
-              <div />
-              <div />
+              <div className="aspect-square" />
+              <div className="aspect-square" />
               {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
                 const isDay7 = day === 7;
                 const isDay17 = day === 17;
                 const isDay23 = day === 23;
 
                 return (
-                  <div key={day} className="py-1 flex flex-col items-center justify-center">
-                    <span className="font-medium text-gray-800">{day}</span>
-                    {isDay7 && <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-0.5" />}
-                    {isDay17 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-0.5" />}
-                    {isDay23 && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-0.5" />}
+                  <div
+                    key={day}
+                    className="bg-white rounded-[4px] aspect-square flex items-center justify-center relative text-xs font-medium text-gray-900 shadow-2xs"
+                  >
+                    <span>{day}</span>
+                    {isDay7 && <span className="absolute bottom-1 right-1 w-2 h-2 rounded-full bg-[#ef4444]" />}
+                    {isDay17 && <span className="absolute bottom-1 right-1 w-2 h-2 rounded-full bg-[#10b981]" />}
+                    {isDay23 && <span className="absolute bottom-1 right-1 w-2 h-2 rounded-full bg-[#eab308]" />}
                   </div>
                 );
               })}
             </div>
 
-            {/* Status Legend */}
-            <div className="pt-2 flex items-center justify-between text-[11px] text-gray-600 font-medium">
+            {/* Status Legend matching CALENDAR.png */}
+            <div className="pt-2 flex items-center gap-4 text-xs text-gray-900 font-medium">
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[#eab308]" />
                 <span>Pending</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[#10b981]" />
                 <span>Completed</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-rose-500" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" />
                 <span>Paused</span>
               </div>
             </div>
           </div>
 
-          <div className="border-t border-gray-100 pt-5 space-y-3">
-            <h3 className="text-sm font-bold text-gray-950">Recent Orders</h3>
+          {/* Recent Orders Container (Fill: #F8F8F8, stroke: #FFFFFF) */}
+          <div className="bg-[#F8F8F8] border border-white rounded-[8px] p-4 space-y-3 shadow-xs">
+            <h3 className="text-sm font-bold text-gray-950 font-sans tracking-tight">Recent Orders</h3>
 
             <div className="space-y-2">
               {/* Order 1: Chloe Dallas */}
               <div 
                 onClick={() => onOpenOrder('ord-101')}
-                className="p-3 rounded-2xl bg-[#f4f5f7] hover:bg-gray-100 transition-colors flex items-center justify-between cursor-pointer"
+                className="p-3 rounded-[8px] bg-white border border-white hover:bg-gray-50 transition-colors flex items-center justify-between cursor-pointer shadow-xs"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-white font-bold text-xs text-gray-900 flex items-center justify-center border border-gray-200">
+                  <div className="w-9 h-9 rounded-full bg-[#f4f5f7] font-bold text-xs text-gray-900 flex items-center justify-center border border-gray-100">
                     CD
                   </div>
                   <div>
@@ -570,10 +701,10 @@ export function OverviewScreen({
               {/* Order 2: Taylor Razaq */}
               <div 
                 onClick={() => onOpenOrder('ord-102')}
-                className="p-3 rounded-2xl bg-[#f4f5f7] hover:bg-gray-100 transition-colors flex items-center justify-between cursor-pointer"
+                className="p-3 rounded-[8px] bg-white border border-white hover:bg-gray-50 transition-colors flex items-center justify-between cursor-pointer shadow-xs"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-white font-bold text-xs text-gray-900 flex items-center justify-center border border-gray-200">
+                  <div className="w-9 h-9 rounded-full bg-[#f4f5f7] font-bold text-xs text-gray-900 flex items-center justify-center border border-gray-100">
                     TR
                   </div>
                   <div>
@@ -587,10 +718,10 @@ export function OverviewScreen({
               {/* Order 3: Bryan Muhammed */}
               <div 
                 onClick={() => onOpenOrder('ord-103')}
-                className="p-3 rounded-2xl bg-[#f4f5f7] hover:bg-gray-100 transition-colors flex items-center justify-between cursor-pointer"
+                className="p-3 rounded-[8px] bg-white border border-white hover:bg-gray-50 transition-colors flex items-center justify-between cursor-pointer shadow-xs"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-white font-bold text-xs text-gray-900 flex items-center justify-center border border-gray-200">
+                  <div className="w-9 h-9 rounded-full bg-[#f4f5f7] font-bold text-xs text-gray-900 flex items-center justify-center border border-gray-100">
                     BM
                   </div>
                   <div>
@@ -605,69 +736,212 @@ export function OverviewScreen({
         </div>
       </div>
 
-      {/* Add Measurement Point Modal */}
-      {showAddPointModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-gray-100 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-              <h3 className="text-sm font-bold text-gray-950">Add Measurement Point</h3>
+      {/* =========================================================================
+          GARMENT TEMPLATES: Responsive Modal (Web Backdrop Blur) & Bottom Sheet Drawer (Mobile)
+          ========================================================================= */}
+      {isTemplateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-md transition-all animate-in fade-in duration-200">
+          {/* Backdrop dismiss */}
+          <div
+            className="absolute inset-0"
+            onClick={() => setIsTemplateModalOpen(false)}
+          />
+
+          {/* Modal / Bottom Sheet Card */}
+          <div className="relative w-full sm:max-w-xl bg-white rounded-t-3xl sm:rounded-3xl p-5 sm:p-7 shadow-2xl z-10 max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200">
+            {/* Mobile Top Drag Handle */}
+            <div className="sm:hidden pt-1 pb-3 flex justify-center">
+              <div className="w-12 h-1 bg-black rounded-full" />
+            </div>
+
+            {/* Header */}
+            <div className="flex items-start justify-between pb-3 sm:pb-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-950 font-sans tracking-tight">
+                  Garment Templates
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                  Browse through available templates that suit all your bespoke needs.
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={() => setShowAddPointModal(false)}
-                className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-900"
+                onClick={() => setIsTemplateModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-900 transition-colors shrink-0 cursor-pointer"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (newPointLabel.trim()) {
-                  setMeasurementList((prev) => [
-                    ...prev,
-                    {
-                      id: newPointLabel.toLowerCase().replace(/\s+/g, '_'),
-                      label: newPointLabel.trim(),
-                      value: '0.0',
-                    },
-                  ]);
-                  setNewPointLabel('');
-                  setShowAddPointModal(false);
-                }
-              }}
-              className="space-y-4"
-            >
-              <div>
-                <label className="block text-xs font-bold text-gray-900 mb-1">
-                  Landmark Point Label
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Bicep, Wrist, Calf"
-                  value={newPointLabel}
-                  onChange={(e) => setNewPointLabel(e.target.value)}
-                  className="w-full h-10 px-3.5 rounded-xl bg-[#f4f5f7] text-xs text-gray-900 focus:outline-none focus:bg-white"
-                />
+            {/* Templates Grid: 2x2 on Web, 1-col on Mobile */}
+            <div className="flex-1 overflow-y-auto py-4 sm:py-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
+                {GARMENT_TEMPLATES.map((tpl) => {
+                  const isSelected = pendingTemplate === tpl.title;
+                  return (
+                    <div
+                      key={tpl.id}
+                      onClick={() => setPendingTemplate(tpl.title)}
+                      className={`p-4 rounded-2xl cursor-pointer transition-all border text-left flex flex-col justify-between ${
+                        isSelected
+                          ? 'border-2 border-[#1d4ed8] bg-blue-50/20 shadow-xs'
+                          : 'border-gray-200/80 bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <div>
+                        <h3
+                          className={`text-sm sm:text-base font-bold ${
+                            isSelected ? 'text-[#1d4ed8]' : 'text-gray-900'
+                          }`}
+                        >
+                          {tpl.title}
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                          {tpl.description}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+            </div>
 
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddPointModal(false)}
-                  className="px-4 py-2 rounded-full text-xs text-gray-600 hover:bg-gray-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold"
-                >
-                  Add Point
-                </button>
+            {/* Footer Actions */}
+            <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsTemplateModalOpen(false)}
+                className="flex-1 sm:flex-none px-7 py-2.5 sm:py-3 rounded-full bg-[#f3f4f6] hover:bg-[#e5e7eb] text-gray-700 text-xs sm:text-sm font-semibold transition-colors text-center cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmTemplate(pendingTemplate)}
+                className="flex-1 sm:flex-none px-7 py-2.5 sm:py-3 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs sm:text-sm font-semibold transition-colors shadow-xs text-center cursor-pointer"
+              >
+                Choose Template
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          SET POINT SIZE: Responsive Modal (Web Backdrop Blur) & Bottom Sheet Drawer (Mobile)
+          ========================================================================= */}
+      {pointModalData && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-md transition-all animate-in fade-in duration-200">
+          {/* Backdrop dismiss */}
+          <div
+            className="absolute inset-0"
+            onClick={() => setPointModalData(null)}
+          />
+
+          {/* Modal / Bottom Sheet Card */}
+          <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-5 sm:p-7 shadow-2xl z-10 flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200">
+            {/* Mobile Top Drag Handle */}
+            <div className="sm:hidden pt-1 pb-3 flex justify-center">
+              <div className="w-12 h-1 bg-black rounded-full" />
+            </div>
+
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-gray-100">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-950 font-sans tracking-tight">
+                Set point size
+              </h2>
+              <button
+                type="button"
+                onClick={() => setPointModalData(null)}
+                className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-900 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body: Landmark Label + Input Capsule matching Overview modal point.png */}
+            <div className="py-5 sm:py-6">
+              <div className="flex items-center justify-between gap-4">
+                {pointModalData.isCustom ? (
+                  <div className="flex-1">
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">
+                      Landmark Point
+                    </label>
+                    <input
+                      type="text"
+                      value={pointModalData.name}
+                      onChange={(e) =>
+                        setPointModalData({
+                          ...pointModalData,
+                          name: e.target.value,
+                          key: e.target.value.toLowerCase().replace(/\s+/g, '_'),
+                        })
+                      }
+                      placeholder="e.g. Sleeve, Neck, Bicep"
+                      className="w-full text-sm font-semibold text-gray-900 bg-[#F8F8F8] border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#1d4ed8]"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#00e5ff] shadow-[0_0_8px_#00e5ff]" />
+                    <span className="text-base sm:text-lg font-semibold text-gray-900">
+                      {pointModalData.name}
+                    </span>
+                  </div>
+                )}
+
+                {/* Numerical Input Capsule */}
+                <div className="flex items-center bg-[#F8F8F8] border border-gray-200/90 rounded-xl px-3 sm:px-4 py-2 w-32 sm:w-40 justify-between focus-within:border-[#1d4ed8] focus-within:bg-white transition-colors">
+                  <input
+                    type="number"
+                    step="0.1"
+                    autoFocus
+                    value={pointModalData.value}
+                    onChange={(e) =>
+                      setPointModalData({ ...pointModalData, value: e.target.value })
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSavePoint(
+                          pointModalData.key,
+                          pointModalData.name,
+                          pointModalData.value
+                        );
+                      }
+                    }}
+                    className="w-full bg-transparent text-right font-bold text-base sm:text-lg text-gray-950 focus:outline-none pr-1.5"
+                    placeholder="0.0"
+                  />
+                  <span className="text-xs font-bold text-gray-400 select-none uppercase tracking-wide">
+                    CM
+                  </span>
+                </div>
               </div>
-            </form>
+            </div>
+
+            {/* Footer Actions matching design */}
+            <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-2.5 sm:gap-3">
+              <button
+                type="button"
+                onClick={() => setPointModalData(null)}
+                className="flex-1 sm:flex-none px-6 py-2.5 rounded-full bg-[#f3f4f6] hover:bg-[#e5e7eb] text-gray-700 text-xs sm:text-sm font-semibold transition-colors text-center cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleSavePoint(
+                    pointModalData.key,
+                    pointModalData.name,
+                    pointModalData.value
+                  )
+                }
+                className="flex-1 sm:flex-none px-6 py-2.5 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs sm:text-sm font-semibold transition-colors shadow-xs text-center cursor-pointer"
+              >
+                Add Point
+              </button>
+            </div>
           </div>
         </div>
       )}

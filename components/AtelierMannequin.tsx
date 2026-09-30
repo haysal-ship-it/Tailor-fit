@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { UnitType } from '@/types';
 import { Sparkles, RefreshCw } from 'lucide-react';
 
-interface LandmarkData {
+export interface LandmarkData {
   key: string;
   name: string;
   defaultValCm: number;
@@ -19,7 +19,7 @@ interface LandmarkData {
   anchorY: number;
 }
 
-const LANDMARKS: LandmarkData[] = [
+export const LANDMARKS: LandmarkData[] = [
   {
     key: 'neck',
     name: 'Neck',
@@ -111,6 +111,7 @@ interface AtelierMannequinProps {
   unit: UnitType;
   measurements: Record<string, number | string>;
   onMeasurementChange: (key: string, value: number) => void;
+  onSelectLandmark?: (key: string, name: string, currentVal: number) => void;
 }
 
 export function AtelierMannequin({
@@ -118,6 +119,7 @@ export function AtelierMannequin({
   unit,
   measurements,
   onMeasurementChange,
+  onSelectLandmark,
 }: AtelierMannequinProps) {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [tempValue, setTempValue] = useState<string>('');
@@ -142,8 +144,14 @@ export function AtelierMannequin({
   };
 
   const handleStartEdit = (key: string, defaultCm: number) => {
-    setEditingKey(key);
-    setTempValue(String(getRawNumber(key, defaultCm)));
+    const rawVal = getRawNumber(key, defaultCm);
+    const landmark = LANDMARKS.find((l) => l.key === key);
+    if (onSelectLandmark) {
+      onSelectLandmark(key, landmark?.name || key, rawVal);
+    } else {
+      setEditingKey(key);
+      setTempValue(String(rawVal));
+    }
   };
 
   const handleSaveEdit = (key: string) => {
@@ -335,14 +343,27 @@ export function AtelierMannequin({
           {LANDMARKS.map((lm) => {
             const isLeft = lm.side === 'left';
             return (
-              <g key={`leader-${lm.key}`} className="pointer-events-none">
+              <g 
+                key={`leader-${lm.key}`} 
+                className="cursor-pointer group"
+                onClick={() => handleStartEdit(lm.key, lm.defaultValCm)}
+              >
+                {/* Expanded touch target for easy tap on mobile */}
+                <circle
+                  cx={lm.anchorX}
+                  cy={lm.anchorY}
+                  r="18"
+                  fill="transparent"
+                  className="cursor-pointer"
+                />
+
                 {/* Body Anchor Dot */}
                 <circle
                   cx={lm.anchorX}
                   cy={lm.anchorY}
-                  r="3.5"
+                  r="4.5"
                   fill="#00e5ff"
-                  className="drop-shadow-[0_0_4px_#00e5ff]"
+                  className="drop-shadow-[0_0_6px_#00e5ff] transition-transform group-hover:scale-125"
                 />
 
                 {/* Dashed Cyan Leader Line */}
@@ -361,8 +382,9 @@ export function AtelierMannequin({
                 <circle
                   cx={isLeft ? lm.labelX + 8 : lm.labelX - 8}
                   cy={lm.labelY - 5}
-                  r="2.5"
+                  r="3"
                   fill="#0284c7"
+                  className="transition-transform group-hover:scale-125"
                 />
               </g>
             );

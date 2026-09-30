@@ -107,58 +107,60 @@ export function SettingsScreen() {
       {/* 2-Column Layout matching Settings.png */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* =========================================================================
-            LEFT COLUMN: "Settings" Navigation Card (3 Columns on Desktop)
+            LEFT COLUMN: "Settings" Navigation Container (Fill: #FFFFFF, 2px padding/gap, 8px radius)
             ========================================================================= */}
-        <div className="lg:col-span-3 bg-white rounded-3xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/90 space-y-4">
-          <h2 className="text-sm font-bold text-gray-950 font-sans tracking-tight">
-            Settings
-          </h2>
+        <div className="lg:col-span-3 bg-white rounded-[8px] p-[2px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-white flex flex-col gap-[2px]">
+          <div className="bg-[#F8F8F8] border border-white rounded-[8px] p-4 space-y-4 shadow-xs">
+            <h2 className="text-sm font-bold text-gray-950 font-sans tracking-tight">
+              Settings
+            </h2>
 
-          <div className="space-y-1">
-            <button
-              type="button"
-              onClick={() => setActiveTab('billing')}
-              className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-colors border ${
-                activeTab === 'billing'
-                  ? 'bg-blue-50/70 text-[#1d4ed8] border-blue-100'
-                  : 'text-gray-500 hover:text-gray-800 border-transparent'
-              }`}
-            >
-              Measurement &amp; Billing Standards
-            </button>
+            <div className="space-y-1">
+              <button
+                type="button"
+                onClick={() => setActiveTab('billing')}
+                className={`w-full text-left px-3.5 py-2.5 rounded-[8px] text-xs font-semibold transition-colors border ${
+                  activeTab === 'billing'
+                    ? 'bg-blue-50/70 text-[#1d4ed8] border-blue-100'
+                    : 'text-gray-500 hover:text-gray-800 border-transparent'
+                }`}
+              >
+                Measurement &amp; Billing Standards
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveTab('blueprints')}
-              className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-colors border ${
-                activeTab === 'blueprints'
-                  ? 'bg-blue-50/70 text-[#1d4ed8] border-blue-100'
-                  : 'text-gray-500 hover:text-gray-800 border-transparent'
-              }`}
-            >
-              Garment Blueprints
-            </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('blueprints')}
+                className={`w-full text-left px-3.5 py-2.5 rounded-[8px] text-xs font-semibold transition-colors border ${
+                  activeTab === 'blueprints'
+                    ? 'bg-blue-50/70 text-[#1d4ed8] border-blue-100'
+                    : 'text-gray-500 hover:text-gray-800 border-transparent'
+                }`}
+              >
+                Garment Blueprints
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveTab('sizing')}
-              className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-colors border ${
-                activeTab === 'sizing'
-                  ? 'bg-blue-50/70 text-[#1d4ed8] border-blue-100'
-                  : 'text-gray-500 hover:text-gray-800 border-transparent'
-              }`}
-            >
-              Sizing/measurements
-            </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('sizing')}
+                className={`w-full text-left px-3.5 py-2.5 rounded-[8px] text-xs font-semibold transition-colors border ${
+                  activeTab === 'sizing'
+                    ? 'bg-blue-50/70 text-[#1d4ed8] border-blue-100'
+                    : 'text-gray-500 hover:text-gray-800 border-transparent'
+                }`}
+              >
+                Sizing/measurements
+              </button>
+            </div>
           </div>
         </div>
 
         {/* =========================================================================
-            RIGHT COLUMN: Settings Sections (9 Columns on Desktop)
+            RIGHT COLUMN: Settings Sections (Fill: #FFFFFF, 2px padding/gap, 8px radius)
             ========================================================================= */}
-        <div className="lg:col-span-9 bg-white rounded-3xl p-6 sm:p-8 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/90 space-y-8">
+        <div className="lg:col-span-9 bg-white rounded-[8px] p-[2px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-white flex flex-col gap-[2px]">
           {/* SECTION 1: Measurement & Billing Standards */}
-          <div className="space-y-5">
+          <div className="bg-[#F8F8F8] border border-white rounded-[8px] p-5 sm:p-6 space-y-5 shadow-xs">
             <div>
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
                 DEFAULT UNITS AND CURRENCY SYMBOLS
@@ -180,7 +182,7 @@ export function SettingsScreen() {
                   className={`px-6 py-2 rounded-full text-xs font-semibold transition-all ${
                     unit === 'cm'
                       ? 'bg-[#1d4ed8] text-white shadow-xs'
-                      : 'bg-white text-gray-700 border border-gray-200'
+                      : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
                   }`}
                 >
                   Centimeteres (cm)
@@ -191,7 +193,7 @@ export function SettingsScreen() {
                   className={`px-6 py-2 rounded-full text-xs font-semibold transition-all ${
                     unit === 'in'
                       ? 'bg-[#1d4ed8] text-white shadow-xs'
-                      : 'bg-white text-gray-700 border border-gray-200'
+                      : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
                   }`}
                 >
                   Inches (“)
@@ -210,10 +212,10 @@ export function SettingsScreen() {
                 {/* 1. NGN (₦) */}
                 <div
                   onClick={() => setSelectedCurrency('NGN (₦)')}
-                  className={`py-3 px-4 rounded-xl border text-center cursor-pointer transition-all ${
+                  className={`py-3 px-4 rounded-[8px] border text-center cursor-pointer transition-all ${
                     selectedCurrency === 'NGN (₦)'
-                      ? 'border-[#1d4ed8] bg-blue-50/30 shadow-xs'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
+                      ? 'border-[#1d4ed8] bg-blue-50/50 shadow-xs'
+                      : 'border-white bg-white hover:border-gray-200 shadow-xs'
                   }`}
                 >
                   <span className="text-xs font-bold text-[#1d4ed8]">NGN (₦)</span>
@@ -222,10 +224,10 @@ export function SettingsScreen() {
                 {/* 2. US Dollar ($) */}
                 <div
                   onClick={() => setSelectedCurrency('US Dollar ($)')}
-                  className={`py-3 px-4 rounded-xl border text-center cursor-pointer transition-all ${
+                  className={`py-3 px-4 rounded-[8px] border text-center cursor-pointer transition-all ${
                     selectedCurrency === 'US Dollar ($)'
-                      ? 'border-[#1d4ed8] bg-blue-50/30 shadow-xs'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
+                      ? 'border-[#1d4ed8] bg-blue-50/50 shadow-xs'
+                      : 'border-white bg-white hover:border-gray-200 shadow-xs'
                   }`}
                 >
                   <span className="text-xs font-bold text-gray-800">US Dollar ($)</span>
@@ -234,10 +236,10 @@ export function SettingsScreen() {
                 {/* 3. Euro () */}
                 <div
                   onClick={() => setSelectedCurrency('Euro ()')}
-                  className={`py-3 px-4 rounded-xl border text-center cursor-pointer transition-all ${
+                  className={`py-3 px-4 rounded-[8px] border text-center cursor-pointer transition-all ${
                     selectedCurrency === 'Euro ()'
-                      ? 'border-[#1d4ed8] bg-blue-50/30 shadow-xs'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
+                      ? 'border-[#1d4ed8] bg-blue-50/50 shadow-xs'
+                      : 'border-white bg-white hover:border-gray-200 shadow-xs'
                   }`}
                 >
                   <span className="text-xs font-bold text-gray-800">Euro ()</span>
@@ -246,10 +248,10 @@ export function SettingsScreen() {
                 {/* 4. Pounds ( */}
                 <div
                   onClick={() => setSelectedCurrency('Pounds (')}
-                  className={`py-3 px-4 rounded-xl border text-center cursor-pointer transition-all ${
+                  className={`py-3 px-4 rounded-[8px] border text-center cursor-pointer transition-all ${
                     selectedCurrency === 'Pounds ('
-                      ? 'border-[#1d4ed8] bg-blue-50/30 shadow-xs'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
+                      ? 'border-[#1d4ed8] bg-blue-50/50 shadow-xs'
+                      : 'border-white bg-white hover:border-gray-200 shadow-xs'
                   }`}
                 >
                   <span className="text-xs font-bold text-gray-800">Pounds (</span>
@@ -259,7 +261,7 @@ export function SettingsScreen() {
           </div>
 
           {/* SECTION 2: Garments Blueprints */}
-          <div className="space-y-4 pt-4 border-t border-gray-100">
+          <div className="bg-[#F8F8F8] border border-white rounded-[8px] p-5 sm:p-6 space-y-4 shadow-xs">
             <div className="flex items-center justify-between">
               <div>
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
@@ -284,7 +286,7 @@ export function SettingsScreen() {
               {blueprints.map((bp) => (
                 <div
                   key={bp.id}
-                  className="p-4 rounded-2xl bg-[#f4f5f7] border border-gray-100 flex flex-col justify-between space-y-3"
+                  className="p-4 rounded-[8px] bg-white border border-white shadow-xs flex flex-col justify-between space-y-3"
                 >
                   <div>
                     <h3 className="text-xs font-bold text-gray-950 mb-1">{bp.title}</h3>
@@ -296,7 +298,7 @@ export function SettingsScreen() {
                     {bp.tags.map((tag) => (
                       <span
                         key={tag}
-                        className="px-2.5 py-0.5 rounded-full bg-white text-[10px] font-semibold text-gray-600 border border-gray-200/60"
+                        className="px-2.5 py-0.5 rounded-full bg-[#F8F8F8] text-[10px] font-semibold text-gray-600 border border-gray-200/60"
                       >
                         {tag}
                       </span>
@@ -311,7 +313,7 @@ export function SettingsScreen() {
           </div>
 
           {/* SECTION 3: Sizing/Measurements */}
-          <div className="space-y-4 pt-4 border-t border-gray-100">
+          <div className="bg-[#F8F8F8] border border-white rounded-[8px] p-5 sm:p-6 space-y-4 shadow-xs">
             <div className="flex items-center justify-between">
               <div>
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
@@ -336,7 +338,7 @@ export function SettingsScreen() {
               {sizingItems.map((item) => (
                 <div
                   key={item.id}
-                  className="p-3.5 rounded-2xl bg-[#f4f5f7] border border-gray-100 text-center space-y-1"
+                  className="p-3.5 rounded-[8px] bg-white border border-white shadow-xs text-center space-y-1"
                 >
                   <h4 className="text-xs font-bold text-gray-950">{item.title}</h4>
                   <p className="text-[10px] text-gray-500">{item.category}</p>

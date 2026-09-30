@@ -133,122 +133,125 @@ export function ClientsScreen({
       {/* 2-Column Cockpit strictly matching Clients.png */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* =========================================================================
-            LEFT COLUMN: "Client Directory" Card (3.5 Columns on Desktop)
+            LEFT COLUMN: "Client Directory" Main Container (Fill: #FFFFFF, 2px padding/gap, 8px radius)
             ========================================================================= */}
-        <div className="lg:col-span-3 bg-white rounded-3xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/90 space-y-4">
-          <h2 className="text-sm font-bold text-gray-950 font-sans tracking-tight">
-            Client Directory
-          </h2>
+        <div className="lg:col-span-3 bg-white rounded-[8px] p-[2px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-white flex flex-col gap-[2px]">
+          <div className="bg-[#F8F8F8] border border-white rounded-[8px] p-4 space-y-4 shadow-xs">
+            <h2 className="text-sm font-bold text-gray-950 font-sans tracking-tight">
+              Client Directory
+            </h2>
 
-          {/* Search Bar */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search clients by name, phone number, email..."
-              className="w-full h-10 pl-9 pr-3.5 rounded-xl bg-[#f4f5f7] text-[11px] text-gray-900 placeholder:text-gray-400 focus:outline-none"
-            />
-          </div>
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search clients by name, phone number, email..."
+                className="w-full h-10 pl-9 pr-3.5 rounded-[8px] bg-white border border-white text-[11px] text-gray-900 placeholder:text-gray-400 focus:outline-none shadow-xs"
+              />
+            </div>
 
-          {/* Subheading: Recently Viewed Clients */}
-          <div className="space-y-2 pt-1">
-            <h3 className="text-xs font-bold text-gray-900">Recently Viewed Clients</h3>
+            {/* Subheading: Recently Viewed Clients */}
+            <div className="space-y-2 pt-1">
+              <h3 className="text-xs font-bold text-gray-900">Recently Viewed Clients</h3>
 
-            <div className="space-y-2">
-              {recentClients
-                .filter((c) =>
-                  searchQuery
-                    ? c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      c.phone.includes(searchQuery) ||
-                      c.email.toLowerCase().includes(searchQuery.toLowerCase())
-                    : true
-                )
-                .map((client) => {
-                  const isSelected = selectedClientProfile.id === client.id;
-                  return (
-                    <div
-                      key={client.id}
-                      onClick={() => setSelectedClientProfile(client)}
-                      className={`p-3 rounded-2xl transition-all flex items-center justify-between cursor-pointer border ${
-                        isSelected
-                          ? 'bg-blue-50/60 border-blue-200 shadow-xs'
-                          : 'bg-[#f4f5f7] border-transparent hover:bg-gray-100'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center border ${
-                          isSelected ? 'bg-[#1d4ed8] text-white border-[#1d4ed8]' : 'bg-white text-gray-800 border-gray-200'
-                        }`}>
-                          {client.initials}
+              <div className="space-y-2">
+                {recentClients
+                  .filter((c) =>
+                    searchQuery
+                      ? c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        c.phone.includes(searchQuery) ||
+                        c.email.toLowerCase().includes(searchQuery.toLowerCase())
+                      : true
+                  )
+                  .map((client) => {
+                    const isSelected = selectedClientProfile.id === client.id;
+                    return (
+                      <div
+                        key={client.id}
+                        onClick={() => setSelectedClientProfile(client)}
+                        className={`p-3 rounded-[8px] transition-all flex items-center justify-between cursor-pointer border ${
+                          isSelected
+                            ? 'bg-blue-50/60 border-blue-200 shadow-xs'
+                            : 'bg-white border-white hover:bg-gray-100 shadow-xs'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-[8px] font-bold text-xs flex items-center justify-center border ${
+                            isSelected ? 'bg-[#1d4ed8] text-white border-[#1d4ed8]' : 'bg-[#f4f5f7] text-gray-800 border-gray-200'
+                          }`}>
+                            {client.initials}
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-bold text-gray-950">{client.name}</h4>
+                            <p className="text-[10px] text-gray-500">{client.phone}</p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="text-xs font-bold text-gray-950">{client.name}</h4>
-                          <p className="text-[10px] text-gray-500">{client.phone}</p>
-                        </div>
+                        <ChevronRight className={`w-4 h-4 ${isSelected ? 'text-[#1d4ed8]' : 'text-gray-400'}`} />
                       </div>
-                      <ChevronRight className={`w-4 h-4 ${isSelected ? 'text-[#1d4ed8]' : 'text-gray-400'}`} />
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+              </div>
             </div>
           </div>
         </div>
 
         {/* =========================================================================
-            RIGHT COLUMN: Client Profile Dossier (8.5 Columns on Desktop)
+            RIGHT COLUMN: Client Profile Dossier (Fill: #FFFFFF, 2px padding/gap, 8px radius)
             ========================================================================= */}
-        <div className="lg:col-span-9 bg-white rounded-3xl p-6 sm:p-8 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/90 space-y-8">
-          {/* Top Bar: Subtitle & Title & "New Order" Action */}
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-                CLIENT PROFILE
-              </span>
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-950 font-sans tracking-tight">
-                {selectedClientProfile.name}
-              </h1>
-            </div>
-
-            <button
-              type="button"
-              id="btn-client-new-order"
-              onClick={() => onNewOrder(selectedClientProfile.id)}
-              className="px-5 py-2 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-            >
-              New Order
-            </button>
-          </div>
-
-          {/* Centered Client Profile Hero */}
-          <div className="flex flex-col items-center justify-center text-center space-y-2 py-1">
-            <div className="w-16 h-16 rounded-full bg-black text-white font-bold text-lg flex items-center justify-center shadow-sm">
-              {selectedClientProfile.initials}
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-gray-950">{selectedClientProfile.name}</h2>
-              <p className="text-[11px] text-gray-400">{selectedClientProfile.since}</p>
-            </div>
-            <div className="flex items-center gap-4 text-[11px] text-gray-600 font-medium">
-              <span className="flex items-center gap-1">
-                <Phone className="w-3.5 h-3.5 text-gray-700" />
-                {selectedClientProfile.phone}
-              </span>
-              <span className="flex items-center gap-1">
-                <Mail className="w-3.5 h-3.5 text-gray-700" />
-                {selectedClientProfile.email}
-              </span>
-            </div>
-          </div>
-
-          {/* Section: Body Measurement History */}
-          <div className="space-y-4 pt-2">
-            <h3 className="text-sm font-bold text-gray-950">Body Measurement History</h3>
-
+        <div className="lg:col-span-9 bg-white rounded-[8px] p-[2px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-white flex flex-col gap-[2px]">
+          {/* Top Profile Card Container */}
+          <div className="bg-[#F8F8F8] border border-white rounded-[8px] p-6 space-y-6 shadow-xs">
+            {/* Top Bar: Subtitle & Title & "New Order" Action */}
             <div className="flex items-center justify-between">
               <div>
-                <h4 className="text-xs font-bold text-gray-900">Mannequin</h4>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                  CLIENT PROFILE
+                </span>
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-950 font-sans tracking-tight">
+                  {selectedClientProfile.name}
+                </h1>
+              </div>
+
+              <button
+                type="button"
+                id="btn-client-new-order"
+                onClick={() => onNewOrder(selectedClientProfile.id)}
+                className="px-5 py-2 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+              >
+                New Order
+              </button>
+            </div>
+
+            {/* Centered Client Profile Hero */}
+            <div className="flex flex-col items-center justify-center text-center space-y-2 py-1">
+              <div className="w-16 h-16 rounded-full bg-black text-white font-bold text-lg flex items-center justify-center shadow-sm">
+                {selectedClientProfile.initials}
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-gray-950">{selectedClientProfile.name}</h2>
+                <p className="text-[11px] text-gray-400">{selectedClientProfile.since}</p>
+              </div>
+              <div className="flex items-center gap-4 text-[11px] text-gray-600 font-medium">
+                <span className="flex items-center gap-1">
+                  <Phone className="w-3.5 h-3.5 text-gray-700" />
+                  {selectedClientProfile.phone}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Mail className="w-3.5 h-3.5 text-gray-700" />
+                  {selectedClientProfile.email}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Section: Body Measurement History Container (Fill: #F8F8F8, stroke: #FFFFFF, 8px radius) */}
+          <div className="bg-[#F8F8F8] border border-white rounded-[8px] p-5 space-y-4 shadow-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-200/60">
+              <div>
+                <h4 className="text-sm font-bold text-gray-950 font-sans tracking-tight">Body Measurement History</h4>
                 <p className="text-[10px] text-gray-400">All available points • Feminine Form</p>
               </div>
 
@@ -257,19 +260,19 @@ export function ClientsScreen({
                 <button
                   type="button"
                   onClick={() => setShowAddPointModal(true)}
-                  className="px-4 py-1.5 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold hover:bg-[#1e40af] transition-colors cursor-pointer"
+                  className="px-4 py-1.5 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold hover:bg-[#1e40af] transition-colors cursor-pointer shadow-xs"
                 >
                   Add Point
                 </button>
 
-                <div className="flex items-center bg-[#f4f5f7] p-1 rounded-full border border-gray-200/50">
+                <div className="flex items-center bg-[#E5E7EB] p-0.5 rounded-full border border-gray-200/50 shadow-xs">
                   <button
                     type="button"
                     onClick={() => setMannequinView('mannequin')}
                     className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
                       mannequinView === 'mannequin'
                         ? 'bg-[#1d4ed8] text-white shadow-xs'
-                        : 'text-gray-500'
+                        : 'text-gray-500 hover:text-gray-900'
                     }`}
                   >
                     <User className="w-3.5 h-3.5" />
@@ -280,7 +283,7 @@ export function ClientsScreen({
                     className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
                       mannequinView === 'table'
                         ? 'bg-[#1d4ed8] text-white shadow-xs'
-                        : 'text-gray-500'
+                        : 'text-gray-500 hover:text-gray-900'
                     }`}
                   >
                     <List className="w-3.5 h-3.5" />
@@ -300,22 +303,22 @@ export function ClientsScreen({
             </div>
           </div>
 
-          {/* Section: Order History */}
-          <div className="space-y-4 pt-4 border-t border-gray-100">
-            <h3 className="text-sm font-bold text-gray-950">Order History</h3>
+          {/* Section: Order History Container (Fill: #F8F8F8, stroke: #FFFFFF, 8px radius) */}
+          <div className="bg-[#F8F8F8] border border-white rounded-[8px] p-5 space-y-4 shadow-xs">
+            <h3 className="text-sm font-bold text-gray-950 font-sans tracking-tight">Order History</h3>
 
             {/* 3 Horizontal Cards in a row matching Clients.png */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {orderHistoryCards.map((card) => (
                 <div
                   key={card.id}
-                  className="rounded-2xl border border-gray-200 overflow-hidden flex flex-col justify-between bg-white shadow-xs"
+                  className="rounded-[8px] border border-white overflow-hidden flex flex-col justify-between bg-white shadow-xs"
                 >
                   {/* Card Header */}
                   <div className="p-4 space-y-2">
                     <div className="flex items-center justify-between">
                       <h4 className="text-xs font-bold text-gray-950">{card.title}</h4>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${card.badgeClass}`}>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${card.badgeClass}`}>
                         {card.badge}
                       </span>
                     </div>
@@ -326,7 +329,7 @@ export function ClientsScreen({
                       <span className="text-[10px] text-gray-500 block mb-1.5">Style references</span>
                       <div className="grid grid-cols-3 gap-1.5">
                         {card.images.map((img, idx) => (
-                          <div key={idx} className="aspect-square rounded-lg overflow-hidden bg-gray-100 border border-gray-100">
+                          <div key={idx} className="aspect-square rounded-[6px] overflow-hidden bg-gray-100 border border-gray-100">
                             <img
                               src={img}
                               alt="Style reference"

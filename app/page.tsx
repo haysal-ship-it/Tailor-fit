@@ -81,7 +81,7 @@ function TailorFitApp() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f0f2f5] text-gray-950">
+    <div className="min-h-screen flex flex-col bg-[#eaedf0] text-gray-950">
       {/* Navigation Header */}
       <Navbar />
 
