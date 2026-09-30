@@ -1,0 +1,6 @@
+{
+  "name": "TailorFit",
+  "description": "Bespoke tailoring and fashion design management app for client profiles, interactive body diagram measurements, style reference images, and pickup scheduling.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

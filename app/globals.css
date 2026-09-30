@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: var(--font-serif), Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-mono: var(--font-geist-mono), monospace;
+
+  --color-canvas: #f0f2f5;
+  --color-surface: #ffffff;
+  --color-field: #f7f8fa;
+  --color-ink: #111827;
+  --color-subtle: #6b7280;
+  --color-faint: #9ca3af;
+  --color-cobalt: #1d4ed8;
+  --color-cobalt-hover: #1e40af;
+}
+
+:root {
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: var(--font-serif), Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-mono: var(--font-geist-mono), monospace;
+}
+
+body {
+  background-color: #f0f2f5;
+  color: #111827;
+  font-family: var(--font-sans);
+}
+
+/* Subtle scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
