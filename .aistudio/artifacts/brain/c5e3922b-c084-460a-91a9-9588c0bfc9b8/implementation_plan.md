@@ -1,78 +1,151 @@
-# Plan: Responsive Modals (Web Backdrop Blur) & Bottom Sheet Drawers (Mobile)
+# 2px Container Rhythm & Phosphor Icons (Filled) Migration Plan
 
-Build and integrate pixel-accurate modal experiences matching `template modal.png`, `Mobile template modal.png`, `Overview modal point.png`, and `Mobile modal bottomsheet.png`.
+Architecture and implementation plan to enforce a uniform 2px gap rhythm between all inner cards on the Overview, Clients, and Settings screens, and migrate all iconography to `@phosphor-icons/react` with filled weight (`weight="fill"`).
 
----
+## User Review & Critical Decisions
 
-## 1. Architecture & Responsive Dual-Presentation
+> [!IMPORTANT]
+> The following explicit decisions and design requirements have been confirmed:
 
-Both dialogs will be responsive:
-- **Desktop (Web, `sm:` and above)**: Centered floating card with heavy backdrop blur (`backdrop-blur-md bg-black/40`), soft drop shadows (`shadow-2xl`), and rounded corners (`rounded-3xl`).
-- **Mobile (`< sm` / viewport under 640px)**: Slide-up bottom sheet drawer docked to screen bottom (`fixed inset-x-0 bottom-0 rounded-t-3xl`), featuring a dark top drag handle (`w-12 h-1 bg-black rounded-full mx-auto`), full touch ergonomics, and flexible vertical scrolling.
-
----
-
-## 2. Dialog 1: Garment Templates Modal & Bottom Sheet Drawer
-Triggered by pressing the **Choose Template** button in the New Client intake card.
-
-### Content & Visuals (Matching `template modal.png` & `Mobile template modal.png`):
-- **Header**:
-  - Title: `Garment Templates` (bold typography, matching atelier style)
-  - Subtitle: `Browse through available templates that suit all your bespoke needs.`
-- **Templates**:
-  1. **Shirt/Blouse** — *Essential measurements for bespoke dress shirts/blouses*
-  2. **Trousers/shorts** — *Fittings for tailored pants, trousers, pleated pants and shorts.*
-  3. **Gown/Dress** — *Evening wears, party gowns, wedding dress etc*
-  4. **Suits/Blazers** — *Full bespoke fitting of two piece suits or blazers and trousers*
-- **Layout**:
-  - **Desktop**: 2x2 grid of selectable cards (`grid-cols-2 gap-4`).
-  - **Mobile**: Single-column vertical stack (`flex flex-col gap-3`).
-- **Card States**:
-  - **Selected**: Royal blue border (`border-2 border-[#1D4ED8] bg-blue-50/20`), blue title text (`text-[#1D4ED8] font-bold`).
-  - **Unselected**: Subtle neutral border (`border border-gray-200/80 bg-white hover:border-gray-300`).
-- **Footer Actions**:
-  - **Cancel** pill button (`rounded-full bg-[#F3F4F6] text-gray-700 font-semibold px-8 py-3 text-sm hover:bg-gray-200`).
-  - **Choose Template** primary pill button (`rounded-full bg-[#1D4ED8] hover:bg-[#1E40AF] text-white font-semibold px-8 py-3 text-sm shadow-xs`).
-- **Interactions & Pre-fills**:
-  - When confirmed, sets the selected template, updates the Garment Type input field in the New Client form, and selects standard measurement presets.
+- **Confirmed Decision 1 (Phosphor Icons with Filled Weight)**: Install `@phosphor-icons/react` and replace `lucide-react` across navigation, action buttons, landmark indicators, and screen components. All primary icons and action elements will use `weight="fill"` for a bold, distinctive silhouette.
+- **Confirmed Decision 2 (Overview Page 2px Container Alignment)**:
+  - Outer white container: `bg-white p-[2px] rounded-[10px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] flex flex-col gap-[2px]`.
+  - Top row: New Client container (`bg-[#f8f8f8]`) and Mannequin container (`bg-[#f8f8f8]`) arranged side-by-side with a strict 2px gap (`grid grid-cols-1 lg:grid-cols-12 gap-[2px]`).
+  - Bottom row: Save button container (`bg-[#f8f8f8]`) placed 2px directly below the top row with `p-2 flex justify-end`.
+- **Confirmed Decision 3 (Clients Page 2px Container Alignment)**:
+  - Right dossier column outer container: `bg-white p-[2px] rounded-[10px] flex flex-col gap-[2px]`.
+  - Inner container 1: Client Profile container (`bg-[#f8f8f8]`).
+  - Inner container 2: Body Measurement History container (`bg-[#f8f8f8]`).
+  - Inner container 3: Order History container (`bg-[#f8f8f8]`).
+  - All three separated by a strict 2px vertical gap (`gap-[2px]`).
+- **Confirmed Decision 4 (Settings Page 2px Container Alignment)**:
+  - Right configuration column outer container: `bg-white p-[2px] rounded-[10px] flex flex-col gap-[2px]`.
+  - Inner container 1: Measurement and Billing Standards (`bg-[#f8f8f8]`).
+  - Inner container 2: Garment Blueprints (`bg-[#f8f8f8]`).
+  - Inner container 3: Sizing/Measurements (`bg-[#f8f8f8]`).
+  - All three separated by a strict 2px vertical gap (`gap-[2px]`) with no white border strokes.
 
 ---
 
-## 3. Dialog 2: Set Point Size Modal & Bottom Sheet Drawer
-Triggered when tapping individual points/landmarks on the mannequin or pressing "+ Add Point".
+## 1. Overview & Core Concept
 
-### Content & Visuals (Matching `Overview modal point.png` & `Mobile modal bottomsheet.png`):
-- **Header**:
-  - Title: `Set point size` (bold, clean typography)
-- **Body Row**:
-  - **Label**: Active landmark name (e.g. `Sleeve`, `Neck`, `Bust`, `Waist`, `Shoulder`, `Thigh`) on the left.
-  - **Input Capsule**: `bg-[#F8F8F8] border border-gray-200/80 rounded-xl px-4 py-2 flex items-center justify-between gap-3`.
-    - Numerical input with formatted value (or placeholder `0.0`), right-aligned text.
-    - Unit label: `CM` (or `IN` based on active atelier unit).
-- **Footer Actions**:
-  - **Cancel** pill button (`rounded-full bg-[#F3F4F6] text-gray-700 font-semibold px-6 py-2.5 text-xs hover:bg-gray-200`).
-  - **Add Point** primary pill button (`rounded-full bg-[#1D4ED8] hover:bg-[#1E40AF] text-white font-semibold px-6 py-2.5 text-xs shadow-xs`).
-- **Interactions**:
-  - Updates the active mannequin landmark measurement in real time and updates the measurement list and table view.
+- **What It Delivers**:
+  1. Complete icon pack migration from Lucide to Phosphor Icons (`@phosphor-icons/react`) with filled weight (`weight="fill"`) across all screens, headers, buttons, cards, and modal sheets.
+  2. Exact, standardized 2px inner container spacing rhythm on the Overview cockpit, Clients profile dossier, and Settings configuration view.
+- **Key Value**: Delivers the tactile, pixel-perfect feel of the original design mockups with crisp 2px insets and rich, solid Phosphor silhouettes.
 
 ---
 
-## 4. Implementation Steps
+## 2. User Experience & Visual Design
 
-1. **Update `components/AtelierMannequin.tsx`**:
-   - Update landmark click handler so clicking a landmark opens the new responsive "Set point size" dialog rather than the inline bottom bar.
-   - Pass landmark key, display name, current value, and unit to the modal.
+### Key User Flows & Visual Enhancements
 
-2. **Update `components/screens/OverviewScreen.tsx`**:
-   - Replace the legacy inline template dropdown with the full Garment Templates dialog (desktop centered modal with blur + mobile bottom sheet drawer).
-   - Integrate the "Set point size" modal & bottom sheet drawer with state connected to both the mannequin SVG points and the Add Point action.
+1. **Navigation Bar (`Navbar.tsx`)**:
+   - Floating header with 2px white border and `#f8f8f8` inner pill.
+   - Phosphor Filled Icons: `House` (fill) for Overview, `Users` (fill) for Clients, `Gear` (fill) for Settings, and `Bell` (fill) for alerts.
 
-3. **Responsive & Backdrop Blur Styling**:
-   - Shared backdrop with `fixed inset-0 z-50 bg-black/40 backdrop-blur-md transition-opacity`.
-   - Desktop wrapper: `hidden sm:flex items-center justify-center p-4 min-h-screen`.
-   - Mobile wrapper: `flex sm:hidden fixed inset-x-0 bottom-0 z-50`.
-   - Mobile top drag handle indicator: `w-12 h-1 bg-black rounded-full mx-auto mb-4`.
+2. **Overview Cockpit (`OverviewScreen.tsx`)**:
+   - Left parent white shell (`p-[2px] gap-[2px]`):
+     - Child 1: New Client Card (`bg-[#f8f8f8]`).
+     - Child 2: Mannequin Card (`bg-[#f8f8f8]`).
+       - Header actions: `Plus` (bold/fill) for Add Point, `User` (fill) and `List` (fill) for view toggle.
+     - 2px gap between Child 1 and Child 2 on desktop (`gap-[2px]`).
+     - Child 3: Save button card (`bg-[#f8f8f8]`) positioned 2px below with `FloppyDisk` (fill).
+   - Right parent white shell (`p-[2px] gap-[2px]`):
+     - Child 1: Garment's Calendar (`bg-[#f8f8f8]`).
+     - Child 2: Recent Orders (`bg-[#f8f8f8]`) with `CaretRight` (fill) navigation directing to client profile.
 
-4. **Verification**:
-   - Run `lint_applet` and `compile_applet`.
-   - Verify desktop view displays centered modals with backdrop blur and mobile viewport displays smooth bottom sheet drawers.
+3. **Clients Screen (`ClientsScreen.tsx`)**:
+   - Left column: Client Directory search bar with `MagnifyingGlass` (fill/bold).
+   - Right column parent white shell (`p-[2px] gap-[2px]`):
+     - Card 1: Client Profile Header with `Plus` (bold/fill) for New Order, `Phone` (fill), and `EnvelopeSimple` (fill).
+     - Card 2: Body Measurement History with `Plus` (bold/fill) Add Point, `User` (fill), and `List` (fill) toggle.
+     - Card 3: Order History with `Clock` (fill), `Scissors` (fill), and status badges.
+     - All 3 cards vertically stacked with strict 2px gap.
+
+4. **Settings Screen (`SettingsScreen.tsx`)**:
+   - Left column: Settings Navigation with `Ruler` (fill), `BookOpen` (fill), and `Tape` (fill).
+   - Right column parent white shell (`p-[2px] gap-[2px]`):
+     - Card 1: Measurement & Billing Standards (`bg-[#f8f8f8]`).
+     - Card 2: Garment Blueprints (`bg-[#f8f8f8]`) with `Plus` (fill) Add Template.
+     - Card 3: Sizing/Measurements (`bg-[#f8f8f8]`) with `Plus` (fill) Add Measurement.
+     - All 3 cards vertically stacked with strict 2px gap and no borders.
+
+---
+
+## 3. Key Product Decisions & Trade-Offs
+
+- **Decision 1: Phosphor Icons Package Selection**:
+  - *Chosen Approach*: Install `@phosphor-icons/react` and use `weight="fill"` for primary icons.
+  - *Why*: It is the official React implementation of Phosphor Icons, provides full tree-shaking, supports standard size and weight props (`weight="fill"`), and integrates smoothly with Tailwind CSS class names.
+- **Decision 2: Uniform 2px Spacing Technique**:
+  - *Chosen Approach*: Parent container uses `p-[2px] gap-[2px] bg-white rounded-[10px]`, and child cards use `bg-[#f8f8f8] rounded-[8px]`.
+  - *Why*: Eliminates arbitrary margins or thick border hacks. CSS flexbox/grid `gap-[2px]` guarantees mathematical precision between all adjacent cards.
+
+---
+
+## 4. Technical Architecture & Data Strategy
+
+### Component Layout & Icon Mapping Diagram
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ Navbar: bg-white p-[2px] rounded-full                                  │
+│   └─ Inner: bg-[#f8f8f8] px-6 py-2 rounded-full                        │
+│       ├─ Logo: TailorFit Geometric Mark                                │
+│       ├─ Center: [ House (fill) | Users (fill) | Gear (fill) ]         │
+│       └─ Right: Bell (fill) Circle Button                              │
+└────────────────────────────────────────────────────────────────────────┘
+                                 │
+         ┌───────────────────────┴───────────────────────┐
+         ▼                                               ▼
+┌──────────────────────────────────────┐  ┌──────────────────────────────┐
+│ Left Parent Shell (p-[2px] gap-[2px])│  │ Right Parent Shell (p-[2px]) │
+│ ┌──────────────────┬───────────────┐ │  │ ┌──────────────────────────┐ │
+│ │ New Client       │ Mannequin     │ │  │ │ Garment's Calendar      │ │
+│ │ bg-[#f8f8f8]     │ bg-[#f8f8f8]  │ │  │ │ bg-[#f8f8f8]            │ │
+│ │                  │ User/List     │ │  │ └──────────────────────────┘ │
+│ └──────────────────┴───────────────┘ │  │               ▲              │
+│                  ▲ 2px gap           │  │               │ 2px gap      │
+│ ┌──────────────────────────────────┐ │  │ ┌──────────────────────────┐ │
+│ │ Save Container: bg-[#f8f8f8]     │ │  │ │ Recent Orders            │ │
+│ │ FloppyDisk (fill) Save Button    │ │  │ │ CaretRight (fill) Links  │ │
+│ └──────────────────────────────────┘ │  │ └──────────────────────────┘ │
+└──────────────────────────────────────┘  └──────────────────────────────┘
+```
+
+### Phosphor Icon Replacement Mapping
+
+| Lucide Icon | Phosphor Replacement (`@phosphor-icons/react`) | Weight |
+|---|---|---|
+| `Home` | `House` | `fill` |
+| `Users` | `Users` | `fill` |
+| `Settings` | `Gear` | `fill` |
+| `Bell` | `Bell` | `fill` |
+| `Save` | `FloppyDisk` | `fill` |
+| `Plus` | `Plus` | `bold` / `fill` |
+| `User` | `User` | `fill` |
+| `List` | `List` | `fill` |
+| `ChevronRight` | `CaretRight` | `fill` |
+| `Search` | `MagnifyingGlass` | `bold` |
+| `Phone` | `Phone` | `fill` |
+| `Mail` | `EnvelopeSimple` | `fill` |
+| `Clock` | `Clock` | `fill` |
+| `Scissors` | `Scissors` | `fill` |
+| `X` | `X` | `bold` |
+| `Trash2` | `Trash` | `fill` |
+| `Edit2` | `PencilSimple` | `fill` |
+| `Calendar` | `CalendarBlank` | `fill` |
+
+---
+
+## 5. Execution Strategy
+
+1. **Dependency Installation**: Run `install_applet_package` with `@phosphor-icons/react`.
+2. **Icon & 2px Spacing Updates**:
+   - `components/Navbar.tsx`: Swap Lucide icons for Phosphor filled icons (`House`, `Users`, `Gear`, `Bell`).
+   - `components/screens/OverviewScreen.tsx`: Enforce 2px grid gap on New Client & Mannequin row, 2px gap to Save card, and replace all icons with Phosphor filled icons.
+   - `components/screens/ClientsScreen.tsx`: Verify 2px gap between Client Profile, Body Measurement History, and Order History containers; replace all icons with Phosphor filled icons.
+   - `components/screens/SettingsScreen.tsx`: Verify 2px gap between the 3 settings cards; replace icons with Phosphor filled icons.
+   - Secondary modals/screens (`OrderFormModal.tsx`, `ClientProfileScreen.tsx`, `OrdersScreen.tsx`): Update to Phosphor icons.
+3. **Verification**: Run `compile_applet` and `lint_applet` to confirm successful build.

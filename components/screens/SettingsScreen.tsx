@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@/lib/store';
-import { Plus, Check, X } from 'lucide-react';
+import { Plus, Check, X } from '@phosphor-icons/react';
 
 export function SettingsScreen() {
   const { settings, updateSettings, addTemplate, allHotspots } = useStore();
@@ -109,8 +109,8 @@ export function SettingsScreen() {
         {/* =========================================================================
             LEFT COLUMN: "Settings" Navigation Container (Fill: #FFFFFF, 2px padding/gap, 8px radius)
             ========================================================================= */}
-        <div className="lg:col-span-3 bg-white rounded-[8px] p-[2px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-white flex flex-col gap-[2px]">
-          <div className="bg-[#F8F8F8] border border-white rounded-[8px] p-4 space-y-4 shadow-xs">
+        <div className="lg:col-span-3 bg-white rounded-[8px] p-[2px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] flex flex-col gap-[2px]">
+          <div className="bg-[#F8F8F8] rounded-[8px] p-4 space-y-4 shadow-xs">
             <h2 className="text-sm font-bold text-gray-950 font-sans tracking-tight">
               Settings
             </h2>
@@ -158,9 +158,9 @@ export function SettingsScreen() {
         {/* =========================================================================
             RIGHT COLUMN: Settings Sections (Fill: #FFFFFF, 2px padding/gap, 8px radius)
             ========================================================================= */}
-        <div className="lg:col-span-9 bg-white rounded-[8px] p-[2px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-white flex flex-col gap-[2px]">
+        <div className="lg:col-span-9 bg-white rounded-[8px] p-[2px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] flex flex-col gap-[2px]">
           {/* SECTION 1: Measurement & Billing Standards */}
-          <div className="bg-[#F8F8F8] border border-white rounded-[8px] p-5 sm:p-6 space-y-5 shadow-xs">
+          <div className="bg-[#F8F8F8] rounded-[8px] p-5 sm:p-6 space-y-5 shadow-xs">
             <div>
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
                 DEFAULT UNITS AND CURRENCY SYMBOLS
@@ -215,10 +215,10 @@ export function SettingsScreen() {
                   className={`py-3 px-4 rounded-[8px] border text-center cursor-pointer transition-all ${
                     selectedCurrency === 'NGN (₦)'
                       ? 'border-[#1d4ed8] bg-blue-50/50 shadow-xs'
-                      : 'border-white bg-white hover:border-gray-200 shadow-xs'
+                      : 'border-transparent bg-white hover:border-gray-200 shadow-xs'
                   }`}
                 >
-                  <span className="text-xs font-bold text-[#1d4ed8]">NGN (₦)</span>
+                  <span className={`text-xs font-bold ${selectedCurrency === 'NGN (₦)' ? 'text-[#1d4ed8]' : 'text-gray-900'}`}>NGN (₦)</span>
                 </div>
 
                 {/* 2. US Dollar ($) */}
@@ -227,41 +227,41 @@ export function SettingsScreen() {
                   className={`py-3 px-4 rounded-[8px] border text-center cursor-pointer transition-all ${
                     selectedCurrency === 'US Dollar ($)'
                       ? 'border-[#1d4ed8] bg-blue-50/50 shadow-xs'
-                      : 'border-white bg-white hover:border-gray-200 shadow-xs'
+                      : 'border-transparent bg-white hover:border-gray-200 shadow-xs'
                   }`}
                 >
-                  <span className="text-xs font-bold text-gray-800">US Dollar ($)</span>
+                  <span className={`text-xs font-bold ${selectedCurrency === 'US Dollar ($)' ? 'text-[#1d4ed8]' : 'text-gray-900'}`}>US Dollar ($)</span>
                 </div>
 
-                {/* 3. Euro () */}
+                {/* 3. Euro (€) */}
                 <div
-                  onClick={() => setSelectedCurrency('Euro ()')}
+                  onClick={() => setSelectedCurrency('Euro (€)')}
                   className={`py-3 px-4 rounded-[8px] border text-center cursor-pointer transition-all ${
-                    selectedCurrency === 'Euro ()'
+                    selectedCurrency === 'Euro (€)'
                       ? 'border-[#1d4ed8] bg-blue-50/50 shadow-xs'
-                      : 'border-white bg-white hover:border-gray-200 shadow-xs'
+                      : 'border-transparent bg-white hover:border-gray-200 shadow-xs'
                   }`}
                 >
-                  <span className="text-xs font-bold text-gray-800">Euro ()</span>
+                  <span className={`text-xs font-bold ${selectedCurrency === 'Euro (€)' ? 'text-[#1d4ed8]' : 'text-gray-900'}`}>Euro (€)</span>
                 </div>
 
-                {/* 4. Pounds ( */}
+                {/* 4. Pounds (£) */}
                 <div
-                  onClick={() => setSelectedCurrency('Pounds (')}
+                  onClick={() => setSelectedCurrency('Pounds (£)')}
                   className={`py-3 px-4 rounded-[8px] border text-center cursor-pointer transition-all ${
-                    selectedCurrency === 'Pounds ('
+                    selectedCurrency === 'Pounds (£)'
                       ? 'border-[#1d4ed8] bg-blue-50/50 shadow-xs'
-                      : 'border-white bg-white hover:border-gray-200 shadow-xs'
+                      : 'border-transparent bg-white hover:border-gray-200 shadow-xs'
                   }`}
                 >
-                  <span className="text-xs font-bold text-gray-800">Pounds (</span>
+                  <span className={`text-xs font-bold ${selectedCurrency === 'Pounds (£)' ? 'text-[#1d4ed8]' : 'text-gray-900'}`}>Pounds (£)</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* SECTION 2: Garments Blueprints */}
-          <div className="bg-[#F8F8F8] border border-white rounded-[8px] p-5 sm:p-6 space-y-4 shadow-xs">
+          <div className="bg-[#F8F8F8] rounded-[8px] p-5 sm:p-6 space-y-4 shadow-xs">
             <div className="flex items-center justify-between">
               <div>
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
@@ -275,9 +275,10 @@ export function SettingsScreen() {
               <button
                 type="button"
                 onClick={() => setShowAddTemplateModal(true)}
-                className="px-5 py-2 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
               >
-                Add Template
+                <Plus className="w-3.5 h-3.5" weight="bold" />
+                <span>Add Template</span>
               </button>
             </div>
 
@@ -286,7 +287,7 @@ export function SettingsScreen() {
               {blueprints.map((bp) => (
                 <div
                   key={bp.id}
-                  className="p-4 rounded-[8px] bg-white border border-white shadow-xs flex flex-col justify-between space-y-3"
+                  className="p-4 rounded-[8px] bg-white border border-gray-100/60 shadow-xs flex flex-col justify-between space-y-3"
                 >
                   <div>
                     <h3 className="text-xs font-bold text-gray-950 mb-1">{bp.title}</h3>
@@ -313,7 +314,7 @@ export function SettingsScreen() {
           </div>
 
           {/* SECTION 3: Sizing/Measurements */}
-          <div className="bg-[#F8F8F8] border border-white rounded-[8px] p-5 sm:p-6 space-y-4 shadow-xs">
+          <div className="bg-[#F8F8F8] rounded-[8px] p-5 sm:p-6 space-y-4 shadow-xs">
             <div className="flex items-center justify-between">
               <div>
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
@@ -327,9 +328,10 @@ export function SettingsScreen() {
               <button
                 type="button"
                 onClick={() => setShowAddMeasurementModal(true)}
-                className="px-5 py-2 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
               >
-                Add Measurement
+                <Plus className="w-3.5 h-3.5" weight="bold" />
+                <span>Add Measurement</span>
               </button>
             </div>
 
@@ -338,7 +340,7 @@ export function SettingsScreen() {
               {sizingItems.map((item) => (
                 <div
                   key={item.id}
-                  className="p-3.5 rounded-[8px] bg-white border border-white shadow-xs text-center space-y-1"
+                  className="p-3.5 rounded-[8px] bg-white border border-gray-100/60 shadow-xs text-center space-y-1"
                 >
                   <h4 className="text-xs font-bold text-gray-950">{item.title}</h4>
                   <p className="text-[10px] text-gray-500">{item.category}</p>
@@ -360,7 +362,7 @@ export function SettingsScreen() {
                 onClick={() => setShowAddTemplateModal(false)}
                 className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-900"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-3.5 h-3.5" weight="bold" />
               </button>
             </div>
 
@@ -423,7 +425,7 @@ export function SettingsScreen() {
                 onClick={() => setShowAddMeasurementModal(false)}
                 className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-900"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-3.5 h-3.5" weight="bold" />
               </button>
             </div>
 

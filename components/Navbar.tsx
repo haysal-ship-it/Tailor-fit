@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@/lib/store';
-import { Bell, Home, Users, Settings as SettingsIcon } from 'lucide-react';
+import { Bell, House, Users, Gear } from '@phosphor-icons/react';
 
 // Precision Origami Folded "T" Icon matching mockup
 export function OrigamiTailorFitLogo({ className = 'w-8 h-8' }: { className?: string }) {
@@ -58,77 +58,79 @@ export function Navbar() {
     <>
       {/* Desktop Floating Navbar */}
       <div className="w-full px-4 sm:px-6 pt-4 pb-2">
-        <header className="max-w-[1440px] mx-auto bg-white rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/90 px-6 py-3 flex items-center justify-between">
-          {/* Brand Logo */}
-          <div 
-            onClick={() => setActiveScreen('overview')}
-            className="flex items-center gap-3 cursor-pointer select-none group"
-            id="brand-logo-button"
-          >
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105">
-              <OrigamiTailorFitLogo className="w-8 h-8" />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-gray-950 font-sans">
-              TailorFit
-            </span>
-          </div>
-
-          {/* Central Black Pill Capsule Navigation */}
-          <nav 
-            className="hidden md:flex items-center bg-[#0a0a0a] rounded-full p-1 shadow-md gap-1"
-            aria-label="Main Navigation"
-          >
-            <button
-              type="button"
-              id="nav-pill-overview"
+        <header className="max-w-[1440px] mx-auto bg-[#ffffff] p-[2px] rounded-full shadow-[0_2px_12px_rgba(0,0,0,0.03)]">
+          <div className="w-full bg-[#f8f8f8] px-[24px] py-[8px] rounded-full flex items-center justify-between">
+            {/* Brand Logo */}
+            <div 
               onClick={() => setActiveScreen('overview')}
-              className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer ${
-                isOverview
-                  ? 'bg-white text-gray-950 font-bold shadow-xs'
-                  : 'text-gray-300 hover:text-white'
-              }`}
+              className="flex items-center gap-3 cursor-pointer select-none group"
+              id="brand-logo-button"
             >
-              <Home className="w-4 h-4" />
-              <span>Overview</span>
-            </button>
-            <button
-              type="button"
-              id="nav-pill-clients"
-              onClick={() => setActiveScreen('clients')}
-              className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer ${
-                isClients
-                  ? 'bg-white text-gray-950 font-bold shadow-xs'
-                  : 'text-gray-300 hover:text-white'
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span>Clients</span>
-            </button>
-            <button
-              type="button"
-              id="nav-pill-settings"
-              onClick={() => setActiveScreen('settings')}
-              className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer ${
-                isSettings
-                  ? 'bg-white text-gray-950 font-bold shadow-xs'
-                  : 'text-gray-300 hover:text-white'
-              }`}
-            >
-              <SettingsIcon className="w-4 h-4" />
-              <span>Settings</span>
-            </button>
-          </nav>
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105">
+                <OrigamiTailorFitLogo className="w-8 h-8" />
+              </div>
+              <span className="text-xl font-bold tracking-tight text-gray-950 font-sans">
+                TailorFit
+              </span>
+            </div>
 
-          {/* Right Action: Single Circular Notification Bell Button matching mockup */}
-          <div className="flex items-center">
-            <button
-              type="button"
-              id="header-bell-button"
-              className="w-10 h-10 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-900 hover:bg-gray-50 transition-colors shadow-xs cursor-pointer"
-              aria-label="Studio Alerts"
+            {/* Central Black Pill Capsule Navigation */}
+            <nav 
+              className="hidden md:flex items-center bg-[#0a0a0a] rounded-full p-1 shadow-md gap-1"
+              aria-label="Main Navigation"
             >
-              <Bell className="w-4 h-4 fill-gray-950 text-gray-950" />
-            </button>
+              <button
+                type="button"
+                id="nav-pill-overview"
+                onClick={() => setActiveScreen('overview')}
+                className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                  isOverview
+                    ? 'bg-white text-gray-950 font-bold shadow-xs'
+                    : 'text-gray-300 hover:text-white'
+                }`}
+              >
+                <House className="w-4 h-4" weight="fill" />
+                <span>Overview</span>
+              </button>
+              <button
+                type="button"
+                id="nav-pill-clients"
+                onClick={() => setActiveScreen('clients')}
+                className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                  isClients
+                    ? 'bg-white text-gray-950 font-bold shadow-xs'
+                    : 'text-gray-300 hover:text-white'
+                }`}
+              >
+                <Users className="w-4 h-4" weight="fill" />
+                <span>Clients</span>
+              </button>
+              <button
+                type="button"
+                id="nav-pill-settings"
+                onClick={() => setActiveScreen('settings')}
+                className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                  isSettings
+                    ? 'bg-white text-gray-950 font-bold shadow-xs'
+                    : 'text-gray-300 hover:text-white'
+                }`}
+              >
+                <Gear className="w-4 h-4" weight="fill" />
+                <span>Settings</span>
+              </button>
+            </nav>
+
+            {/* Right Action: Single Circular Notification Bell Button matching mockup */}
+            <div className="flex items-center">
+              <button
+                type="button"
+                id="header-bell-button"
+                className="w-10 h-10 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-900 hover:bg-gray-50 transition-colors shadow-xs cursor-pointer"
+                aria-label="Studio Alerts"
+              >
+                <Bell className="w-4 h-4 text-gray-950" weight="fill" />
+              </button>
+            </div>
           </div>
         </header>
       </div>
@@ -143,7 +145,7 @@ export function Navbar() {
               isOverview ? 'bg-white text-black font-semibold shadow-xs' : 'text-gray-300'
             }`}
           >
-            <Home className="w-3.5 h-3.5" />
+            <House className="w-3.5 h-3.5" weight="fill" />
             <span>Overview</span>
           </button>
           <button
@@ -153,7 +155,7 @@ export function Navbar() {
               isClients ? 'bg-white text-black font-semibold shadow-xs' : 'text-gray-300'
             }`}
           >
-            <Users className="w-3.5 h-3.5" />
+            <Users className="w-3.5 h-3.5" weight="fill" />
             <span>Clients</span>
           </button>
           <button
@@ -163,7 +165,7 @@ export function Navbar() {
               isSettings ? 'bg-white text-black font-semibold shadow-xs' : 'text-gray-300'
             }`}
           >
-            <SettingsIcon className="w-3.5 h-3.5" />
+            <Gear className="w-3.5 h-3.5" weight="fill" />
             <span>Settings</span>
           </button>
         </nav>

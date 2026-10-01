@@ -12,7 +12,7 @@ import { OrdersScreen } from '@/components/screens/OrdersScreen';
 import { PickupCalendarScreen } from '@/components/screens/PickupCalendarScreen';
 import { SettingsScreen } from '@/components/screens/SettingsScreen';
 import { OrderFormModal } from '@/components/screens/OrderFormModal';
-import { X, UserPlus } from 'lucide-react';
+import { X, UserPlus } from '@phosphor-icons/react';
 
 function TailorFitApp() {
   const { 
@@ -156,7 +156,7 @@ function TailorFitApp() {
                 onClick={() => setIsNewClientModalOpen(false)}
                 className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 hover:text-gray-900 flex items-center justify-center"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4" weight="bold" />
               </button>
             </div>
 

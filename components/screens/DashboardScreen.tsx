@@ -129,7 +129,7 @@ export function DashboardScreen({
                   return (
                     <div
                       key={ord.id}
-                      onClick={() => onOpenOrder(ord.id)}
+                      onClick={() => onOpenClient(ord.clientId)}
                       className="text-[12px] flex items-center justify-between p-2 rounded-[10px] bg-[#fdfcfc] cursor-pointer hover:border-[#000000] border border-[#ebe8e4]"
                     >
                       <span className="font-medium text-[#000000] truncate">

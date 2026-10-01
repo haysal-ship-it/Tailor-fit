@@ -5,22 +5,22 @@ import { useStore } from '@/lib/store';
 import { 
   ArrowLeft, 
   Phone, 
-  Mail, 
-  Calendar, 
+  EnvelopeSimple, 
+  CalendarBlank, 
   Scissors, 
   Plus, 
-  ShoppingBag, 
+  Bag, 
   Image as ImageIcon, 
-  ChevronDown, 
-  ChevronUp, 
+  CaretDown, 
+  CaretUp, 
   Clock, 
-  ExternalLink,
-  Trash2,
-  Edit2,
-  Upload,
-  Check,
-  X
-} from 'lucide-react';
+  ArrowSquareOut, 
+  Trash, 
+  PencilSimple, 
+  UploadSimple, 
+  Check, 
+  X 
+} from '@phosphor-icons/react';
 import { MeasurementSnapshot, Order, ReferenceImage, OrderStatus } from '@/types';
 
 interface ClientProfileScreenProps {
@@ -119,7 +119,7 @@ export function ClientProfileScreen({
             className="w-10 h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center text-gray-700 hover:bg-gray-50 transition-colors shadow-xs"
             title="Back to Clients"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4" weight="bold" />
           </button>
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-full bg-[#e5e7eb] text-gray-800 font-bold text-sm flex items-center justify-center border border-gray-200/60 shrink-0">
@@ -146,8 +146,8 @@ export function ClientProfileScreen({
             }}
             className="px-5 py-2.5 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-semibold shadow-xs flex items-center gap-2 transition-colors"
           >
-            <Scissors className="w-3.5 h-3.5" />
-            <span>Measure on 3D Mannequin</span>
+            <Scissors className="w-3.5 h-3.5" weight="fill" />
+            <span>Measure on Mannequin</span>
           </button>
 
           <button
@@ -155,7 +155,7 @@ export function ClientProfileScreen({
             onClick={() => onNewOrder(client.id)}
             className="px-4 py-2.5 rounded-full border border-gray-200 text-gray-800 text-xs font-semibold hover:bg-gray-50 transition-colors shadow-xs flex items-center gap-1.5"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-3.5 h-3.5" weight="bold" />
             <span>New Commission</span>
           </button>
         </div>
@@ -175,12 +175,12 @@ export function ClientProfileScreen({
 
             <div className="space-y-3.5 text-xs text-gray-700">
               <div className="flex items-center gap-3 p-3 rounded-2xl bg-[#f7f8fa] border border-gray-100">
-                <Phone className="w-4 h-4 text-gray-400 shrink-0" />
+                <Phone className="w-4 h-4 text-gray-400 shrink-0" weight="fill" />
                 <span className="font-semibold text-gray-900">{client.phone}</span>
               </div>
 
               <div className="flex items-center gap-3 p-3 rounded-2xl bg-[#f7f8fa] border border-gray-100">
-                <Mail className="w-4 h-4 text-gray-400 shrink-0" />
+                <EnvelopeSimple className="w-4 h-4 text-gray-400 shrink-0" weight="fill" />
                 <span className="font-semibold text-gray-900 truncate">{client.email}</span>
               </div>
 
@@ -207,7 +207,7 @@ export function ClientProfileScreen({
                     }}
                     className="text-[11px] font-semibold text-[#1d4ed8] hover:underline flex items-center gap-1"
                   >
-                    <Edit2 className="w-3 h-3" />
+                    <PencilSimple className="w-3 h-3" weight="fill" />
                     <span>Edit</span>
                   </button>
                 ) : (
@@ -224,7 +224,7 @@ export function ClientProfileScreen({
                       onClick={saveNotes}
                       className="text-[11px] font-semibold text-[#1d4ed8] hover:underline flex items-center gap-0.5"
                     >
-                      <Check className="w-3 h-3" />
+                      <Check className="w-3 h-3" weight="bold" />
                       <span>Save</span>
                     </button>
                   </div>

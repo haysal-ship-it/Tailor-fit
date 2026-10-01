@@ -4,15 +4,16 @@ import React, { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { AtelierMannequin } from '@/components/AtelierMannequin';
 import { 
-  ChevronDown, 
-  Upload, 
+  CaretDown, 
+  UploadSimple, 
   Check, 
-  ChevronRight, 
-  Save, 
+  CaretRight, 
+  FloppyDisk, 
   X,
   User,
-  List
-} from 'lucide-react';
+  List,
+  Plus
+} from '@phosphor-icons/react';
 
 export interface GarmentTemplate {
   id: string;
@@ -102,7 +103,7 @@ export function OverviewScreen({
 
   // Form states - template starts as empty string so button displays "Choose Template"
   const [selectedTemplate, setSelectedTemplate] = useState('');
-  const [gender, setGender] = useState<'M' | 'F'>('M');
+  const [gender, setGender] = useState<'M' | 'F'>('F');
   const [clientName, setClientName] = useState('');
   const [garmentType, setGarmentType] = useState('');
   const [phone, setPhone] = useState('');
@@ -269,7 +270,7 @@ export function OverviewScreen({
       {saveSuccess && (
         <div className="fixed top-6 right-6 z-50 bg-[#0a0a0a] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-gray-800 animate-in fade-in">
           <div className="w-6 h-6 rounded-full bg-[#10b981] text-white flex items-center justify-center">
-            <Check className="w-3.5 h-3.5 stroke-[3]" />
+            <Check className="w-3.5 h-3.5" weight="bold" />
           </div>
           <span className="text-sm font-medium">Order &amp; Measurements saved successfully!</span>
         </div>
@@ -289,22 +290,22 @@ export function OverviewScreen({
         {/* =========================================================================
             SHARED PARENT CONTAINER (Fill: #FFFFFF): Houses New Client + Mannequin + Save Container
             ========================================================================= */}
-        <div className="lg:col-span-8 xl:col-span-9 bg-white rounded-[8px] p-[2px] border border-white shadow-[0_2px_12px_rgba(0,0,0,0.03)] flex flex-col gap-[2px]">
+        <div className="lg:col-span-8 xl:col-span-9 bg-white rounded-[8px] p-[2px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] flex flex-col gap-[2px]">
           
-          {/* Sub-containers Row with gap-2px */}
+          {/* Sub-containers Row with original 2px gap */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-[2px] items-stretch">
             
             {/* -----------------------------------------------------------------------
-                CHILD 1: "New Client" Container (Fill: #F8F8F8, stroke: #FFFFFF)
+                CHILD 1: "New Client" Container (Fill: #F8F8F8, stroke removed)
                 ----------------------------------------------------------------------- */}
-            <div className="lg:col-span-5 bg-[#F8F8F8] border border-white rounded-[8px] p-4 space-y-4 shadow-xs">
+            <div className="lg:col-span-5 bg-[#F8F8F8] rounded-[8px] p-4 space-y-4 shadow-xs">
               {/* Card Title */}
               <h2 className="text-lg font-bold text-gray-950 font-sans tracking-tight">
                 New Client
               </h2>
 
-              {/* Combined Top Pill Container (Fill: #FFFFFF): "Choose Template" Button (Centered, No Icon) & Gender Toggle */}
-              <div className="relative bg-white rounded-full p-1 flex items-center gap-1.5 shadow-xs border border-white">
+              {/* Combined Top Pill Container: "Choose Template" Button & Gender Toggle with #f2f2f2 fill */}
+              <div className="relative bg-white rounded-full p-1 flex items-center gap-1.5 shadow-xs">
                 <div className="relative flex-1">
                   <button
                     type="button"
@@ -319,15 +320,15 @@ export function OverviewScreen({
                   </button>
                 </div>
 
-                {/* Gender Toggle: [ M | F ] in same white container */}
-                <div className="flex items-center gap-1 shrink-0 pr-1">
+                {/* Gender Toggle beside Choose Template: active button matches Add Point button (#1d4ed8) with white text */}
+                <div className="flex items-center gap-0.5 bg-[#f2f2f2] p-1 rounded-full shrink-0">
                   <button
                     type="button"
                     onClick={() => setGender('M')}
-                    className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all ${
+                    className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all cursor-pointer ${
                       gender === 'M'
                         ? 'bg-[#1d4ed8] text-white shadow-xs'
-                        : 'text-gray-600 hover:text-gray-900'
+                        : 'text-gray-500 hover:text-gray-800'
                     }`}
                   >
                     M
@@ -335,10 +336,10 @@ export function OverviewScreen({
                   <button
                     type="button"
                     onClick={() => setGender('F')}
-                    className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all ${
+                    className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all cursor-pointer ${
                       gender === 'F'
                         ? 'bg-[#1d4ed8] text-white shadow-xs'
-                        : 'text-gray-600 hover:text-gray-900'
+                        : 'text-gray-500 hover:text-gray-800'
                     }`}
                   >
                     F
@@ -423,7 +424,7 @@ export function OverviewScreen({
                   ) : (
                     <div className="flex flex-col items-center gap-1.5 text-gray-500">
                       <div className="w-8 h-8 rounded-full bg-[#f4f5f7] flex items-center justify-center text-gray-700">
-                        <Upload className="w-4 h-4" />
+                        <UploadSimple className="w-4 h-4" weight="bold" />
                       </div>
                       <span className="text-xs font-semibold text-gray-700">
                         Tap to upload image
@@ -478,9 +479,9 @@ export function OverviewScreen({
             </div>
 
             {/* -----------------------------------------------------------------------
-                CHILD 2: "Mannequin" OR "Measurement List View" (Fill: #F8F8F8, stroke: #FFFFFF)
+                CHILD 2: "Mannequin" OR "Measurement List View" (Fill: #F8F8F8, stroke removed)
                 ----------------------------------------------------------------------- */}
-            <div className="lg:col-span-7 bg-[#F8F8F8] border border-white rounded-[8px] p-4 flex flex-col justify-between min-h-[640px] relative overflow-hidden shadow-xs">
+            <div className="lg:col-span-7 bg-[#F8F8F8] rounded-[8px] p-4 flex flex-col justify-between min-h-[640px] relative overflow-hidden shadow-xs">
               {/* Card Header */}
               <div className="flex items-center justify-between pb-3 border-b border-gray-200/60">
                 <div>
@@ -489,7 +490,7 @@ export function OverviewScreen({
                   </h2>
                   <p className="text-xs text-gray-400">
                     {centerView === 'mannequin'
-                      ? 'All available points • Feminine Form'
+                      ? 'All available points'
                       : 'Fast keyboard entry for all garment fields'}
                   </p>
                 </div>
@@ -506,9 +507,10 @@ export function OverviewScreen({
                         isCustom: true,
                       })
                     }
-                    className="px-4 py-1.5 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold hover:bg-[#1e40af] transition-colors cursor-pointer shadow-xs"
+                    className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold hover:bg-[#1e40af] transition-colors cursor-pointer shadow-xs"
                   >
-                    Add Point
+                    <Plus className="w-3.5 h-3.5" weight="bold" />
+                    <span>Add Point</span>
                   </button>
 
                   {/* Segmented Icon Toggle matching mockups */}
@@ -523,7 +525,7 @@ export function OverviewScreen({
                       }`}
                       title="Mannequin Body Diagram"
                     >
-                      <User className="w-3.5 h-3.5" />
+                      <User className="w-3.5 h-3.5" weight="fill" />
                     </button>
                     <button
                       type="button"
@@ -535,7 +537,7 @@ export function OverviewScreen({
                       }`}
                       title="Measurement List View"
                     >
-                      <List className="w-3.5 h-3.5" />
+                      <List className="w-3.5 h-3.5" weight="fill" />
                     </button>
                   </div>
                 </div>
@@ -577,7 +579,7 @@ export function OverviewScreen({
                             onClick={() => handleDeleteListItem(item.id)}
                             className="text-gray-400 hover:text-gray-700"
                           >
-                            <X className="w-3.5 h-3.5" />
+                            <X className="w-3.5 h-3.5" weight="bold" />
                           </button>
                         </div>
 
@@ -588,7 +590,7 @@ export function OverviewScreen({
                             onChange={(e) => handleListValueChange(item.id, e.target.value)}
                             className="w-16 text-xs font-semibold text-gray-900 focus:outline-none bg-transparent"
                           />
-                          <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
+                          <Check className="w-3.5 h-3.5 text-emerald-600" weight="bold" />
                         </div>
                       </div>
                     ))}
@@ -600,15 +602,15 @@ export function OverviewScreen({
 
           {/* -----------------------------------------------------------------------
               CONTAINER HOUSING THE SAVE BUTTON BELOW THE TWO CONTAINERS
-              (Fill: #F8F8F8, stroke: #FFFFFF, gap-2px from top containers)
+              (Fill: #F8F8F8, stroke removed)
               ----------------------------------------------------------------------- */}
-          <div className="bg-[#F8F8F8] border border-white rounded-[8px] p-2 flex justify-end items-center shadow-xs">
+          <div className="bg-[#F8F8F8] rounded-[8px] p-2 flex justify-end items-center shadow-xs">
             <button
               type="button"
               onClick={handleSave}
               className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
             >
-              <Save className="w-3.5 h-3.5" />
+              <FloppyDisk className="w-3.5 h-3.5" weight="fill" />
               <span>Save</span>
             </button>
           </div>
@@ -617,14 +619,14 @@ export function OverviewScreen({
         {/* =========================================================================
             RIGHT PARENT CONTAINER (Fill: #FFFFFF): Garment's Calendar & Recent Orders
             ========================================================================= */}
-        <div className="lg:col-span-4 xl:col-span-3 bg-white rounded-[8px] p-[2px] border border-white shadow-[0_2px_12px_rgba(0,0,0,0.03)] flex flex-col gap-[2px]">
+        <div className="lg:col-span-4 xl:col-span-3 bg-white rounded-[8px] p-[2px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] flex flex-col gap-[2px]">
           {/* Garment's Calendar Inner Card */}
-          <div className="bg-[#F8F8F8] border border-white rounded-[8px] p-4 space-y-3.5 shadow-xs">
+          <div className="bg-[#F8F8F8] rounded-[8px] p-4 space-y-3.5 shadow-xs">
             <h2 className="text-base font-bold text-gray-950 font-sans tracking-tight">
               Garment&apos;s Calendar
             </h2>
 
-            {/* Weekday Columns (Fill: #FFFFFF, rounded-[4px], gap: 2px) */}
+            {/* Weekday Columns */}
             <div className="grid grid-cols-7 gap-[2px] text-center text-xs font-medium">
               <div className="bg-white rounded-[4px] py-1.5 text-gray-400">Mon</div>
               <div className="bg-white rounded-[4px] py-1.5 text-gray-400">Tue</div>
@@ -635,7 +637,7 @@ export function OverviewScreen({
               <div className="bg-white rounded-[4px] py-1.5 text-gray-400">Sun</div>
             </div>
 
-            {/* Calendar Days 1 to 31 (Fill: #FFFFFF, rounded-[4px], gap: 2px) */}
+            {/* Calendar Days 1 to 31 */}
             <div className="grid grid-cols-7 gap-[2px] text-center text-xs">
               {/* Offset for 1st of month: 2 blank days */}
               <div className="aspect-square" />
@@ -676,15 +678,15 @@ export function OverviewScreen({
             </div>
           </div>
 
-          {/* Recent Orders Container (Fill: #F8F8F8, stroke: #FFFFFF) */}
-          <div className="bg-[#F8F8F8] border border-white rounded-[8px] p-4 space-y-3 shadow-xs">
+          {/* Recent Orders Container (Fill: #F8F8F8, stroke removed) */}
+          <div className="bg-[#F8F8F8] rounded-[8px] p-4 space-y-3 shadow-xs">
             <h3 className="text-sm font-bold text-gray-950 font-sans tracking-tight">Recent Orders</h3>
 
             <div className="space-y-2">
-              {/* Order 1: Chloe Dallas */}
+              {/* Order 1: Chloe Dallas -> directly routes to Client Profile c-1 */}
               <div 
-                onClick={() => onOpenOrder('ord-101')}
-                className="p-3 rounded-[8px] bg-white border border-white hover:bg-gray-50 transition-colors flex items-center justify-between cursor-pointer shadow-xs"
+                onClick={() => onOpenClient('c-1')}
+                className="p-3 rounded-[8px] bg-white border border-gray-100 hover:bg-gray-50 transition-colors flex items-center justify-between cursor-pointer shadow-xs"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-[#f4f5f7] font-bold text-xs text-gray-900 flex items-center justify-center border border-gray-100">
@@ -695,13 +697,13 @@ export function OverviewScreen({
                     <p className="text-[10px] text-gray-500">Bespoke African Gown</p>
                   </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-gray-400" />
+                <CaretRight className="w-4 h-4 text-gray-400" weight="fill" />
               </div>
 
-              {/* Order 2: Taylor Razaq */}
+              {/* Order 2: Taylor Razaq -> directly routes to Client Profile c-2 */}
               <div 
-                onClick={() => onOpenOrder('ord-102')}
-                className="p-3 rounded-[8px] bg-white border border-white hover:bg-gray-50 transition-colors flex items-center justify-between cursor-pointer shadow-xs"
+                onClick={() => onOpenClient('c-2')}
+                className="p-3 rounded-[8px] bg-white border border-gray-100 hover:bg-gray-50 transition-colors flex items-center justify-between cursor-pointer shadow-xs"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-[#f4f5f7] font-bold text-xs text-gray-900 flex items-center justify-center border border-gray-100">
@@ -712,13 +714,13 @@ export function OverviewScreen({
                     <p className="text-[10px] text-gray-500">Bespoke African Gown</p>
                   </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-gray-400" />
+                <CaretRight className="w-4 h-4 text-gray-400" weight="fill" />
               </div>
 
-              {/* Order 3: Bryan Muhammed */}
+              {/* Order 3: Bryan Muhammed -> directly routes to Client Profile c-3 */}
               <div 
-                onClick={() => onOpenOrder('ord-103')}
-                className="p-3 rounded-[8px] bg-white border border-white hover:bg-gray-50 transition-colors flex items-center justify-between cursor-pointer shadow-xs"
+                onClick={() => onOpenClient('c-3')}
+                className="p-3 rounded-[8px] bg-white border border-gray-100 hover:bg-gray-50 transition-colors flex items-center justify-between cursor-pointer shadow-xs"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-[#f4f5f7] font-bold text-xs text-gray-900 flex items-center justify-center border border-gray-100">
@@ -729,7 +731,7 @@ export function OverviewScreen({
                     <p className="text-[10px] text-gray-500">Bespoke African Gown</p>
                   </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-gray-400" />
+                <CaretRight className="w-4 h-4 text-gray-400" weight="fill" />
               </div>
             </div>
           </div>
@@ -769,7 +771,7 @@ export function OverviewScreen({
                 onClick={() => setIsTemplateModalOpen(false)}
                 className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-900 transition-colors shrink-0 cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4" weight="bold" />
               </button>
             </div>
 
@@ -839,7 +841,7 @@ export function OverviewScreen({
           />
 
           {/* Modal / Bottom Sheet Card */}
-          <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-5 sm:p-7 shadow-2xl z-10 flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200">
+          <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-5 sm:p-7 shadow-2xl z-10 flex flex-col max-h-[85vh] overflow-y-auto pb-8 sm:pb-7 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200">
             {/* Mobile Top Drag Handle */}
             <div className="sm:hidden pt-1 pb-3 flex justify-center">
               <div className="w-12 h-1 bg-black rounded-full" />
@@ -848,14 +850,14 @@ export function OverviewScreen({
             {/* Header */}
             <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-gray-100">
               <h2 className="text-lg sm:text-xl font-bold text-gray-950 font-sans tracking-tight">
-                Set point size
+                {pointModalData.isCustom ? 'Add point size' : 'Set point size'}
               </h2>
               <button
                 type="button"
                 onClick={() => setPointModalData(null)}
                 className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-900 transition-colors cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4" weight="bold" />
               </button>
             </div>
 
@@ -878,12 +880,12 @@ export function OverviewScreen({
                         })
                       }
                       placeholder="e.g. Sleeve, Neck, Bicep"
-                      className="w-full text-sm font-semibold text-gray-900 bg-[#F8F8F8] border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#1d4ed8]"
+                      className="w-full text-base font-semibold text-gray-900 bg-[#F8F8F8] border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#1d4ed8]"
                     />
                   </div>
                 ) : (
                   <div className="flex items-center gap-2.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#00e5ff] shadow-[0_0_8px_#00e5ff]" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#0084FF] shadow-[0_0_8px_#0084FF]" />
                     <span className="text-base sm:text-lg font-semibold text-gray-900">
                       {pointModalData.name}
                     </span>
@@ -891,11 +893,10 @@ export function OverviewScreen({
                 )}
 
                 {/* Numerical Input Capsule */}
-                <div className="flex items-center bg-[#F8F8F8] border border-gray-200/90 rounded-xl px-3 sm:px-4 py-2 w-32 sm:w-40 justify-between focus-within:border-[#1d4ed8] focus-within:bg-white transition-colors">
+                <div className="flex items-center bg-[#F8F8F8] border border-gray-200/90 rounded-xl px-3 sm:px-4 py-2 w-32 sm:w-40 justify-between focus-within:border-[#0084FF] focus-within:bg-white transition-colors">
                   <input
                     type="number"
                     step="0.1"
-                    autoFocus
                     value={pointModalData.value}
                     onChange={(e) =>
                       setPointModalData({ ...pointModalData, value: e.target.value })
@@ -939,7 +940,7 @@ export function OverviewScreen({
                 }
                 className="flex-1 sm:flex-none px-6 py-2.5 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs sm:text-sm font-semibold transition-colors shadow-xs text-center cursor-pointer"
               >
-                Add Point
+                {pointModalData.isCustom ? 'Add Point' : 'Update Point'}
               </button>
             </div>
           </div>

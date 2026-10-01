@@ -6,18 +6,18 @@ import { Order, ReferenceImage, OrderStatus } from '@/types';
 import { PRESET_IMAGE_SWATCHES } from '@/lib/initial-data';
 import { 
   X, 
-  UploadCloud, 
+  UploadSimple, 
   Image as ImageIcon, 
-  Trash2, 
+  Trash, 
   Plus, 
-  Sparkles, 
-  Calendar, 
+  Sparkle, 
+  CalendarBlank, 
   Clock, 
-  DollarSign, 
+  CurrencyDollar, 
   Scissors, 
   FileText,
   Check
-} from 'lucide-react';
+} from '@phosphor-icons/react';
 
 interface OrderFormModalProps {
   orderId?: string | null;
@@ -178,7 +178,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
             onClick={onClose}
             className="w-8 h-8 rounded-full flex items-center justify-center text-[#a59f97] hover:text-[#000000] hover:bg-[#f5f3f1] transition-colors"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4" weight="bold" />
           </button>
         </div>
 
@@ -232,7 +232,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
           <div className="bg-[#f5f3f1] rounded-[18px] p-4">
             <div className="flex items-center justify-between mb-2">
               <label className="text-[12px] font-medium text-[#44403b] flex items-center gap-1.5">
-                <Scissors className="w-3.5 h-3.5 text-[#777169]" />
+                <Scissors className="w-3.5 h-3.5 text-[#777169]" weight="fill" />
                 <span>Linked Body Measurement Snapshot</span>
               </label>
               <button
@@ -243,7 +243,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                 }}
                 className="text-[12px] font-medium text-[#0447ff] hover:underline flex items-center gap-1"
               >
-                <Plus className="w-3 h-3" />
+                <Plus className="w-3 h-3" weight="bold" />
                 <span>Take New Diagram</span>
               </button>
             </div>
@@ -274,7 +274,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                   }}
                   className="mt-2 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#000000] text-white text-[11px] font-medium"
                 >
-                  <Scissors className="w-3 h-3" />
+                  <Scissors className="w-3 h-3" weight="fill" />
                   <span>Launch Body Diagram</span>
                 </button>
               </div>
@@ -298,7 +298,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                   onClick={() => setShowPresetPicker(!showPresetPicker)}
                   className="px-3 py-1 rounded-full border border-[#ebe8e4] bg-[#f5f3f1] text-[#44403b] text-[11px] font-medium hover:bg-[#ebe8e4] inline-flex items-center gap-1 transition-colors"
                 >
-                  <Sparkles className="w-3 h-3 text-[#0447ff]" />
+                  <Sparkle className="w-3 h-3 text-[#0447ff]" weight="fill" />
                   <span>{showPresetPicker ? 'Hide Swatches' : 'Preset Swatches'}</span>
                 </button>
                 <button
@@ -306,7 +306,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                   onClick={() => fileInputRef.current?.click()}
                   className="px-3 py-1 rounded-full bg-[#000000] text-white text-[11px] font-medium hover:bg-[#222222] inline-flex items-center gap-1 transition-colors"
                 >
-                  <UploadCloud className="w-3 h-3" />
+                  <UploadSimple className="w-3 h-3" weight="bold" />
                   <span>Upload</span>
                 </button>
                 <input
@@ -381,7 +381,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                       onClick={() => removeImage(img.id)}
                       className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[#fdfcfc] text-[#a59f97] hover:text-[#ff4704] flex items-center justify-center border border-[#ebe8e4] transition-colors"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash className="w-3 h-3" weight="fill" />
                     </button>
                   </div>
                 ))}
@@ -391,7 +391,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                 onClick={() => fileInputRef.current?.click()}
                 className="p-6 rounded-[16px] border border-dashed border-[#ebe8e4] text-center cursor-pointer hover:bg-[#f5f3f1]/40 transition-colors"
               >
-                <ImageIcon className="w-8 h-8 text-[#a59f97] mx-auto mb-2" />
+                <ImageIcon className="w-8 h-8 text-[#a59f97] mx-auto mb-2" weight="fill" />
                 <p className="text-[13px] text-[#44403b] font-medium">
                   Drop style photos, fabric swatches, or sketches here
                 </p>

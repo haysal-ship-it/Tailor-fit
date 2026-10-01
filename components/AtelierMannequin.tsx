@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { UnitType } from '@/types';
-import { Sparkles, RefreshCw } from 'lucide-react';
 
 export interface LandmarkData {
   key: string;
@@ -17,6 +16,7 @@ export interface LandmarkData {
   side: 'left' | 'right';
   anchorX: number;
   anchorY: number;
+  linePoints?: string;
 }
 
 export const LANDMARKS: LandmarkData[] = [
@@ -24,117 +24,106 @@ export const LANDMARKS: LandmarkData[] = [
     key: 'neck',
     name: 'Neck',
     defaultValCm: 36,
-    color: '#00d2b4',
+    color: '#0084FF',
     zone: 'Collar Band',
-    dotX: 200,
-    dotY: 104,
-    anchorX: 195,
-    anchorY: 104,
-    labelX: 120,
-    labelY: 104,
-    side: 'left',
-  },
-  {
-    key: 'waist',
-    name: 'Waist',
-    defaultValCm: 72,
-    color: '#1e3a8a',
-    zone: 'Natural Midriff',
     dotX: 195,
-    dotY: 250,
-    anchorX: 172,
-    anchorY: 250,
-    labelX: 120,
-    labelY: 250,
+    dotY: 112,
+    anchorX: 195,
+    anchorY: 112,
+    labelX: 110,
+    labelY: 115,
     side: 'left',
   },
   {
     key: 'shoulder',
     name: 'Shoulder',
     defaultValCm: 42,
-    color: '#00d2b4',
+    color: '#0084FF',
     zone: 'Acromion Span',
-    dotX: 254,
-    dotY: 132,
-    anchorX: 254,
-    anchorY: 132,
+    dotX: 256,
+    dotY: 136,
+    anchorX: 256,
+    anchorY: 136,
     labelX: 290,
-    labelY: 100,
+    labelY: 109,
     side: 'right',
   },
   {
     key: 'bust',
     name: 'Bust',
     defaultValCm: 92,
-    color: '#00bfa5',
+    color: '#0084FF',
     zone: 'Full Bodice',
-    dotX: 236,
-    dotY: 182,
+    dotX: 238,
+    dotY: 184,
     anchorX: 238,
-    anchorY: 182,
+    anchorY: 184,
     labelX: 290,
-    labelY: 175,
+    labelY: 187,
     side: 'right',
+  },
+  {
+    key: 'waist',
+    name: 'Waist',
+    defaultValCm: 72,
+    color: '#0084FF',
+    zone: 'Natural Midriff',
+    dotX: 195,
+    dotY: 254,
+    anchorX: 195,
+    anchorY: 254,
+    labelX: 110,
+    labelY: 257,
+    side: 'left',
   },
   {
     key: 'sleeve',
     name: 'Sleeve',
     defaultValCm: 60,
-    color: '#f59e0b',
+    color: '#0084FF',
     zone: 'Sleeve Length',
-    dotX: 275,
-    dotY: 260,
-    anchorX: 278,
-    anchorY: 260,
+    dotX: 276,
+    dotY: 270,
+    anchorX: 276,
+    anchorY: 270,
     labelX: 290,
-    labelY: 260,
+    labelY: 273,
     side: 'right',
   },
   {
     key: 'thigh',
     name: 'Thigh',
     defaultValCm: 54,
-    color: '#0ea5e9',
+    color: '#0084FF',
     zone: 'Upper Leg',
-    dotX: 235,
-    dotY: 375,
-    anchorX: 238,
-    anchorY: 375,
+    dotX: 236,
+    dotY: 380,
+    anchorX: 236,
+    anchorY: 380,
     labelX: 290,
-    labelY: 420,
+    labelY: 419,
     side: 'right',
   },
 ];
 
-interface AtelierMannequinProps {
-  gender: 'M' | 'F';
-  unit: UnitType;
-  measurements: Record<string, number | string>;
-  onMeasurementChange: (key: string, value: number) => void;
+export interface AtelierMannequinProps {
+  gender?: string;
+  unit?: UnitType;
+  measurements?: Record<string, number | string>;
+  onMeasurementChange?: (key: string, value: number) => void;
   onSelectLandmark?: (key: string, name: string, currentVal: number) => void;
+  className?: string;
 }
 
 export function AtelierMannequin({
-  gender,
-  unit,
-  measurements,
+  gender = 'F',
+  unit = 'cm',
+  measurements = {},
   onMeasurementChange,
   onSelectLandmark,
+  className = '',
 }: AtelierMannequinProps) {
-  const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [tempValue, setTempValue] = useState<string>('');
-
-  const formatValue = (key: string, defaultCm: number) => {
-    const raw = measurements[key];
-    let cm = typeof raw === 'number' ? raw : parseFloat(String(raw)) || defaultCm;
-    if (unit === 'in') {
-      const inches = (cm / 2.54).toFixed(1);
-      return `${inches}"`;
-    }
-    return `${Math.round(cm)} cm`;
-  };
-
-  const getRawNumber = (key: string, defaultCm: number) => {
+  const getMeasurementVal = (key: string, defaultCm: number) => {
     const raw = measurements[key];
     const cm = typeof raw === 'number' ? raw : parseFloat(String(raw)) || defaultCm;
     if (unit === 'in') {
@@ -143,269 +132,262 @@ export function AtelierMannequin({
     return Math.round(cm);
   };
 
-  const handleStartEdit = (key: string, defaultCm: number) => {
-    const rawVal = getRawNumber(key, defaultCm);
-    const landmark = LANDMARKS.find((l) => l.key === key);
+  const handleLandmarkClick = (landmark: LandmarkData) => {
+    const val = getMeasurementVal(landmark.key, landmark.defaultValCm);
     if (onSelectLandmark) {
-      onSelectLandmark(key, landmark?.name || key, rawVal);
-    } else {
-      setEditingKey(key);
-      setTempValue(String(rawVal));
+      onSelectLandmark(landmark.key, landmark.name, val);
     }
-  };
-
-  const handleSaveEdit = (key: string) => {
-    const val = parseFloat(tempValue);
-    if (!isNaN(val) && val > 0) {
-      const cmVal = unit === 'in' ? parseFloat((val * 2.54).toFixed(1)) : val;
-      onMeasurementChange(key, cmVal);
-    }
-    setEditingKey(null);
   };
 
   return (
-    <div className="w-full flex flex-col items-center select-none relative">
-      {/* Visual Canvas */}
-      <div className="w-full max-w-[440px] relative aspect-[3/4] flex items-center justify-center">
+    <div className={`w-full flex flex-col items-center justify-center select-none relative ${className}`}>
+      {/* 2D Anatomical Mannequin SVG Canvas matching Overview.png & Clients.png */}
+      <div className="w-full max-w-[420px] aspect-[3/4] max-h-[540px] flex items-center justify-center relative">
         <svg
-          viewBox="0 0 400 560"
-          className="w-full h-full drop-shadow-[0_20px_35px_rgba(0,0,0,0.08)]"
+          viewBox="0 0 400 550"
+          className="w-full h-full drop-shadow-[0_8px_20px_rgba(0,0,0,0.04)]"
           xmlns="http://www.w3.org/2000/svg"
         >
           <defs>
-            {/* Gradients for Mannequin Shading */}
-            <linearGradient id="studioPedestal" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#1f2937" />
-              <stop offset="50%" stopColor="#4b5563" />
-              <stop offset="100%" stopColor="#111827" />
+            {/* Shading Gradients for Smooth Porcelain Form */}
+            <linearGradient id="headPorcelain" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#fdfdfd" />
+              <stop offset="60%" stopColor="#e5e7eb" />
+              <stop offset="100%" stopColor="#d1d5db" />
             </linearGradient>
 
-            {/* Neck Band Color (Teal) */}
-            <linearGradient id="neckGrad" x1="0" y1="0" x2="1" y2="1">
+            <linearGradient id="neckPorcelain" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#f3f4f6" />
+              <stop offset="50%" stopColor="#ffffff" />
+              <stop offset="100%" stopColor="#e5e7eb" />
+            </linearGradient>
+
+            {/* Amber Collar Band */}
+            <linearGradient id="collarAmber" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#d97706" />
+              <stop offset="50%" stopColor="#f59e0b" />
+              <stop offset="100%" stopColor="#b45309" />
+            </linearGradient>
+
+            {/* Chest / Bust Emerald Teal Zone matching design */}
+            <linearGradient id="bodiceTeal" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stopColor="#00e5c0" />
-              <stop offset="50%" stopColor="#00bfa5" />
-              <stop offset="100%" stopColor="#0d9488" />
+              <stop offset="45%" stopColor="#00bfa5" />
+              <stop offset="100%" stopColor="#059669" />
             </linearGradient>
 
-            {/* Chest / Bodice (Mint Green) */}
-            <linearGradient id="chestGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#34d399" />
-              <stop offset="50%" stopColor="#10b981" />
-              <stop offset="100%" stopColor="#047857" />
+            {/* Midriff Neutral White Porcelain */}
+            <linearGradient id="midriffWhite" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#e5e7eb" />
+              <stop offset="50%" stopColor="#f9fafb" />
+              <stop offset="100%" stopColor="#d1d5db" />
             </linearGradient>
 
-            {/* Waist (Midnight Navy Blue) */}
-            <linearGradient id="waistGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#2563eb" />
-              <stop offset="50%" stopColor="#1d4ed8" />
-              <stop offset="100%" stopColor="#0f172a" />
+            {/* Natural Waist Deep Midnight Navy Blue Zone */}
+            <linearGradient id="waistNavy" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#1e1b4b" />
+              <stop offset="40%" stopColor="#0f172a" />
+              <stop offset="100%" stopColor="#0a1128" />
             </linearGradient>
 
-            {/* Thighs / Legs (Cerulean Cyan) */}
-            <linearGradient id="thighGrad" x1="0" y1="0" x2="1" y2="1">
+            {/* Hip / Pelvis Lower Band */}
+            <linearGradient id="hipWhite" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#e5e7eb" />
+              <stop offset="50%" stopColor="#f9fafb" />
+              <stop offset="100%" stopColor="#cbd5e1" />
+            </linearGradient>
+
+            {/* Arms Warm Amber Gold Zone */}
+            <linearGradient id="armAmber" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#fbbf24" />
+              <stop offset="50%" stopColor="#f59e0b" />
+              <stop offset="100%" stopColor="#d97706" />
+            </linearGradient>
+
+            {/* Legs Cerulean Cyan Zone */}
+            <linearGradient id="legsCyan" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stopColor="#38bdf8" />
               <stop offset="50%" stopColor="#0ea5e9" />
               <stop offset="100%" stopColor="#0284c7" />
             </linearGradient>
 
-            {/* Arms (Warm Amber Gold) */}
-            <linearGradient id="armGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#fbbf24" />
-              <stop offset="50%" stopColor="#f59e0b" />
-              <stop offset="100%" stopColor="#b45309" />
+            {/* Stand Pole & Metal Base */}
+            <linearGradient id="metalStand" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#374151" />
+              <stop offset="50%" stopColor="#6b7280" />
+              <stop offset="100%" stopColor="#1f2937" />
             </linearGradient>
-
-            {/* Neutral Body Silhouette Gradient for Non-blocked parts */}
-            <linearGradient id="bodyNeutral" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#f8fafc" />
-              <stop offset="40%" stopColor="#e2e8f0" />
-              <stop offset="100%" stopColor="#cbd5e1" />
-            </linearGradient>
-
-            {/* Soft Ambient Ground Shadow */}
-            <radialGradient id="groundShadow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="rgba(0,0,0,0.18)" />
-              <stop offset="60%" stopColor="rgba(0,0,0,0.06)" />
-              <stop offset="100%" stopColor="rgba(0,0,0,0)" />
-            </radialGradient>
           </defs>
 
-          {/* Ground Contact Shadow */}
-          <ellipse cx="200" cy="535" rx="90" ry="14" fill="url(#groundShadow)" />
-
-          {/* Metallic Tailoring Stand Base & Central Pole */}
-          <g id="atelier-stand" opacity="0.85">
-            <ellipse cx="200" cy="530" rx="42" ry="7" fill="url(#studioPedestal)" />
-            <rect x="197" y="460" width="6" height="70" rx="3" fill="#374151" />
+          {/* Stand Pole & Pedestal Base at ground level */}
+          <g opacity="0.85">
+            <ellipse cx="200" cy="528" rx="36" ry="6" fill="url(#metalStand)" />
+            <rect x="198" y="475" width="4" height="53" rx="2" fill="#4b5563" />
           </g>
 
-          {/* Mannequin Finial Cap (Top Wood/Metal Knob) */}
-          <circle cx="200" cy="62" r="7" fill="#1e293b" />
-          <rect x="198" y="68" width="4" height="12" rx="2" fill="#475569" />
+          {/* === 2D MANNEQUIN ANATOMY MESH === */}
+          <g id="couture-mannequin-body">
+            {/* Top Finial Cap Knob */}
+            <circle cx="200" cy="36" r="3.5" fill="#374151" />
+            <rect x="198.5" y="39.5" width="3" height="6" rx="1.5" fill="#6b7280" />
 
-          {/* === 3D COLOR-BLOCKED ANATOMICAL MANNEQUIN === */}
-          <g id="mannequin-mesh">
-            {/* Lower Torso / Thighs / Hip Base (Cerulean Blue Zone) */}
+            {/* Stylized Egg-Shaped Porcelain Head */}
+            <ellipse cx="200" cy="58" rx="14" ry="19" fill="url(#headPorcelain)" />
+
+            {/* Neck Pillar */}
             <path
-              d={
-                gender === 'F'
-                  ? 'M155 285 Q145 320 152 380 Q170 395 198 395 Q226 395 244 380 Q252 320 242 285 Q220 295 198 295 Q176 295 155 285 Z'
-                  : 'M158 285 Q150 325 156 385 Q174 395 198 395 Q222 395 240 385 Q246 325 238 285 Q218 292 198 292 Q178 292 158 285 Z'
-              }
-              fill="url(#thighGrad)"
-              className="transition-all duration-300 hover:brightness-105 cursor-pointer"
-              onClick={() => handleStartEdit('thigh', 54)}
+              d="M194 77 Q193 98 189 108 Q200 112 211 108 Q207 98 206 77 Z"
+              fill="url(#neckPorcelain)"
             />
 
-            {/* Natural Waist & Midriff (Navy Blue Zone) */}
+            {/* Golden Amber Collar Band */}
             <path
-              d={
-                gender === 'F'
-                  ? 'M160 215 Q150 248 155 285 Q176 295 198 295 Q220 295 242 285 Q247 248 237 215 Q218 222 198 222 Q178 222 160 215 Z'
-                  : 'M155 215 Q154 250 158 285 Q178 292 198 292 Q218 292 238 285 Q242 250 241 215 Q220 220 198 220 Q176 220 155 215 Z'
-              }
-              fill="url(#waistGrad)"
-              className="transition-all duration-300 hover:brightness-110 cursor-pointer"
-              onClick={() => handleStartEdit('waist', 72)}
+              d="M189 108 Q200 113 211 108 Q214 116 215 120 Q200 124 185 120 Q186 116 189 108 Z"
+              fill="url(#collarAmber)"
+              className="cursor-pointer transition-opacity hover:opacity-90"
+              onClick={() => handleLandmarkClick(LANDMARKS[0])}
             />
 
-            {/* Bust & Upper Bodice (Mint Green Zone) */}
+            {/* Legs & Lower Torso / Thighs (Cerulean Cyan Zone) */}
+            {/* Left Leg */}
             <path
-              d={
-                gender === 'F'
-                  ? 'M146 135 Q136 170 160 215 Q178 222 198 222 Q218 222 237 215 Q260 170 250 135 Q230 142 198 142 Q166 142 146 135 Z'
-                  : 'M140 135 Q138 172 155 215 Q176 220 198 220 Q220 220 241 215 Q258 172 256 135 Q228 140 198 140 Q168 140 140 135 Z'
-              }
-              fill="url(#chestGrad)"
-              className="transition-all duration-300 hover:brightness-105 cursor-pointer"
-              onClick={() => handleStartEdit('bust', 92)}
+              d="M158 300 Q150 340 152 395 Q156 450 160 490 Q167 492 168 488 Q167 445 171 390 Q175 338 186 310 Q172 305 158 300 Z"
+              fill="url(#legsCyan)"
+              className="cursor-pointer transition-all hover:brightness-105"
+              onClick={() => handleLandmarkClick(LANDMARKS[5])}
+            />
+            {/* Right Leg */}
+            <path
+              d="M242 300 Q250 340 248 395 Q244 450 240 490 Q233 492 232 488 Q233 445 229 390 Q225 338 214 310 Q228 305 242 300 Z"
+              fill="url(#legsCyan)"
+              className="cursor-pointer transition-all hover:brightness-105"
+              onClick={() => handleLandmarkClick(LANDMARKS[5])}
             />
 
-            {/* Left Arm (Warm Amber Gold Zone) */}
+            {/* Lower Hip / Pelvis Band (Neutral Light Grey) */}
             <path
-              d="M142 135 Q125 155 122 195 Q120 240 126 290 Q136 290 138 275 Q134 235 138 190 Q142 155 150 138 Z"
-              fill="url(#armGrad)"
-              className="transition-all duration-300 hover:brightness-110 cursor-pointer"
-              onClick={() => handleStartEdit('arm', 60)}
+              d="M158 266 Q153 283 158 300 Q179 308 200 308 Q221 308 242 300 Q247 283 242 266 Q221 272 200 272 Q179 272 158 266 Z"
+              fill="url(#hipWhite)"
             />
 
-            {/* Right Arm (Warm Amber Gold Zone) */}
+            {/* Natural Waist Midriff (Deep Midnight Navy Blue Zone) */}
             <path
-              d="M254 135 Q271 155 274 195 Q276 240 270 290 Q260 290 258 275 Q262 235 258 190 Q254 155 246 138 Z"
-              fill="url(#armGrad)"
-              className="transition-all duration-300 hover:brightness-110 cursor-pointer"
-              onClick={() => handleStartEdit('arm', 60)}
+              d="M161 234 Q157 250 158 266 Q179 272 200 272 Q221 272 242 266 Q243 250 239 234 Q220 240 200 240 Q180 240 161 234 Z"
+              fill="url(#waistNavy)"
+              className="cursor-pointer transition-all hover:brightness-110"
+              onClick={() => handleLandmarkClick(LANDMARKS[3])}
             />
 
-            {/* Neck & Collar Band (Teal Zone) */}
+            {/* Midriff Transition Band (Neutral Porcelain) */}
             <path
-              d="M185 80 Q182 108 180 115 Q198 122 216 115 Q214 108 211 80 Q198 84 185 80 Z"
-              fill="url(#neckGrad)"
-              className="transition-all duration-300 hover:brightness-110 cursor-pointer"
-              onClick={() => handleStartEdit('neck', 36)}
+              d="M163 210 Q159 222 161 234 Q180 240 200 240 Q220 240 239 234 Q241 222 237 210 Q220 216 200 216 Q180 216 163 210 Z"
+              fill="url(#midriffWhite)"
             />
 
-            {/* Shoulder Contours (Green Transition to Bodice) */}
+            {/* Upper Bodice / Chest (Teal / Emerald Green Zone) */}
             <path
-              d="M180 115 Q160 120 142 135 Q166 142 198 142 Q230 142 254 135 Q236 120 216 115 Q198 122 180 115 Z"
-              fill="#059669"
-              opacity="0.9"
-              className="transition-all duration-300 hover:brightness-110 cursor-pointer"
-              onClick={() => handleStartEdit('shoulder', 42)}
+              d="M185 120 Q160 124 138 138 Q134 142 140 152 Q156 168 163 210 Q180 216 200 216 Q220 216 237 210 Q244 168 260 152 Q266 142 262 138 Q240 124 215 120 Q200 124 185 120 Z"
+              fill="url(#bodiceTeal)"
+              className="cursor-pointer transition-all hover:brightness-105"
+              onClick={() => handleLandmarkClick(LANDMARKS[2])}
             />
 
-            {/* 3D Surface Highlights & Seam Lines for Haute-Couture Realism */}
-            {/* Center Princess Seam Left */}
+            {/* Arms (Warm Amber Gold Zone) */}
+            {/* Left Arm */}
             <path
-              d="M186 124 Q182 165 180 220 Q178 260 180 294"
-              fill="none"
-              stroke="rgba(255,255,255,0.22)"
-              strokeWidth="1.5"
+              d="M136 140 Q121 168 116 208 Q113 254 122 292 Q127 292 129 278 Q125 242 128 204 Q132 168 142 144 Z"
+              fill="url(#armAmber)"
+              className="cursor-pointer transition-all hover:brightness-110"
+              onClick={() => handleLandmarkClick(LANDMARKS[4])}
             />
-            {/* Center Princess Seam Right */}
+            {/* Right Arm */}
             <path
-              d="M210 124 Q214 165 216 220 Q218 260 216 294"
-              fill="none"
-              stroke="rgba(255,255,255,0.22)"
-              strokeWidth="1.5"
-            />
-            {/* Specular Highlighting on Curvature */}
-            <path
-              d="M194 130 Q190 190 192 250"
-              fill="none"
-              stroke="rgba(255,255,255,0.4)"
-              strokeWidth="2.5"
-              strokeLinecap="round"
+              d="M264 140 Q279 168 284 208 Q287 254 278 292 Q273 292 271 278 Q275 242 272 204 Q268 168 258 144 Z"
+              fill="url(#armAmber)"
+              className="cursor-pointer transition-all hover:brightness-110"
+              onClick={() => handleLandmarkClick(LANDMARKS[4])}
             />
           </g>
 
-          {/* === CYAN DASHED LEADER LINES & ANCHOR DOTS === */}
+          {/* === CYAN DASHED LEADER LINES & CONCENTRIC ANCHOR TARGETS === */}
           {LANDMARKS.map((lm) => {
             const isLeft = lm.side === 'left';
-            return (
-              <g 
-                key={`leader-${lm.key}`} 
-                className="cursor-pointer group"
-                onClick={() => handleStartEdit(lm.key, lm.defaultValCm)}
-              >
-                {/* Expanded touch target for easy tap on mobile */}
-                <circle
-                  cx={lm.anchorX}
-                  cy={lm.anchorY}
-                  r="18"
-                  fill="transparent"
-                  className="cursor-pointer"
-                />
+            
+            // Exact anchor & leader line endpoints matching Overview.png & Clients.png
+            let lineX2 = isLeft ? lm.labelX + 8 : lm.labelX - 8;
+            let lineY2 = lm.labelY - 5;
 
-                {/* Body Anchor Dot */}
-                <circle
-                  cx={lm.anchorX}
-                  cy={lm.anchorY}
-                  r="4.5"
-                  fill="#00e5ff"
-                  className="drop-shadow-[0_0_6px_#00e5ff] transition-transform group-hover:scale-125"
-                />
-
-                {/* Dashed Cyan Leader Line */}
-                <line
-                  x1={lm.anchorX}
-                  y1={lm.anchorY}
-                  x2={isLeft ? lm.labelX + 8 : lm.labelX - 8}
-                  y2={lm.labelY - 5}
-                  stroke="#38bdf8"
-                  strokeWidth="1.5"
-                  strokeDasharray="3 3"
-                  opacity="0.9"
-                />
-
-                {/* Outer Connection Dot */}
-                <circle
-                  cx={isLeft ? lm.labelX + 8 : lm.labelX - 8}
-                  cy={lm.labelY - 5}
-                  r="3"
-                  fill="#0284c7"
-                  className="transition-transform group-hover:scale-125"
-                />
-              </g>
-            );
-          })}
-
-          {/* Landmark Text Display on Canvas for Perfect Scale Positioning */}
-          {LANDMARKS.map((lm) => {
-            const isLeft = lm.side === 'left';
+            // Shoulder has slight upward angle
+            if (lm.key === 'shoulder') {
+              lineY2 = lm.labelY - 4;
+            }
+            // Thigh has downward diagonal dashed line
+            if (lm.key === 'thigh') {
+              lineY2 = lm.labelY - 4;
+            }
 
             return (
               <g
                 key={`callout-${lm.key}`}
                 className="cursor-pointer group"
-                onClick={() => handleStartEdit(lm.key, lm.defaultValCm)}
+                onClick={() => handleLandmarkClick(lm)}
               >
-                {/* Fashion Serif Label Name matching design mockup */}
+                {/* Expanded touch target for easy tap on mobile */}
+                <circle
+                  cx={lm.anchorX}
+                  cy={lm.anchorY}
+                  r="20"
+                  fill="transparent"
+                  className="cursor-pointer"
+                />
+
+                {/* Cyan Dashed Leader Line */}
+                <line
+                  x1={lm.anchorX}
+                  y1={lm.anchorY}
+                  x2={lineX2}
+                  y2={lineY2}
+                  stroke="#38bdf8"
+                  strokeWidth="1.5"
+                  strokeDasharray="3 3"
+                  className="transition-opacity group-hover:stroke-[#0284c7]"
+                />
+
+                {/* Concentric Anchor Target - Outer Translucent Ring */}
+                <circle
+                  cx={lm.anchorX}
+                  cy={lm.anchorY}
+                  r="7"
+                  fill="rgba(0, 132, 255, 0.16)"
+                  stroke="#0084FF"
+                  strokeWidth="1.5"
+                  className="transition-transform group-hover:scale-125 origin-center"
+                />
+
+                {/* Concentric Anchor Target - Inner Solid Dot */}
+                <circle
+                  cx={lm.anchorX}
+                  cy={lm.anchorY}
+                  r="3.5"
+                  fill="#0084FF"
+                  className="transition-transform group-hover:scale-125 origin-center"
+                />
+
+                {/* Outer Connection Dot */}
+                <circle
+                  cx={lineX2}
+                  cy={lineY2}
+                  r="2.5"
+                  fill="#0284c7"
+                  className="transition-transform group-hover:scale-125 origin-center"
+                />
+
+                {/* Fashion Serif Landmark Label (Playfair Display font) */}
                 <text
                   x={lm.labelX}
                   y={lm.labelY}
                   textAnchor={isLeft ? 'end' : 'start'}
-                  className="font-serif text-[18px] font-normal fill-gray-900 tracking-wide select-none group-hover:fill-[#1d4ed8] transition-colors"
+                  className="font-serif text-[17px] font-normal fill-gray-950 tracking-wide select-none group-hover:fill-[#1d4ed8] transition-colors"
                 >
                   {lm.name}
                 </text>
@@ -413,62 +395,6 @@ export function AtelierMannequin({
             );
           })}
         </svg>
-      </div>
-
-      {/* Interactive Value Edit Dialog / Inline Controller */}
-      {editingKey && (
-        <div className="absolute inset-x-4 bottom-4 bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-xl border border-gray-100 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 z-20">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#00e5ff]" />
-            <div>
-              <p className="text-xs text-gray-500 font-medium">Update Landmark</p>
-              <h4 className="text-sm font-bold text-gray-900 font-serif">
-                {LANDMARKS.find((l) => l.key === editingKey)?.name}
-              </h4>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <input
-                type="number"
-                step="0.1"
-                autoFocus
-                value={tempValue}
-                onChange={(e) => setTempValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSaveEdit(editingKey);
-                  if (e.key === 'Escape') setEditingKey(null);
-                }}
-                className="w-24 h-9 px-3 rounded-xl bg-gray-50 border border-gray-200 text-sm font-bold text-gray-900 focus:outline-none focus:border-[#1d4ed8] text-center"
-              />
-              <span className="absolute right-2 top-2 text-xs text-gray-400 font-medium pointer-events-none">
-                {unit}
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => handleSaveEdit(editingKey)}
-              className="px-4 py-2 bg-[#1d4ed8] text-white rounded-xl text-xs font-semibold hover:bg-[#1e40af] transition-colors"
-            >
-              Apply
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditingKey(null)}
-              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs font-medium hover:bg-gray-200 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Atelier Hint Footer */}
-      <div className="mt-2 flex items-center justify-center gap-2 text-[12px] text-gray-400 font-medium">
-        <Sparkles className="w-3.5 h-3.5 text-teal-500" />
-        <span>Tap any landmark to adjust contour measurements</span>
       </div>
     </div>
   );
