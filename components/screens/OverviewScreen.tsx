@@ -678,18 +678,19 @@ export function OverviewScreen({
             </div>
           </div>
 
-          {/* Recent Orders Container (Fill: #F8F8F8, stroke removed) */}
+          {/* Recent Orders Container */}
           <div className="bg-[#F8F8F8] rounded-[8px] p-4 space-y-3 shadow-xs">
             <h3 className="text-sm font-bold text-gray-950 font-sans tracking-tight">Recent Orders</h3>
 
-            <div className="space-y-2">
+            {/* Main container: FFFFFF fill with 2px padding and 2px gap between individual containers */}
+            <div className="bg-[#FFFFFF] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
               {/* Order 1: Chloe Dallas -> directly routes to Client Profile c-1 */}
               <div 
                 onClick={() => onOpenClient('c-1')}
-                className="p-3 rounded-[8px] bg-white border border-gray-100 hover:bg-gray-50 transition-colors flex items-center justify-between cursor-pointer shadow-xs"
+                className="p-3 rounded-[6px] bg-[#f2f2f2] hover:bg-[#e8e8e8] transition-colors flex items-center justify-between cursor-pointer"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-[#f4f5f7] font-bold text-xs text-gray-900 flex items-center justify-center border border-gray-100">
+                  <div className="w-9 h-9 rounded-full bg-white font-bold text-xs text-gray-900 flex items-center justify-center border border-gray-100">
                     CD
                   </div>
                   <div>
@@ -703,10 +704,10 @@ export function OverviewScreen({
               {/* Order 2: Taylor Razaq -> directly routes to Client Profile c-2 */}
               <div 
                 onClick={() => onOpenClient('c-2')}
-                className="p-3 rounded-[8px] bg-white border border-gray-100 hover:bg-gray-50 transition-colors flex items-center justify-between cursor-pointer shadow-xs"
+                className="p-3 rounded-[6px] bg-[#f2f2f2] hover:bg-[#e8e8e8] transition-colors flex items-center justify-between cursor-pointer"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-[#f4f5f7] font-bold text-xs text-gray-900 flex items-center justify-center border border-gray-100">
+                  <div className="w-9 h-9 rounded-full bg-white font-bold text-xs text-gray-900 flex items-center justify-center border border-gray-100">
                     TR
                   </div>
                   <div>
@@ -720,10 +721,10 @@ export function OverviewScreen({
               {/* Order 3: Bryan Muhammed -> directly routes to Client Profile c-3 */}
               <div 
                 onClick={() => onOpenClient('c-3')}
-                className="p-3 rounded-[8px] bg-white border border-gray-100 hover:bg-gray-50 transition-colors flex items-center justify-between cursor-pointer shadow-xs"
+                className="p-3 rounded-[6px] bg-[#f2f2f2] hover:bg-[#e8e8e8] transition-colors flex items-center justify-between cursor-pointer"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-[#f4f5f7] font-bold text-xs text-gray-900 flex items-center justify-center border border-gray-100">
+                  <div className="w-9 h-9 rounded-full bg-white font-bold text-xs text-gray-900 flex items-center justify-center border border-gray-100">
                     BM
                   </div>
                   <div>

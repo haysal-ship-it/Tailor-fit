@@ -37,7 +37,7 @@ function TailorFitApp() {
   // Handlers for cross-screen navigation
   const handleOpenClient = (clientId: string) => {
     setSelectedClientId(clientId);
-    setActiveScreen('client-profile');
+    setActiveScreen('clients');
   };
 
   const handleOpenNewOrder = (clientId?: string) => {

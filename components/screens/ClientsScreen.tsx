@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { AtelierMannequin } from '@/components/AtelierMannequin';
 import { 
@@ -10,7 +10,7 @@ import {
   EnvelopeSimple, 
   User, 
   List,
-  Check,
+  Check, 
   X,
   Plus
 } from '@phosphor-icons/react';
@@ -26,7 +26,7 @@ export function ClientsScreen({
   onNewMeasurement, 
   onNewOrder 
 }: ClientsScreenProps) {
-  const { clients, getClientSnapshots, updateSnapshot, addSnapshot } = useStore();
+  const { clients, selectedClientId, setSelectedClientId, getClientSnapshots, updateSnapshot, addSnapshot } = useStore();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [mannequinView, setMannequinView] = useState<'mannequin' | 'table'>('mannequin');
@@ -37,19 +37,10 @@ export function ClientsScreen({
     isCustom?: boolean;
   } | null>(null);
 
-  const [selectedClientProfile, setSelectedClientProfile] = useState({
-    id: 'c-1',
-    initials: 'CD',
-    name: 'Chloe Dallas',
-    since: 'Client since Jun 2025',
-    phone: '+234 8141 432 211',
-    email: 'chloedallas@email.com',
-  });
-
-  const recentClients = [
+  const recentClients = useMemo(() => [
     {
       id: 'c-6',
-      initials: 'CD',
+      initials: 'AB',
       name: 'Amanda Billings',
       phone: '+23740930299',
       email: 'a.billings@couture.com',
@@ -71,7 +62,26 @@ export function ClientsScreen({
       email: 'chloedallas@email.com',
       since: 'Client since Jun 2025',
     },
-  ];
+  ], []);
+
+  const [activeClientId, setActiveClientId] = useState<string>('c-6');
+
+  const selectedClientProfile = useMemo(() => {
+    const targetId = selectedClientId || activeClientId;
+    const match = recentClients.find((c) => c.id === targetId) ||
+                  clients.find((c) => c.id === targetId);
+    if (match) {
+      return {
+        id: match.id,
+        initials: 'initials' in match ? (match as any).initials : match.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase(),
+        name: match.name,
+        since: 'since' in match ? (match as any).since : 'Client since 2025',
+        phone: match.phone || '+234 8141 432 211',
+        email: match.email || 'client@email.com',
+      };
+    }
+    return recentClients[0];
+  }, [selectedClientId, activeClientId, clients, recentClients]);
 
   // Exact measurements from design / store
   const [measurements, setMeasurements] = useState<Record<string, number | string>>(() => {
@@ -93,7 +103,8 @@ export function ClientsScreen({
   });
 
   const handleSelectClient = (client: typeof recentClients[0]) => {
-    setSelectedClientProfile(client);
+    setActiveClientId(client.id);
+    setSelectedClientId(client.id);
     const clientSnaps = getClientSnapshots(client.id);
     if (clientSnaps && clientSnaps.length > 0) {
       const latest = clientSnaps[clientSnaps.length - 1];
@@ -174,7 +185,7 @@ export function ClientsScreen({
       id: 'ord-hist-1',
       title: 'Gown/ Dress',
       badge: 'Urgent',
-      badgeClass: 'bg-orange-500 text-white',
+      badgeClass: 'bg-[#ea580c] text-white',
       date: 'Size taken on 09-10-2025',
       price: '₦130,000',
       images: [
@@ -187,7 +198,7 @@ export function ClientsScreen({
       id: 'ord-hist-2',
       title: 'Oxford Three Piece Suit',
       badge: 'Completed',
-      badgeClass: 'bg-emerald-600 text-white',
+      badgeClass: 'bg-[#15803d] text-white',
       date: 'Size taken on 09-10-2025',
       price: '₦230,000',
       images: [
@@ -200,7 +211,7 @@ export function ClientsScreen({
       id: 'ord-hist-3',
       title: 'Gown/ Dress',
       badge: 'Pending',
-      badgeClass: 'bg-lime-500 text-white',
+      badgeClass: 'bg-[#84cc16] text-white',
       date: 'Size taken on 09-10-2025',
       price: '₦130,000',
       images: [
@@ -218,13 +229,13 @@ export function ClientsScreen({
         {/* =========================================================================
             LEFT COLUMN: "Client Directory" Main Container
             ========================================================================= */}
-        <div className="lg:col-span-3 bg-white rounded-[8px] p-[2px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] flex flex-col gap-[2px]">
-          <div className="bg-[#F8F8F8] rounded-[8px] p-4 space-y-4 shadow-xs">
+        <div className="lg:col-span-3 bg-[#FFFFFF] p-[2px] rounded-[8px] shadow-[0_2px_12px_rgba(0,0,0,0.03)]">
+          <div className="bg-[#f8f8f8] rounded-[6px] p-4 space-y-4">
             <h2 className="text-sm font-bold text-gray-950 font-sans tracking-tight">
               Client Directory
             </h2>
 
-            {/* Search Bar */}
+            {/* Search Bar: fill of f1f1f1 with stroke of ededed */}
             <div className="relative">
               <MagnifyingGlass className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" weight="bold" />
               <input
@@ -232,7 +243,7 @@ export function ClientsScreen({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search clients by name, phone number, email..."
-                className="w-full h-10 pl-9 pr-3.5 rounded-[8px] bg-white border border-gray-100 text-[11px] text-gray-900 placeholder:text-gray-400 focus:outline-none shadow-xs"
+                className="w-full h-10 pl-9 pr-3.5 rounded-[6px] bg-[#f1f1f1] border border-[#ededed] text-[11px] text-gray-900 placeholder:text-gray-400 focus:outline-none shadow-xs"
               />
             </div>
 
@@ -240,7 +251,8 @@ export function ClientsScreen({
             <div className="space-y-2 pt-1">
               <h3 className="text-xs font-bold text-gray-900">Recently Viewed Clients</h3>
 
-              <div className="space-y-2">
+              {/* Main container: FFFFFF fill with 2px padding and 2px gap between individual containers */}
+              <div className="bg-[#FFFFFF] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
                 {recentClients
                   .filter((c) =>
                     searchQuery
@@ -255,15 +267,15 @@ export function ClientsScreen({
                       <div
                         key={client.id}
                         onClick={() => handleSelectClient(client)}
-                        className={`p-3 rounded-[8px] transition-all flex items-center justify-between cursor-pointer border ${
+                        className={`p-3 rounded-[6px] transition-all flex items-center justify-between cursor-pointer ${
                           isSelected
-                            ? 'bg-blue-50/60 border-blue-200 shadow-xs'
-                            : 'bg-white border-gray-100 hover:bg-gray-100 shadow-xs'
+                            ? 'bg-[#f8f8f8] ring-1.5 ring-[#1d4ed8]'
+                            : 'bg-[#f8f8f8] hover:bg-[#f0f0f0]'
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-[8px] font-bold text-xs flex items-center justify-center border ${
-                            isSelected ? 'bg-[#1d4ed8] text-white border-[#1d4ed8]' : 'bg-[#f4f5f7] text-gray-800 border-gray-200'
+                          <div className={`w-8 h-8 rounded-[6px] font-bold text-xs flex items-center justify-center ${
+                            isSelected ? 'bg-[#1d4ed8] text-white' : 'bg-white text-gray-800'
                           }`}>
                             {client.initials}
                           </div>
@@ -284,9 +296,9 @@ export function ClientsScreen({
         {/* =========================================================================
             RIGHT COLUMN: Client Profile Dossier
             ========================================================================= */}
-        <div className="lg:col-span-9 bg-white rounded-[8px] p-[2px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] flex flex-col gap-[2px]">
+        <div className="lg:col-span-9 bg-[#FFFFFF] p-[2px] rounded-[8px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] flex flex-col gap-[2px]">
           {/* Top Profile Card Container */}
-          <div className="bg-[#F8F8F8] rounded-[8px] p-6 space-y-6 shadow-xs">
+          <div className="bg-[#f8f8f8] rounded-[6px] p-6 space-y-6 shadow-xs">
             {/* Top Bar: Subtitle & Title & "New Order" Action */}
             <div className="flex items-center justify-between">
               <div>
@@ -331,8 +343,8 @@ export function ClientsScreen({
             </div>
           </div>
 
-          {/* Section: Body Measurement History Container (Fill: #F8F8F8, stroke removed) */}
-          <div className="bg-[#F8F8F8] rounded-[8px] p-5 space-y-4 shadow-xs">
+          {/* Section: Body Measurement History Container */}
+          <div className="bg-[#f8f8f8] rounded-[6px] p-5 space-y-4 shadow-xs">
             <div className="flex items-center justify-between pb-3 border-b border-gray-200/60">
               <div>
                 <h4 className="text-sm font-bold text-gray-950 font-sans tracking-tight">Body Measurement History</h4>
@@ -436,8 +448,8 @@ export function ClientsScreen({
             )}
           </div>
 
-          {/* Section: Order History Container (Fill: #F8F8F8, stroke removed) */}
-          <div className="bg-[#F8F8F8] rounded-[8px] p-5 space-y-4 shadow-xs">
+          {/* Section: Order History Container */}
+          <div className="bg-[#f8f8f8] rounded-[6px] p-5 space-y-4 shadow-xs">
             <h3 className="text-sm font-bold text-gray-950 font-sans tracking-tight">Order History</h3>
 
             {/* 3 Horizontal Cards in a row matching Clients.png */}
@@ -445,7 +457,7 @@ export function ClientsScreen({
               {orderHistoryCards.map((card) => (
                 <div
                   key={card.id}
-                  className="rounded-[8px] border border-gray-100 overflow-hidden flex flex-col justify-between bg-white shadow-xs"
+                  className="rounded-[8px] border-2 border-black overflow-hidden flex flex-col justify-between bg-white shadow-xs"
                 >
                   {/* Card Header */}
                   <div className="p-4 space-y-2">

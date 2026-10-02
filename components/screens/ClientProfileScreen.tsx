@@ -350,9 +350,9 @@ export function ClientProfileScreen({
                             {isExpanded ? 'Collapse' : 'Inspect'}
                           </span>
                           {isExpanded ? (
-                            <ChevronUp className="w-4 h-4 text-gray-400" />
+                            <CaretUp className="w-4 h-4 text-gray-400" weight="fill" />
                           ) : (
-                            <ChevronDown className="w-4 h-4 text-gray-400" />
+                            <CaretDown className="w-4 h-4 text-gray-400" weight="fill" />
                           )}
                         </div>
                       </div>
@@ -459,7 +459,7 @@ export function ClientProfileScreen({
               </div>
             ) : (
               <div className="py-8 text-center text-gray-400 text-xs">
-                <ShoppingBag className="w-8 h-8 mx-auto text-gray-300 mb-2" />
+                <Bag className="w-8 h-8 mx-auto text-gray-300 mb-2" weight="fill" />
                 <span>No garment orders created yet.</span>
               </div>
             )}

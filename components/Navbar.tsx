@@ -58,8 +58,8 @@ export function Navbar() {
     <>
       {/* Desktop Floating Navbar */}
       <div className="w-full px-4 sm:px-6 pt-4 pb-2">
-        <header className="max-w-[1440px] mx-auto bg-[#ffffff] p-[2px] rounded-full shadow-[0_2px_12px_rgba(0,0,0,0.03)]">
-          <div className="w-full bg-[#f8f8f8] px-[24px] py-[8px] rounded-full flex items-center justify-between">
+        <header className="max-w-[1440px] mx-auto bg-[#ffffff] p-[2px] rounded-[8px] shadow-[0_2px_12px_rgba(0,0,0,0.03)]">
+          <div className="w-full bg-[#f8f8f8] px-[24px] py-[8px] rounded-[6px] flex items-center justify-between">
             {/* Brand Logo */}
             <div 
               onClick={() => setActiveScreen('overview')}
