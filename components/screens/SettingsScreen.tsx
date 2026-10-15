@@ -1,57 +1,81 @@
 'use client';
 
 import React, { useState } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useStore } from '@/lib/store';
-import { Plus, Check, X } from '@phosphor-icons/react';
+import { 
+  Building2, 
+  Ruler, 
+  Sliders, 
+  Plus, 
+  Check, 
+  X, 
+  ChevronDown, 
+  ChevronUp 
+} from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { MorphingSaveButton } from '@/components/ui/MorphingSaveButton';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { Input } from '@/components/ui/Input';
+import { Textarea } from '@/components/ui/Textarea';
+import { ToastContainer, ToastMessage } from '@/components/ui/Toasts';
+import { SmallFloatingDock } from '@/components/ui/SmallFloatingDock';
+import { springGentle } from '@/lib/motion-tokens';
+import { cn } from '@/lib/utils';
 
 export function SettingsScreen() {
-  const { settings, updateSettings, addTemplate, allHotspots } = useStore();
+  const { settings, updateSettings } = useStore();
+  const shouldReduceMotion = useReducedMotion();
 
-  const [activeTab, setActiveTab] = useState<'billing' | 'blueprints' | 'sizing'>('billing');
+  const [mobileTab, setMobileTab] = useState<'studio' | 'blueprints' | 'sizing'>('studio');
   const [selectedCurrency, setSelectedCurrency] = useState('NGN (₦)');
   const [unit, setUnit] = useState<'cm' | 'in'>('cm');
 
-  // Blueprints list matching Settings.png
+  // Studio form fields
+  const [studioName, setStudioName] = useState('Atelier Kunle Bespoke');
+  const [leadTailor, setLeadTailor] = useState('Adriana Kunle');
+  const [studioPhone, setStudioPhone] = useState('+234 803 929 1100');
+  const [studioEmail, setStudioEmail] = useState('concierge@kunleatelier.com');
+
+  // Blueprints with accordion tags
+  const [expandedBlueprintTags, setExpandedBlueprintTags] = useState<Record<string, boolean>>({});
+
   const [blueprints, setBlueprints] = useState([
     {
       id: 'bp-1',
       title: 'Bespoke African Gown',
-      description:
-        'Traditional african couture gown, bridal styles corset-backed silhouettes and embellished trains',
+      description: 'Traditional couture gown, bridal styles corset-backed silhouettes and flared hems',
       tags: ['neck', 'sleeves', 'bust', 'waist'],
-      moreCount: '+3 more',
+      extraTags: ['hip', 'thigh', 'ankle'],
     },
     {
       id: 'bp-2',
-      title: 'Shirt/Blouse',
-      description:
-        'Essential measurements for bespoke dress shirts, casual button downs and tailored blouses',
+      title: 'Shirt / Blouse',
+      description: 'Essential measurements for bespoke dress shirts, casual button downs and tailored blouses',
       tags: ['neck', 'sleeves', 'bust', 'waist'],
-      moreCount: '+4 more',
+      extraTags: ['cuff', 'collar', 'shoulder', 'back'],
     },
     {
       id: 'bp-3',
       title: 'Trousers',
-      description:
-        'Fittings for tailored pants, pleated trouses and custom chinos/pants',
-      tags: ['neck', 'sleeves', 'bust', 'waist'],
-      moreCount: '+3 more',
+      description: 'Fittings for tailored pants, pleated trousers and custom chinos/pants',
+      tags: ['waist', 'hip', 'thigh', 'ankle'],
+      extraTags: ['inseam', 'outseam', 'rise'],
     },
     {
       id: 'bp-4',
-      title: 'Bespoke African Gown',
-      description:
-        'Traditional african couture gown, bridal styles corset-backed silhouettes and embellished trains',
-      tags: ['neck', 'sleeves', 'bust', 'waist'],
-      moreCount: '+3 more',
+      title: '2-Piece Suit',
+      description: 'Jacket and matching trousers tailored specifications for formal couture',
+      tags: ['neck', 'chest', 'waist', 'sleeve'],
+      extraTags: ['lapel', 'jacket_length', 'pant_waist'],
     },
   ]);
 
-  // Sizing measurements list matching Settings.png
+  // Sizing items
   const [sizingItems, setSizingItems] = useState([
     { id: 'sz-1', title: 'Shoulder width', category: 'Upper Body' },
-    { id: 'sz-2', title: 'Neck Circumference', category: 'Head/Neck' },
-    { id: 'sz-3', title: 'Bust/Chest', category: 'Upper Body' },
+    { id: 'sz-2', title: 'Neck Circumference', category: 'Head / Neck' },
+    { id: 'sz-3', title: 'Bust / Chest', category: 'Upper Body' },
     { id: 'sz-4', title: 'Waist Circumference', category: 'Upper Body' },
     { id: 'sz-5', title: 'Hip Circumference', category: 'Lower Body' },
     { id: 'sz-6', title: 'Inseam Length', category: 'Lower Body' },
@@ -67,6 +91,30 @@ export function SettingsScreen() {
   const [newMeasurementName, setNewMeasurementName] = useState('');
   const [newMeasurementCategory, setNewMeasurementCategory] = useState('Upper Body');
 
+  // Toasts
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const addToast = (toast: Omit<ToastMessage, 'id'>) => {
+    const id = `toast-${Date.now()}`;
+    setToasts((prev) => [...prev, { ...toast, id }]);
+  };
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const toggleBlueprintTags = (id: string) => {
+    setExpandedBlueprintTags((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
+
+  const handleSaveSettings = async () => {
+    addToast({
+      type: 'velocity',
+      message: 'Studio settings and blueprints saved.',
+    });
+  };
+
   const handleCreateTemplate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTemplateName.trim()) return;
@@ -78,12 +126,16 @@ export function SettingsScreen() {
         title: newTemplateName.trim(),
         description: newTemplateDesc.trim() || 'Custom bespoke garment blueprint',
         tags: ['neck', 'bust', 'waist'],
-        moreCount: '+2 more',
+        extraTags: ['sleeves', 'shoulder'],
       },
     ]);
     setNewTemplateName('');
     setNewTemplateDesc('');
     setShowAddTemplateModal(false);
+    addToast({
+      type: 'velocity',
+      message: `Blueprint "${newTemplateName}" created.`,
+    });
   };
 
   const handleCreateMeasurement = (e: React.FormEvent) => {
@@ -100,385 +152,467 @@ export function SettingsScreen() {
     ]);
     setNewMeasurementName('');
     setShowAddMeasurementModal(false);
+    addToast({
+      type: 'velocity',
+      message: `Standard landmark "${newMeasurementName}" added.`,
+    });
   };
 
+  const currencyOptions = [
+    { id: 'NGN', label: 'NGN (₦)', code: 'Nigerian Naira' },
+    { id: 'USD', label: 'USD ($)', code: 'US Dollar' },
+    { id: 'EUR', label: 'EUR (€)', code: 'Euro' },
+    { id: 'GBP', label: 'GBP (£)', code: 'British Pound' },
+  ];
+
   return (
-    <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-4">
-      {/* 2-Column Layout matching Settings.png */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* =========================================================================
-            LEFT COLUMN: "Settings" Navigation Container (Fill: #FFFFFF, 2px padding/gap, 8px radius)
-            ========================================================================= */}
-        <div className="lg:col-span-3 bg-white rounded-[8px] p-[2px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] flex flex-col gap-[2px]">
-          <div className="bg-[#F8F8F8] rounded-[8px] p-4 space-y-4 shadow-xs">
-            <h2 className="text-sm font-bold text-gray-950 font-sans tracking-tight">
-              Settings
-            </h2>
+    <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-3 space-y-4 pb-28 md:pb-6">
+      <ToastContainer toasts={toasts} onDismiss={removeToast} />
 
-            <div className="space-y-1">
-              <button
-                type="button"
-                onClick={() => setActiveTab('billing')}
-                className={`w-full text-left px-3.5 py-2.5 rounded-[8px] text-xs font-semibold transition-colors border ${
-                  activeTab === 'billing'
-                    ? 'bg-blue-50/70 text-[#1d4ed8] border-blue-100'
-                    : 'text-gray-500 hover:text-gray-800 border-transparent'
-                }`}
-              >
-                Measurement &amp; Billing Standards
-              </button>
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+        
+        {/* =====================================================================
+            LEFT COLUMN: Settings Nav (Desktop & Tablet)
+            ===================================================================== */}
+        <div className="hidden md:block md:col-span-4 xl:col-span-3 rounded-2xl bg-[var(--surface-1)] border border-[var(--border)] p-4 sm:p-5 space-y-3 transition-colors hover:border-[var(--border-strong)]">
+          <h2 className="text-base font-semibold tracking-[-0.01em] text-[var(--text)] pb-2 border-b border-[var(--border)]">
+            Settings
+          </h2>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('blueprints')}
-                className={`w-full text-left px-3.5 py-2.5 rounded-[8px] text-xs font-semibold transition-colors border ${
-                  activeTab === 'blueprints'
-                    ? 'bg-blue-50/70 text-[#1d4ed8] border-blue-100'
-                    : 'text-gray-500 hover:text-gray-800 border-transparent'
-                }`}
-              >
-                Garment Blueprints
-              </button>
+          <div className="space-y-1">
+            <button
+              type="button"
+              onClick={() => setMobileTab('studio')}
+              className={cn(
+                'w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors text-left cursor-pointer',
+                mobileTab === 'studio'
+                  ? 'bg-[var(--surface-2)] text-[var(--text)] font-semibold border border-[var(--border)]'
+                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]'
+              )}
+            >
+              <Building2 className="w-4 h-4 shrink-0" />
+              <span>Studio &amp; Currency</span>
+            </button>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('sizing')}
-                className={`w-full text-left px-3.5 py-2.5 rounded-[8px] text-xs font-semibold transition-colors border ${
-                  activeTab === 'sizing'
-                    ? 'bg-blue-50/70 text-[#1d4ed8] border-blue-100'
-                    : 'text-gray-500 hover:text-gray-800 border-transparent'
-                }`}
-              >
-                Sizing/measurements
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setMobileTab('blueprints')}
+              className={cn(
+                'w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors text-left cursor-pointer',
+                mobileTab === 'blueprints'
+                  ? 'bg-[var(--surface-2)] text-[var(--text)] font-semibold border border-[var(--border)]'
+                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]'
+              )}
+            >
+              <Sliders className="w-4 h-4 shrink-0" />
+              <span>Garments Blueprints</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMobileTab('sizing')}
+              className={cn(
+                'w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors text-left cursor-pointer',
+                mobileTab === 'sizing'
+                  ? 'bg-[var(--surface-2)] text-[var(--text)] font-semibold border border-[var(--border)]'
+                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]'
+              )}
+            >
+              <Ruler className="w-4 h-4 shrink-0" />
+              <span>Measurement Standards</span>
+            </button>
           </div>
         </div>
 
-        {/* =========================================================================
-            RIGHT COLUMN: Settings Sections (Fill: #FFFFFF, 2px padding/gap, 8px radius)
-            ========================================================================= */}
-        <div className="lg:col-span-9 bg-white rounded-[8px] p-[2px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] flex flex-col gap-[2px]">
-          {/* SECTION 1: Measurement & Billing Standards */}
-          <div className="bg-[#F8F8F8] rounded-[8px] p-5 sm:p-6 space-y-5 shadow-xs">
-            <div>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-                DEFAULT UNITS AND CURRENCY SYMBOLS
-              </span>
-              <h1 className="text-base font-bold text-gray-950 font-sans tracking-tight">
-                Measurement &amp; Billing Standards
-              </h1>
+        {/* =====================================================================
+            RIGHT COLUMN: Configuration Sections
+            ===================================================================== */}
+        <div className="md:col-span-8 xl:col-span-9 space-y-4">
+          
+          {/* Studio Profile & Currency Section */}
+          <div
+            className={cn(
+              'rounded-2xl bg-[var(--surface-1)] border border-[var(--border)] p-4 sm:p-6 space-y-4 transition-colors hover:border-[var(--border-strong)]',
+              mobileTab !== 'studio' ? 'hidden md:block' : 'block'
+            )}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
+              <div>
+                <span className="text-[11px] font-medium text-[var(--text-muted)] tracking-wider uppercase block">
+                  ATELIER CONFIGURATION
+                </span>
+                <h2 className="text-base font-semibold tracking-[-0.01em] text-[var(--text)]">
+                  Studio Profile &amp; Preferences
+                </h2>
+              </div>
+
+              {/* EXACTLY ONE PRIMARY COMMIT BUTTON: Save Changes */}
+              <MorphingSaveButton
+                idleText="Save Changes"
+                onClick={handleSaveSettings}
+              />
             </div>
 
-            {/* Default Mesurement Unit */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-900 block">
-                Default Mesurement Unit
-              </label>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setUnit('cm')}
-                  className={`px-6 py-2 rounded-full text-xs font-semibold transition-all ${
-                    unit === 'cm'
-                      ? 'bg-[#1d4ed8] text-white shadow-xs'
-                      : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
-                  }`}
-                >
-                  Centimeteres (cm)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUnit('in')}
-                  className={`px-6 py-2 rounded-full text-xs font-semibold transition-all ${
-                    unit === 'in'
-                      ? 'bg-[#1d4ed8] text-white shadow-xs'
-                      : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
-                  }`}
-                >
-                  Inches (“)
-                </button>
+            <div className="space-y-3">
+              <div className="border-b border-[var(--border)] pb-1">
+                <h3 className="text-sm font-medium text-[var(--text)]">Studio Details</h3>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input
+                  label="Atelier Name"
+                  value={studioName}
+                  onChange={(e) => setStudioName(e.target.value)}
+                />
+                <Input
+                  label="Lead Master Tailor"
+                  value={leadTailor}
+                  onChange={(e) => setLeadTailor(e.target.value)}
+                />
+                <Input
+                  label="Studio Phone"
+                  value={studioPhone}
+                  onChange={(e) => setStudioPhone(e.target.value)}
+                />
+                <Input
+                  label="Studio Email"
+                  type="email"
+                  value={studioEmail}
+                  onChange={(e) => setStudioEmail(e.target.value)}
+                />
               </div>
             </div>
 
-            {/* Preferred Currency */}
-            <div className="space-y-2 pt-1">
-              <label className="text-xs font-bold text-gray-900 block">
-                Preferred Currency
-              </label>
+            {/* Currency Option Cards with --accent border & check */}
+            <div className="space-y-3 pt-2">
+              <div className="border-b border-[var(--border)] pb-1">
+                <h3 className="text-sm font-medium text-[var(--text)]">Preferred Currency</h3>
+              </div>
 
-              {/* 4 Cards in a single row matching Settings.png */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {/* 1. NGN (₦) */}
-                <div
-                  onClick={() => setSelectedCurrency('NGN (₦)')}
-                  className={`py-3 px-4 rounded-[8px] border text-center cursor-pointer transition-all ${
-                    selectedCurrency === 'NGN (₦)'
-                      ? 'border-[#1d4ed8] bg-blue-50/50 shadow-xs'
-                      : 'border-transparent bg-white hover:border-gray-200 shadow-xs'
-                  }`}
-                >
-                  <span className={`text-xs font-bold ${selectedCurrency === 'NGN (₦)' ? 'text-[#1d4ed8]' : 'text-gray-900'}`}>NGN (₦)</span>
-                </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {currencyOptions.map((curr) => {
+                  const isSelected = selectedCurrency === curr.label;
+                  return (
+                    <button
+                      key={curr.id}
+                      type="button"
+                      onClick={() => setSelectedCurrency(curr.label)}
+                      className={cn(
+                        'p-3 rounded-2xl border text-left transition-colors cursor-pointer relative',
+                        isSelected
+                          ? 'border-[var(--accent)] bg-[var(--surface-2)] shadow-xs'
+                          : 'border-[var(--border)] bg-[var(--surface-1)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]'
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-xs font-semibold text-[var(--text)]">
+                          {curr.label}
+                        </span>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-[var(--accent)]" />}
+                      </div>
+                      <p className="text-[10px] text-[var(--text-muted)] mt-1">{curr.code}</p>
+                    </button>
+                  );
+                })}
+              </div>
 
-                {/* 2. US Dollar ($) */}
-                <div
-                  onClick={() => setSelectedCurrency('US Dollar ($)')}
-                  className={`py-3 px-4 rounded-[8px] border text-center cursor-pointer transition-all ${
-                    selectedCurrency === 'US Dollar ($)'
-                      ? 'border-[#1d4ed8] bg-blue-50/50 shadow-xs'
-                      : 'border-transparent bg-white hover:border-gray-200 shadow-xs'
-                  }`}
-                >
-                  <span className={`text-xs font-bold ${selectedCurrency === 'US Dollar ($)' ? 'text-[#1d4ed8]' : 'text-gray-900'}`}>US Dollar ($)</span>
-                </div>
-
-                {/* 3. Euro (€) */}
-                <div
-                  onClick={() => setSelectedCurrency('Euro (€)')}
-                  className={`py-3 px-4 rounded-[8px] border text-center cursor-pointer transition-all ${
-                    selectedCurrency === 'Euro (€)'
-                      ? 'border-[#1d4ed8] bg-blue-50/50 shadow-xs'
-                      : 'border-transparent bg-white hover:border-gray-200 shadow-xs'
-                  }`}
-                >
-                  <span className={`text-xs font-bold ${selectedCurrency === 'Euro (€)' ? 'text-[#1d4ed8]' : 'text-gray-900'}`}>Euro (€)</span>
-                </div>
-
-                {/* 4. Pounds (£) */}
-                <div
-                  onClick={() => setSelectedCurrency('Pounds (£)')}
-                  className={`py-3 px-4 rounded-[8px] border text-center cursor-pointer transition-all ${
-                    selectedCurrency === 'Pounds (£)'
-                      ? 'border-[#1d4ed8] bg-blue-50/50 shadow-xs'
-                      : 'border-transparent bg-white hover:border-gray-200 shadow-xs'
-                  }`}
-                >
-                  <span className={`text-xs font-bold ${selectedCurrency === 'Pounds (£)' ? 'text-[#1d4ed8]' : 'text-gray-900'}`}>Pounds (£)</span>
-                </div>
+              <div className="pt-2 flex items-center justify-between">
+                <span className="text-xs font-normal text-[var(--text-muted)]">
+                  Measurement Unit Standard
+                </span>
+                <SegmentedControl
+                  name="unit-standard-toggle"
+                  size="sm"
+                  value={unit}
+                  onChange={(u) => setUnit(u as 'cm' | 'in')}
+                  options={[
+                    { value: 'cm', label: 'Centimeters (CM)' },
+                    { value: 'in', label: 'Inches (IN)' },
+                  ]}
+                />
               </div>
             </div>
           </div>
 
-          {/* SECTION 2: Garments Blueprints */}
-          <div className="bg-[#F8F8F8] rounded-[8px] p-5 sm:p-6 space-y-4 shadow-xs">
-            <div className="flex items-center justify-between">
+          {/* Garments Blueprints Section */}
+          <div
+            className={cn(
+              'rounded-2xl bg-[var(--surface-1)] border border-[var(--border)] p-4 sm:p-6 space-y-4 transition-colors hover:border-[var(--border-strong)]',
+              mobileTab !== 'blueprints' ? 'hidden md:block' : 'block'
+            )}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                <span className="text-[11px] font-medium text-[var(--text-muted)] tracking-wider uppercase block">
                   TAILORING TEMPLATES
                 </span>
-                <h2 className="text-base font-bold text-gray-950 font-sans tracking-tight">
+                <h2 className="text-base font-semibold tracking-[-0.01em] text-[var(--text)]">
                   Garments Blueprints
                 </h2>
               </div>
 
-              <button
-                type="button"
+              {/* OUTLINE PILL: Add Template */}
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<Plus className="w-3.5 h-3.5" />}
                 onClick={() => setShowAddTemplateModal(true)}
-                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" weight="bold" />
-                <span>Add Template</span>
-              </button>
+                Add Template
+              </Button>
             </div>
 
-            {/* 2x2 Grid of Blueprint Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-              {blueprints.map((bp) => (
-                <div
-                  key={bp.id}
-                  className="p-4 rounded-[8px] bg-white border border-gray-100/60 shadow-xs flex flex-col justify-between space-y-3"
-                >
-                  <div>
-                    <h3 className="text-xs font-bold text-gray-950 mb-1">{bp.title}</h3>
-                    <p className="text-[11px] text-gray-500 leading-snug">{bp.description}</p>
-                  </div>
+              {blueprints.map((bp) => {
+                const isExpanded = Boolean(expandedBlueprintTags[bp.id]);
+                return (
+                  <div
+                    key={bp.id}
+                    className="p-4 rounded-2xl bg-[var(--surface-1)] border border-[var(--border)] flex flex-col justify-between space-y-3 transition-colors hover:border-[var(--border-strong)]"
+                  >
+                    <div>
+                      <h3 className="text-xs font-semibold text-[var(--text)] tracking-[-0.01em] mb-1">
+                        {bp.title}
+                      </h3>
+                      <p className="text-[11px] text-[var(--text-muted)] leading-snug">
+                        {bp.description}
+                      </p>
+                    </div>
 
-                  {/* Badges row */}
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {bp.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="px-2.5 py-0.5 rounded-full bg-[#F8F8F8] text-[10px] font-semibold text-gray-600 border border-gray-200/60"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                    <span className="px-2 py-0.5 text-[10px] font-bold text-gray-500">
-                      {bp.moreCount}
-                    </span>
+                    {/* Tag chips as pills on --surface-2 at 12px with smooth accordion */}
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {bp.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="px-2.5 py-0.5 rounded-full bg-[var(--surface-2)] text-[11px] font-medium text-[var(--text-muted)] border border-[var(--border)]"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+
+                        <button
+                          type="button"
+                          onClick={() => toggleBlueprintTags(bp.id)}
+                          className="px-2 py-0.5 rounded-full text-[11px] font-medium text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors cursor-pointer inline-flex items-center gap-0.5"
+                        >
+                          <span>{isExpanded ? 'less' : `+${bp.extraTags.length} more`}</span>
+                          {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        </button>
+                      </div>
+
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={shouldReduceMotion ? { duration: 0.05 } : springGentle}
+                            className="overflow-hidden flex flex-wrap gap-1.5 pt-1"
+                          >
+                            {bp.extraTags.map((tag) => (
+                              <span
+                                key={tag}
+                                className="px-2.5 py-0.5 rounded-full bg-[var(--surface-2)] text-[11px] font-medium text-[var(--text-muted)] border border-[var(--border)]"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
-          {/* SECTION 3: Sizing/Measurements */}
-          <div className="bg-[#F8F8F8] rounded-[8px] p-5 sm:p-6 space-y-4 shadow-xs">
-            <div className="flex items-center justify-between">
+          {/* Measurement Standards Section */}
+          <div
+            className={cn(
+              'rounded-2xl bg-[var(--surface-1)] border border-[var(--border)] p-4 sm:p-6 space-y-4 transition-colors hover:border-[var(--border-strong)]',
+              mobileTab !== 'sizing' ? 'hidden md:block' : 'block'
+            )}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-                  Standard Tape Measurements
+                <span className="text-[11px] font-medium text-[var(--text-muted)] tracking-wider uppercase block">
+                  ANATOMICAL LANDMARKS
                 </span>
-                <h2 className="text-base font-bold text-gray-950 font-sans tracking-tight">
-                  Sizing/Measurements
+                <h2 className="text-base font-semibold tracking-[-0.01em] text-[var(--text)]">
+                  Measurement Standards
                 </h2>
               </div>
 
-              <button
-                type="button"
+              {/* OUTLINE PILL: Add Measurement */}
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<Plus className="w-3.5 h-3.5" />}
                 onClick={() => setShowAddMeasurementModal(true)}
-                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" weight="bold" />
-                <span>Add Measurement</span>
-              </button>
+                Add Measurement
+              </Button>
             </div>
 
-            {/* 4x2 Grid of Sizing Cards matching Settings.png */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
               {sizingItems.map((item) => (
                 <div
                   key={item.id}
-                  className="p-3.5 rounded-[8px] bg-white border border-gray-100/60 shadow-xs text-center space-y-1"
+                  className="p-3 rounded-2xl bg-[var(--surface-1)] border border-[var(--border)] flex items-center justify-between transition-colors hover:border-[var(--border-strong)]"
                 >
-                  <h4 className="text-xs font-bold text-gray-950">{item.title}</h4>
-                  <p className="text-[10px] text-gray-500">{item.category}</p>
+                  <div>
+                    <h4 className="text-xs font-semibold text-[var(--text)] tracking-[-0.01em]">
+                      {item.title}
+                    </h4>
+                    <p className="text-[10px] text-[var(--text-muted)]">{item.category}</p>
+                  </div>
+                  <Check className="w-3.5 h-3.5 text-[var(--status-success)]" />
                 </div>
               ))}
             </div>
           </div>
+
         </div>
+
       </div>
 
-      {/* Add Template Modal */}
-      {showAddTemplateModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-gray-100">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-              <h3 className="text-sm font-bold text-gray-950">Add Garment Blueprint</h3>
-              <button
-                type="button"
-                onClick={() => setShowAddTemplateModal(false)}
-                className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-900"
-              >
-                <X className="w-3.5 h-3.5" weight="bold" />
-              </button>
-            </div>
+      {/* Floating Dock on Mobile */}
+      <SmallFloatingDock
+        activeTab={mobileTab}
+        onChange={setMobileTab}
+        tabs={[
+          { id: 'studio', label: 'Studio', icon: <Building2 className="w-4 h-4" /> },
+          { id: 'blueprints', label: 'Templates', icon: <Sliders className="w-4 h-4" /> },
+          { id: 'sizing', label: 'Sizing', icon: <Ruler className="w-4 h-4" /> },
+        ]}
+      />
 
-            <form onSubmit={handleCreateTemplate} className="space-y-4 pt-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-900 mb-1">
-                  Template Name
-                </label>
-                <input
-                  type="text"
+      {/* Add Blueprint Modal */}
+      <AnimatePresence>
+        {showAddTemplateModal && (
+          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.94, opacity: 0 }}
+              animate={{ scale: [0.94, 1.02, 1], opacity: 1 }}
+              exit={{ scale: 0.94, opacity: 0 }}
+              className="w-full max-w-md rounded-2xl bg-[var(--surface-1)] border border-[var(--border)] p-6 shadow-2xl space-y-4"
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+                <h3 className="text-sm font-semibold tracking-[-0.01em] text-[var(--text)]">
+                  Add Garment Blueprint
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowAddTemplateModal(false)}
+                  className="w-7 h-7 rounded-full bg-[var(--surface-2)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)]"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateTemplate} className="space-y-3.5 pt-1">
+                <Input
+                  label="Blueprint Title"
                   required
                   placeholder="e.g. Bespoke Safari Jacket"
                   value={newTemplateName}
                   onChange={(e) => setNewTemplateName(e.target.value)}
-                  className="w-full h-10 px-3.5 rounded-xl bg-[#f4f5f7] text-xs text-gray-900 focus:outline-none focus:bg-white"
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-900 mb-1">
-                  Description
-                </label>
-                <textarea
+                <Textarea
+                  label="Description"
                   rows={2}
-                  placeholder="e.g. Tailored outerwear with pleated bellow pockets..."
+                  placeholder="Outerwear specifications and fitting landmarks..."
                   value={newTemplateDesc}
                   onChange={(e) => setNewTemplateDesc(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-[#f4f5f7] text-xs text-gray-900 focus:outline-none focus:bg-white resize-none"
                 />
-              </div>
 
-              <div className="pt-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddTemplateModal(false)}
-                  className="px-4 py-2 rounded-full text-xs text-gray-600 hover:bg-gray-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold"
-                >
-                  Save
-                </button>
-              </div>
-            </form>
+                <div className="pt-2 flex justify-end gap-2 border-t border-[var(--border)]">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAddTemplateModal(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" variant="primary" size="sm">
+                    Create Blueprint
+                  </Button>
+                </div>
+              </form>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* Add Measurement Modal */}
-      {showAddMeasurementModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-gray-100">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-              <h3 className="text-sm font-bold text-gray-950">Add Measurement</h3>
-              <button
-                type="button"
-                onClick={() => setShowAddMeasurementModal(false)}
-                className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-900"
-              >
-                <X className="w-3.5 h-3.5" weight="bold" />
-              </button>
-            </div>
+      <AnimatePresence>
+        {showAddMeasurementModal && (
+          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.94, opacity: 0 }}
+              animate={{ scale: [0.94, 1.02, 1], opacity: 1 }}
+              exit={{ scale: 0.94, opacity: 0 }}
+              className="w-full max-w-md rounded-2xl bg-[var(--surface-1)] border border-[var(--border)] p-6 shadow-2xl space-y-4"
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+                <h3 className="text-sm font-semibold tracking-[-0.01em] text-[var(--text)]">
+                  Add Measurement Standard
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowAddMeasurementModal(false)}
+                  className="w-7 h-7 rounded-full bg-[var(--surface-2)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)]"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
 
-            <form onSubmit={handleCreateMeasurement} className="space-y-4 pt-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-900 mb-1">
-                  Measurement Label
-                </label>
-                <input
-                  type="text"
+              <form onSubmit={handleCreateMeasurement} className="space-y-3.5 pt-1">
+                <Input
+                  label="Measurement Label"
                   required
                   placeholder="e.g. Bicep Circumference"
                   value={newMeasurementName}
                   onChange={(e) => setNewMeasurementName(e.target.value)}
-                  className="w-full h-10 px-3.5 rounded-xl bg-[#f4f5f7] text-xs text-gray-900 focus:outline-none focus:bg-white"
                 />
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-900 mb-1">
-                  Body Region
-                </label>
-                <select
-                  value={newMeasurementCategory}
-                  onChange={(e) => setNewMeasurementCategory(e.target.value)}
-                  className="w-full h-10 px-3.5 rounded-xl bg-[#f4f5f7] text-xs text-gray-900 focus:outline-none focus:bg-white"
-                >
-                  <option value="Upper Body">Upper Body</option>
-                  <option value="Lower Body">Lower Body</option>
-                  <option value="Head/Neck">Head/Neck</option>
-                  <option value="Arms">Arms</option>
-                </select>
-              </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-normal text-[var(--text-muted)]">
+                    Anatomical Zone
+                  </label>
+                  <select
+                    value={newMeasurementCategory}
+                    onChange={(e) => setNewMeasurementCategory(e.target.value)}
+                    className="w-full rounded-xl h-10 px-3.5 bg-[var(--surface-2)] border border-[var(--border)] text-xs text-[var(--text)] focus:outline-none focus:border-[var(--accent)]"
+                  >
+                    <option value="Upper Body">Upper Body</option>
+                    <option value="Lower Body">Lower Body</option>
+                    <option value="Head / Neck">Head / Neck</option>
+                    <option value="Full Length">Full Length</option>
+                  </select>
+                </div>
 
-              <div className="pt-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddMeasurementModal(false)}
-                  className="px-4 py-2 rounded-full text-xs text-gray-600 hover:bg-gray-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold"
-                >
-                  Save
-                </button>
-              </div>
-            </form>
+                <div className="pt-2 flex justify-end gap-2 border-t border-[var(--border)]">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAddMeasurementModal(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" variant="primary" size="sm">
+                    Add Landmark
+                  </Button>
+                </div>
+              </form>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -5,29 +5,64 @@
   --font-serif: var(--font-serif), Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: var(--font-geist-mono), monospace;
 
-  --color-canvas: #f0f2f5;
-  --color-surface: #ffffff;
-  --color-field: #f7f8fa;
-  --color-ink: #111827;
-  --color-subtle: #6b7280;
-  --color-faint: #9ca3af;
-  --color-cobalt: #1d4ed8;
-  --color-cobalt-hover: #1e40af;
+  --color-bg: var(--bg);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-faint: var(--text-faint);
+  --color-accent: var(--accent);
 }
 
 :root {
   --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-serif: var(--font-serif), Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: var(--font-geist-mono), monospace;
+
+  /* EasyUI Light Theme */
+  --bg: #FAFAFA;
+  --surface-1: #FFFFFF;
+  --surface-2: #F4F4F5;
+  --border: #E4E4E7;
+  --border-strong: #D4D4D8;
+  --text: #0A0A0A;
+  --text-muted: #525252;
+  --text-faint: #737373;
+  --accent: #0447FF;
+
+  --status-success: #16A34A;
+  --status-warning: #D97706;
+  --status-danger: #DC2626;
+}
+
+.dark {
+  /* EasyUI Dark Theme */
+  --bg: #050505;
+  --surface-1: #0E0E0E;
+  --surface-2: #151515;
+  --border: #1F1F1F;
+  --border-strong: #2A2A2A;
+  --text: #FAFAFA;
+  --text-muted: #A3A3A3;
+  --text-faint: #8A8A8A;
+  --accent: #5B83FF;
+
+  --status-success: #4ADE80;
+  --status-warning: #FBBF24;
+  --status-danger: #F87171;
 }
 
 body {
-  background-color: #f0f2f5;
-  color: #111827;
+  background-color: var(--bg);
+  color: var(--text);
   font-family: var(--font-sans);
+  min-height: 100vh;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Prevent unnatural mobile zoom and tap delays */
+/* Prevent unnatural mobile tap delays while allowing pinch-to-zoom */
 html, body, button, input, select, textarea, a {
   touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
@@ -41,17 +76,16 @@ html, body, button, input, select, textarea, a {
 
 /* Subtle scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: var(--border-strong);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: var(--text-muted);
 }
-

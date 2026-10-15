@@ -12,7 +12,10 @@ import { OrdersScreen } from '@/components/screens/OrdersScreen';
 import { PickupCalendarScreen } from '@/components/screens/PickupCalendarScreen';
 import { SettingsScreen } from '@/components/screens/SettingsScreen';
 import { OrderFormModal } from '@/components/screens/OrderFormModal';
-import { X, UserPlus } from '@phosphor-icons/react';
+import { X } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Textarea } from '@/components/ui/Textarea';
 
 function TailorFitApp() {
   const { 
@@ -66,7 +69,7 @@ function TailorFitApp() {
 
     const created = addClient({
       name: newClientName.trim(),
-      phone: newClientPhone.trim() || '+1 (555) 000-0000',
+      phone: newClientPhone.trim() || '+234 800 000 0000',
       email: newClientEmail.trim() || `${newClientName.toLowerCase().replace(/\s+/g, '.')}@client.com`,
       notes: newClientNotes.trim(),
     });
@@ -77,11 +80,11 @@ function TailorFitApp() {
     setNewClientNotes('');
     setIsNewClientModalOpen(false);
     setSelectedClientId(created.id);
-    setActiveScreen('client-profile');
+    setActiveScreen('clients');
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#eaedf0] text-gray-950">
+    <div className="min-h-screen flex flex-col bg-[var(--bg)] text-[var(--text)] transition-colors">
       {/* Navigation Header */}
       <Navbar />
 
@@ -145,89 +148,68 @@ function TailorFitApp() {
       {/* Quick New Client Modal */}
       {isNewClientModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-gray-100 animate-in zoom-in-95">
-            <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+          <div className="w-full max-w-md rounded-2xl bg-[var(--surface-1)] border border-[var(--border)] p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
               <div>
-                <h3 className="text-lg font-bold text-gray-950 font-sans">New Client Profile</h3>
-                <p className="text-xs text-gray-400">Add client to atelier records</p>
+                <h3 className="text-base font-semibold tracking-[-0.01em] text-[var(--text)]">
+                  New Client Profile
+                </h3>
+                <p className="text-xs text-[var(--text-muted)]">Add client to atelier records</p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsNewClientModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 hover:text-gray-900 flex items-center justify-center"
+                className="w-7 h-7 rounded-full bg-[var(--surface-2)] text-[var(--text-muted)] hover:text-[var(--text)] flex items-center justify-center cursor-pointer"
               >
-                <X className="w-4 h-4" weight="bold" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateClient} className="space-y-4 pt-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Adriana Kunle"
-                  value={newClientName}
-                  onChange={(e) => setNewClientName(e.target.value)}
-                  className="w-full h-11 px-4 rounded-xl bg-[#f7f8fa] border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-[#1d4ed8] focus:bg-white"
-                />
-              </div>
+            <form onSubmit={handleCreateClient} className="space-y-3.5 pt-1">
+              <Input
+                label="Full Name *"
+                required
+                placeholder="e.g. Adriana Kunle"
+                value={newClientName}
+                onChange={(e) => setNewClientName(e.target.value)}
+              />
 
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  placeholder="+234 - "
-                  value={newClientPhone}
-                  onChange={(e) => setNewClientPhone(e.target.value)}
-                  className="w-full h-11 px-4 rounded-xl bg-[#f7f8fa] border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-[#1d4ed8] focus:bg-white"
-                />
-              </div>
+              <Input
+                label="Phone Number"
+                type="tel"
+                placeholder="+234 - "
+                value={newClientPhone}
+                onChange={(e) => setNewClientPhone(e.target.value)}
+              />
 
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  placeholder="name@example.com"
-                  value={newClientEmail}
-                  onChange={(e) => setNewClientEmail(e.target.value)}
-                  className="w-full h-11 px-4 rounded-xl bg-[#f7f8fa] border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-[#1d4ed8] focus:bg-white"
-                />
-              </div>
+              <Input
+                label="Email Address"
+                type="email"
+                placeholder="name@example.com"
+                value={newClientEmail}
+                onChange={(e) => setNewClientEmail(e.target.value)}
+              />
 
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Bespoke Notes / Style Preferences
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="e.g. Sloped posture, silk lining preference..."
-                  value={newClientNotes}
-                  onChange={(e) => setNewClientNotes(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-[#f7f8fa] border border-gray-200 text-xs text-gray-900 focus:outline-none focus:border-[#1d4ed8] focus:bg-white resize-none"
-                />
-              </div>
+              <Textarea
+                label="Bespoke Notes / Style Preferences"
+                rows={2}
+                placeholder="e.g. Sloped posture, silk lining preference..."
+                value={newClientNotes}
+                onChange={(e) => setNewClientNotes(e.target.value)}
+              />
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
-                <button
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border)]">
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => setIsNewClientModalOpen(false)}
-                  className="px-4 py-2 rounded-full border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold hover:bg-[#1e40af] shadow-xs"
-                >
+                </Button>
+                <Button type="submit" variant="primary" size="sm">
                   Create Client
-                </button>
+                </Button>
               </div>
             </form>
           </div>

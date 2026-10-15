@@ -63,6 +63,20 @@ export const LANDMARKS: LandmarkData[] = [
     side: 'right',
   },
   {
+    key: 'back',
+    name: 'Back',
+    defaultValCm: 40,
+    color: '#0084FF',
+    zone: 'Cross Back',
+    dotX: 165,
+    dotY: 195,
+    anchorX: 165,
+    anchorY: 195,
+    labelX: 110,
+    labelY: 195,
+    side: 'left',
+  },
+  {
     key: 'waist',
     name: 'Waist',
     defaultValCm: 72,
@@ -91,6 +105,20 @@ export const LANDMARKS: LandmarkData[] = [
     side: 'right',
   },
   {
+    key: 'hip',
+    name: 'Hip',
+    defaultValCm: 96,
+    color: '#0084FF',
+    zone: 'Full Hip',
+    dotX: 165,
+    dotY: 318,
+    anchorX: 165,
+    anchorY: 318,
+    labelX: 110,
+    labelY: 318,
+    side: 'left',
+  },
+  {
     key: 'thigh',
     name: 'Thigh',
     defaultValCm: 54,
@@ -104,6 +132,20 @@ export const LANDMARKS: LandmarkData[] = [
     labelY: 419,
     side: 'right',
   },
+  {
+    key: 'ankle',
+    name: 'Ankle',
+    defaultValCm: 24,
+    color: '#0084FF',
+    zone: 'Lower Leg',
+    dotX: 185,
+    dotY: 485,
+    anchorX: 185,
+    anchorY: 485,
+    labelX: 110,
+    labelY: 485,
+    side: 'left',
+  },
 ];
 
 export interface AtelierMannequinProps {
@@ -113,6 +155,7 @@ export interface AtelierMannequinProps {
   onMeasurementChange?: (key: string, value: number) => void;
   onSelectLandmark?: (key: string, name: string, currentVal: number) => void;
   className?: string;
+  readOnly?: boolean;
 }
 
 export function AtelierMannequin({
@@ -122,6 +165,7 @@ export function AtelierMannequin({
   onMeasurementChange,
   onSelectLandmark,
   className = '',
+  readOnly = false,
 }: AtelierMannequinProps) {
   const getMeasurementVal = (key: string, defaultCm: number) => {
     const raw = measurements[key];
@@ -309,19 +353,17 @@ export function AtelierMannequin({
             />
           </g>
 
-          {/* === CYAN DASHED LEADER LINES & CONCENTRIC ANCHOR TARGETS === */}
+          {/* === EASYUI POINTS, LEADER LINES & LABELS === */}
           {LANDMARKS.map((lm) => {
             const isLeft = lm.side === 'left';
+            const isMeasured = Boolean(measurements[lm.key] && Number(measurements[lm.key]) > 0);
             
-            // Exact anchor & leader line endpoints matching Overview.png & Clients.png
             let lineX2 = isLeft ? lm.labelX + 8 : lm.labelX - 8;
             let lineY2 = lm.labelY - 5;
 
-            // Shoulder has slight upward angle
             if (lm.key === 'shoulder') {
               lineY2 = lm.labelY - 4;
             }
-            // Thigh has downward diagonal dashed line
             if (lm.key === 'thigh') {
               lineY2 = lm.labelY - 4;
             }
@@ -329,65 +371,81 @@ export function AtelierMannequin({
             return (
               <g
                 key={`callout-${lm.key}`}
-                className="cursor-pointer group"
-                onClick={() => handleLandmarkClick(lm)}
+                className={readOnly ? 'pointer-events-none opacity-40' : 'cursor-pointer group'}
+                onClick={() => !readOnly && handleLandmarkClick(lm)}
               >
                 {/* Expanded touch target for easy tap on mobile */}
                 <circle
                   cx={lm.anchorX}
                   cy={lm.anchorY}
-                  r="20"
+                  r="22"
                   fill="transparent"
-                  className="cursor-pointer"
+                  className={readOnly ? 'cursor-default' : 'cursor-pointer'}
                 />
 
-                {/* Cyan Dashed Leader Line */}
+                {/* Leader line: 1px dashed --text-faint */}
                 <line
                   x1={lm.anchorX}
                   y1={lm.anchorY}
                   x2={lineX2}
                   y2={lineY2}
-                  stroke="#38bdf8"
-                  strokeWidth="1.5"
-                  strokeDasharray="3 3"
-                  className="transition-opacity group-hover:stroke-[#0284c7]"
+                  stroke="var(--text-faint)"
+                  strokeWidth="1"
+                  strokeDasharray="2 2"
+                  opacity="0.8"
+                  className={readOnly ? '' : 'transition-opacity group-hover:opacity-100'}
                 />
 
-                {/* Concentric Anchor Target - Outer Translucent Ring */}
-                <circle
-                  cx={lm.anchorX}
-                  cy={lm.anchorY}
-                  r="7"
-                  fill="rgba(0, 132, 255, 0.16)"
-                  stroke="#0084FF"
-                  strokeWidth="1.5"
-                  className="transition-transform group-hover:scale-125 origin-center"
-                />
-
-                {/* Concentric Anchor Target - Inner Solid Dot */}
-                <circle
-                  cx={lm.anchorX}
-                  cy={lm.anchorY}
-                  r="3.5"
-                  fill="#0084FF"
-                  className="transition-transform group-hover:scale-125 origin-center"
-                />
+                {/* Point Graphic */}
+                {isMeasured ? (
+                  <>
+                    {/* Measured point = filled --accent with soft pulse */}
+                    <circle
+                      cx={lm.anchorX}
+                      cy={lm.anchorY}
+                      r="5"
+                      fill="var(--accent)"
+                      className="origin-center"
+                    />
+                    <circle
+                      cx={lm.anchorX}
+                      cy={lm.anchorY}
+                      r="8"
+                      fill="transparent"
+                      stroke="var(--accent)"
+                      strokeWidth="1"
+                      opacity="0.4"
+                    />
+                  </>
+                ) : (
+                  /* Unmeasured point = 10px ring in --border-strong */
+                  <circle
+                    cx={lm.anchorX}
+                    cy={lm.anchorY}
+                    r="5"
+                    fill="var(--surface-1)"
+                    stroke="var(--border-strong)"
+                    strokeWidth="1.5"
+                    className="origin-center"
+                  />
+                )}
 
                 {/* Outer Connection Dot */}
                 <circle
                   cx={lineX2}
                   cy={lineY2}
-                  r="2.5"
-                  fill="#0284c7"
-                  className="transition-transform group-hover:scale-125 origin-center"
+                  r="2"
+                  fill={isMeasured ? 'var(--accent)' : 'var(--border-strong)'}
                 />
 
-                {/* Fashion Serif Landmark Label (Playfair Display font) */}
+                {/* Label: Inter 12px, --text-muted */}
                 <text
                   x={lm.labelX}
                   y={lm.labelY}
                   textAnchor={isLeft ? 'end' : 'start'}
-                  className="font-serif text-[17px] font-normal fill-gray-950 tracking-wide select-none group-hover:fill-[#1d4ed8] transition-colors"
+                  className={`font-sans text-[12px] font-normal fill-[var(--text-muted)] select-none ${
+                    readOnly ? '' : 'group-hover:fill-[var(--text)] transition-colors'
+                  }`}
                 >
                   {lm.name}
                 </text>

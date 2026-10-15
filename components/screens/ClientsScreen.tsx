@@ -1,19 +1,30 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useStore } from '@/lib/store';
 import { AtelierMannequin } from '@/components/AtelierMannequin';
 import { 
-  MagnifyingGlass, 
-  CaretRight, 
+  Search, 
+  ChevronRight, 
   Phone, 
-  EnvelopeSimple, 
+  Mail, 
   User, 
-  List,
-  Check, 
-  X,
-  Plus
-} from '@phosphor-icons/react';
+  Ruler, 
+  Plus, 
+  X, 
+  UserCheck,
+  ShoppingBag,
+  Users
+} from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { DrawCheckbox } from '@/components/ui/DrawCheckbox';
+import { ToastContainer, ToastMessage } from '@/components/ui/Toasts';
+import { SmallFloatingDock } from '@/components/ui/SmallFloatingDock';
+import { AnimatedNumberMorph } from '@/components/ui/AnimatedNumberMorph';
+import { springSmooth } from '@/lib/motion-tokens';
+import { cn } from '@/lib/utils';
 
 interface ClientsScreenProps {
   onOpenClient: (clientId: string) => void;
@@ -21,173 +32,164 @@ interface ClientsScreenProps {
   onNewOrder: (clientId: string) => void;
 }
 
+let clientToastSeq = 0;
+
 export function ClientsScreen({ 
   onOpenClient, 
   onNewMeasurement, 
   onNewOrder 
 }: ClientsScreenProps) {
-  const { clients, selectedClientId, setSelectedClientId, getClientSnapshots, updateSnapshot, addSnapshot } = useStore();
+  const { clients, selectedClientId, setSelectedClientId, getClientSnapshots } = useStore();
+  const shouldReduceMotion = useReducedMotion();
 
+  const [mobileTab, setMobileTab] = useState<'directory' | 'profile' | 'orders'>('directory');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [mannequinView, setMannequinView] = useState<'mannequin' | 'table'>('mannequin');
-  const [pointModalData, setPointModalData] = useState<{
-    key: string;
-    name: string;
-    value: string;
-    isCustom?: boolean;
-  } | null>(null);
 
-  const recentClients = useMemo(() => [
+  // Toasts
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const addToast = (toast: Omit<ToastMessage, 'id'>) => {
+    const id = `toast-${++clientToastSeq}`;
+    setToasts((prev) => [...prev, { ...toast, id }]);
+  };
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const defaultClients = useMemo(() => [
     {
-      id: 'c-6',
-      initials: 'AB',
-      name: 'Amanda Billings',
-      phone: '+23740930299',
-      email: 'a.billings@couture.com',
-      since: 'Client since Aug 2025',
+      id: 'c-1',
+      initials: 'CD',
+      name: 'Chloe Dallas',
+      phone: '+234 809 489 2011',
+      email: 'chloedallas@couture.com',
+      since: 'Client since October 2026',
     },
     {
       id: 'c-2',
       initials: 'TR',
       name: 'Taylor Razaq',
-      phone: '+44740930509',
-      email: 'taylor.razaq@londoncouture.co.uk',
-      since: 'Client since May 2025',
+      phone: '+234 803 929 1100',
+      email: 't.razaq@tailorfit.design',
+      since: 'Client since May 2024',
     },
     {
-      id: 'c-1',
-      initials: 'CD',
-      name: 'Chloe Dallas',
-      phone: '+234 8141 432 211',
-      email: 'chloedallas@email.com',
-      since: 'Client since Jun 2025',
+      id: 'c-6',
+      initials: 'AB',
+      name: 'Amanda Billings',
+      phone: '+237 409 302 990',
+      email: 'a.billings@couture.com',
+      since: 'Client since Aug 2025',
     },
   ], []);
 
-  const [activeClientId, setActiveClientId] = useState<string>('c-6');
+  const activeClientId = selectedClientId || 'c-1';
+  const activeClientFromStore = clients.find((c) => c.id === activeClientId);
 
   const selectedClientProfile = useMemo(() => {
-    const targetId = selectedClientId || activeClientId;
-    const match = recentClients.find((c) => c.id === targetId) ||
-                  clients.find((c) => c.id === targetId);
-    if (match) {
+    if (activeClientFromStore) {
+      const calcInitials = activeClientFromStore.name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase();
+
       return {
-        id: match.id,
-        initials: 'initials' in match ? (match as any).initials : match.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase(),
-        name: match.name,
-        since: 'since' in match ? (match as any).since : 'Client since 2025',
-        phone: match.phone || '+234 8141 432 211',
-        email: match.email || 'client@email.com',
+        id: activeClientFromStore.id,
+        initials: calcInitials || 'CL',
+        name: activeClientFromStore.name,
+        since: activeClientFromStore.createdAt
+          ? `Client since ${new Date(activeClientFromStore.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
+          : 'Client since October 2026',
+        phone: activeClientFromStore.phone || '+234 - ',
+        email: activeClientFromStore.email || 'client@example.com',
       };
     }
-    return recentClients[0];
-  }, [selectedClientId, activeClientId, clients, recentClients]);
+    return defaultClients[0];
+  }, [activeClientFromStore, defaultClients]);
 
-  // Exact measurements from design / store
-  const [measurements, setMeasurements] = useState<Record<string, number | string>>(() => {
-    const clientSnaps = getClientSnapshots('c-1');
-    if (clientSnaps && clientSnaps.length > 0) {
-      const latest = clientSnaps[clientSnaps.length - 1];
-      if (latest.measurements) {
-        return latest.measurements;
-      }
-    }
-    return {
-      shoulder: 42,
-      neck: 36,
-      bust: 92,
-      waist: 72,
-      sleeve: 60,
-      thigh: 54,
-    };
+  const clientSnapshots = getClientSnapshots(selectedClientProfile.id);
+  const activeSnapshot = clientSnapshots[0];
+
+  const [measurements, setMeasurements] = useState<Record<string, number>>({
+    shoulder: 42,
+    neck: 36,
+    bust: 92,
+    waist: 72,
+    sleeve: 60,
+    thigh: 54,
+    hip: 96,
+    ankle: 24,
+    back: 40,
+    ...(activeSnapshot?.measurements as Record<string, number> || {}),
   });
 
-  const handleSelectClient = (client: typeof recentClients[0]) => {
-    setActiveClientId(client.id);
+  const [measurementList, setMeasurementList] = useState([
+    { id: 'shoulder', label: 'Shoulder width', value: '42.0', confirmed: true },
+    { id: 'neck', label: 'Neck Circumference', value: '36.0', confirmed: true },
+    { id: 'bust', label: 'Bust / Chest', value: '92.0', confirmed: true },
+    { id: 'waist', label: 'Waist Circumference', value: '72.0', confirmed: true },
+    { id: 'sleeve', label: 'Sleeve Length', value: '60.0', confirmed: true },
+    { id: 'thigh', label: 'Thigh Width', value: '54.0', confirmed: true },
+    { id: 'hip', label: 'Hip Circumference', value: '96.0', confirmed: true },
+    { id: 'ankle', label: 'Ankle Opening', value: '24.0', confirmed: true },
+    { id: 'back', label: 'Back Width', value: '40.0', confirmed: true },
+  ]);
+
+  const handleSelectClient = (client: { id: string }) => {
     setSelectedClientId(client.id);
-    const clientSnaps = getClientSnapshots(client.id);
-    if (clientSnaps && clientSnaps.length > 0) {
-      const latest = clientSnaps[clientSnaps.length - 1];
-      if (latest.measurements) {
-        setMeasurements(latest.measurements);
-        return;
-      }
+    const snapshots = getClientSnapshots(client.id);
+    const snap = snapshots[0];
+    if (snap?.measurements) {
+      const snapMeasurements = snap.measurements as Record<string, number>;
+      setMeasurements({ ...snapMeasurements });
+      setMeasurementList((prev) =>
+        prev.map((item) => ({
+          ...item,
+          value: snapMeasurements[item.id] !== undefined
+            ? Number(snapMeasurements[item.id]).toFixed(1)
+            : item.value,
+        }))
+      );
     }
-    setMeasurements({
-      shoulder: 42,
-      neck: 36,
-      bust: 92,
-      waist: 72,
-      sleeve: 60,
-      thigh: 54,
+    setMobileTab('profile');
+  };
+
+  const handleListValueChange = (id: string, value: string) => {
+    setMeasurementList((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, value } : item))
+    );
+    const num = parseFloat(value);
+    if (!isNaN(num)) {
+      setMeasurements((prev) => ({ ...prev, [id]: num }));
+    }
+  };
+
+  const handleDeleteListItem = (id: string) => {
+    const itemToDelete = measurementList.find((item) => item.id === id);
+    if (!itemToDelete) return;
+
+    setMeasurementList((prev) => prev.filter((item) => item.id !== id));
+
+    addToast({
+      type: 'undo',
+      message: `Removed "${itemToDelete.label}"`,
+      onUndo: () => {
+        setMeasurementList((prev) => [...prev, itemToDelete]);
+      },
     });
   };
 
-  const handleMeasurementChange = (key: string, value: number) => {
-    const updated = {
-      ...measurements,
-      [key]: value,
-    };
-    setMeasurements(updated);
-
-    // Persist change to store
-    const clientSnaps = getClientSnapshots(selectedClientProfile.id);
-    if (clientSnaps && clientSnaps.length > 0) {
-      const latest = clientSnaps[clientSnaps.length - 1];
-      updateSnapshot(latest.id, {
-        measurements: updated,
-      });
-    } else {
-      addSnapshot({
-        clientId: selectedClientProfile.id,
-        date: new Date().toISOString().slice(0, 10),
-        unit: 'cm',
-        garmentType: 'Bespoke Fitting',
-        measurements: updated,
-        notes: 'Updated via Body Measurement History',
-      });
-    }
-  };
-
-  const handleSavePoint = (key: string, name: string, valStr: string) => {
-    const numVal = parseFloat(valStr);
-    if (!isNaN(numVal) && numVal > 0) {
-      const updated = {
-        ...measurements,
-        [key]: numVal,
-      };
-      setMeasurements(updated);
-
-      // Persist directly to client profile store
-      const clientSnaps = getClientSnapshots(selectedClientProfile.id);
-      if (clientSnaps && clientSnaps.length > 0) {
-        const latest = clientSnaps[clientSnaps.length - 1];
-        updateSnapshot(latest.id, {
-          measurements: updated,
-        });
-      } else {
-        addSnapshot({
-          clientId: selectedClientProfile.id,
-          date: new Date().toISOString().slice(0, 10),
-          unit: 'cm',
-          garmentType: 'Bespoke Fitting',
-          measurements: updated,
-          notes: 'Updated via Body Measurement History',
-        });
-      }
-    }
-    setPointModalData(null);
-  };
-
-  // Curated reference photos for the 3 Order History cards matching Clients.png
   const orderHistoryCards = [
     {
       id: 'ord-hist-1',
-      title: 'Gown/ Dress',
+      title: 'Bespoke African Gown',
       badge: 'Urgent',
-      badgeClass: 'bg-[#ea580c] text-white',
-      date: 'Size taken on 09-10-2025',
-      price: '₦130,000',
+      isUrgent: true,
+      date: 'Fitting on 09-10-2026',
+      price: 130000,
       images: [
         'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
         'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=300&q=80',
@@ -197,10 +199,10 @@ export function ClientsScreen({
     {
       id: 'ord-hist-2',
       title: 'Oxford Three Piece Suit',
-      badge: 'Completed',
-      badgeClass: 'bg-[#15803d] text-white',
-      date: 'Size taken on 09-10-2025',
-      price: '₦230,000',
+      badge: 'Ready',
+      isUrgent: false,
+      date: 'Completed 02-10-2026',
+      price: 230000,
       images: [
         'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=300&q=80',
         'https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?auto=format&fit=crop&w=300&q=80',
@@ -209,11 +211,11 @@ export function ClientsScreen({
     },
     {
       id: 'ord-hist-3',
-      title: 'Gown/ Dress',
-      badge: 'Pending',
-      badgeClass: 'bg-[#84cc16] text-white',
-      date: 'Size taken on 09-10-2025',
-      price: '₦130,000',
+      title: 'Silk Evening Corset',
+      badge: 'In Progress',
+      isUrgent: false,
+      date: 'Scheduled 18-10-2026',
+      price: 95000,
       images: [
         'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=300&q=80',
         'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=300&q=80',
@@ -222,225 +224,266 @@ export function ClientsScreen({
     },
   ];
 
+  const filteredClients = useMemo(() => {
+    return defaultClients.filter((c) =>
+      searchQuery.trim()
+        ? c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          c.phone.includes(searchQuery) ||
+          c.email.toLowerCase().includes(searchQuery.toLowerCase())
+        : true
+    );
+  }, [defaultClients, searchQuery]);
+
   return (
-    <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-4">
-      {/* 2-Column Cockpit strictly matching Clients.png */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* =========================================================================
-            LEFT COLUMN: "Client Directory" Main Container
-            ========================================================================= */}
-        <div className="lg:col-span-3 bg-[#FFFFFF] p-[2px] rounded-[8px] shadow-[0_2px_12px_rgba(0,0,0,0.03)]">
-          <div className="bg-[#f8f8f8] rounded-[6px] p-4 space-y-4">
-            <h2 className="text-sm font-bold text-gray-950 font-sans tracking-tight">
+    <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-3 space-y-4 pb-28 md:pb-6">
+      <ToastContainer toasts={toasts} onDismiss={removeToast} />
+
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+        
+        {/* =====================================================================
+            LEFT COLUMN: Client Directory with Expandable Search Pill
+            ===================================================================== */}
+        <div
+          className={cn(
+            'md:col-span-5 xl:col-span-4 rounded-2xl bg-[var(--surface-1)] border border-[var(--border)] p-4 sm:p-6 space-y-4 transition-colors hover:border-[var(--border-strong)]',
+            mobileTab !== 'directory' ? 'hidden md:block' : 'block'
+          )}
+        >
+          <div className="flex items-center justify-between pb-1 border-b border-[var(--border)]">
+            <h2 className="text-base font-semibold tracking-[-0.01em] text-[var(--text)]">
               Client Directory
             </h2>
+            <span className="text-xs font-mono text-[var(--text-muted)]">
+              {filteredClients.length} clients
+            </span>
+          </div>
 
-            {/* Search Bar: fill of f1f1f1 with stroke of ededed */}
-            <div className="relative">
-              <MagnifyingGlass className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" weight="bold" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search clients by name, phone number, email..."
-                className="w-full h-10 pl-9 pr-3.5 rounded-[6px] bg-[#f1f1f1] border border-[#ededed] text-[11px] text-gray-900 placeholder:text-gray-400 focus:outline-none shadow-xs"
-              />
-            </div>
+          {/* Expandable Search Pill with spring transition */}
+          <motion.div
+            animate={{
+              borderColor: isSearchFocused ? 'var(--accent)' : 'var(--border)',
+            }}
+            transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.15 }}
+            className="relative flex items-center rounded-full bg-[var(--surface-2)] border px-3 h-10 min-h-[40px] max-sm:min-h-[44px]"
+          >
+            <Search className="w-4 h-4 text-[var(--text-muted)] shrink-0 mr-2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => setIsSearchFocused(false)}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search clients..."
+              className="w-full bg-transparent text-xs text-[var(--text)] placeholder:text-[var(--text-faint)] focus:outline-none max-sm:text-base"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="text-[var(--text-muted)] hover:text-[var(--text)] p-1 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </motion.div>
 
-            {/* Subheading: Recently Viewed Clients */}
-            <div className="space-y-2 pt-1">
-              <h3 className="text-xs font-bold text-gray-900">Recently Viewed Clients</h3>
-
-              {/* Main container: FFFFFF fill with 2px padding and 2px gap between individual containers */}
-              <div className="bg-[#FFFFFF] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
-                {recentClients
-                  .filter((c) =>
-                    searchQuery
-                      ? c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        c.phone.includes(searchQuery) ||
-                        c.email.toLowerCase().includes(searchQuery.toLowerCase())
-                      : true
-                  )
-                  .map((client) => {
-                    const isSelected = selectedClientProfile.id === client.id;
-                    return (
-                      <div
-                        key={client.id}
-                        onClick={() => handleSelectClient(client)}
-                        className={`p-3 rounded-[6px] transition-all flex items-center justify-between cursor-pointer ${
-                          isSelected
-                            ? 'bg-[#f8f8f8] ring-1.5 ring-[#1d4ed8]'
-                            : 'bg-[#f8f8f8] hover:bg-[#f0f0f0]'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-[6px] font-bold text-xs flex items-center justify-center ${
-                            isSelected ? 'bg-[#1d4ed8] text-white' : 'bg-white text-gray-800'
-                          }`}>
-                            {client.initials}
-                          </div>
-                          <div>
-                            <h4 className="text-xs font-bold text-gray-950">{client.name}</h4>
-                            <p className="text-[10px] text-gray-500">{client.phone}</p>
-                          </div>
-                        </div>
-                        <CaretRight className={`w-4 h-4 ${isSelected ? 'text-[#1d4ed8]' : 'text-gray-400'}`} weight="fill" />
-                      </div>
-                    );
-                  })}
+          {/* Directory Rows */}
+          <div className="space-y-2 pt-1">
+            {!searchQuery.trim() && (
+              <div className="border-b border-[var(--border)] pb-1 mb-2">
+                <h3 className="text-xs font-medium text-[var(--text-muted)]">
+                  Recently Viewed Clients
+                </h3>
               </div>
+            )}
+
+            <div className="flex flex-col gap-2">
+              {filteredClients.length === 0 ? (
+                <div className="p-4 text-center rounded-xl bg-[var(--surface-2)] border border-[var(--border)]">
+                  <p className="text-xs text-[var(--text-muted)]">
+                    No clients match &ldquo;{searchQuery}&rdquo;
+                  </p>
+                </div>
+              ) : (
+                filteredClients.map((client) => {
+                  const isSelected = selectedClientProfile.id === client.id;
+                  return (
+                    <button
+                      key={client.id}
+                      type="button"
+                      onClick={() => handleSelectClient(client)}
+                      className={cn(
+                        'w-full p-3 rounded-xl border text-left transition-colors flex items-center justify-between cursor-pointer select-none',
+                        isSelected
+                          ? 'bg-[var(--surface-2)] border-[var(--border-strong)]'
+                          : 'bg-[var(--surface-1)] border-[var(--border)] hover:bg-[var(--surface-2)] hover:border-[var(--border-strong)]'
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={cn(
+                            'w-8 h-8 rounded-full font-semibold text-xs flex items-center justify-center shrink-0 border',
+                            isSelected
+                              ? 'bg-[var(--text)] text-[var(--bg)] border-transparent'
+                              : 'bg-[var(--surface-2)] text-[var(--text)] border-[var(--border)]'
+                          )}
+                        >
+                          {client.initials}
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-semibold text-[var(--text)] tracking-[-0.01em]">
+                            {client.name}
+                          </h4>
+                          <p className="text-[11px] text-[var(--text-muted)] font-mono">
+                            {client.phone}
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-[var(--text-muted)]" />
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
 
-        {/* =========================================================================
-            RIGHT COLUMN: Client Profile Dossier
-            ========================================================================= */}
-        <div className="lg:col-span-9 bg-[#FFFFFF] p-[2px] rounded-[8px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] flex flex-col gap-[2px]">
-          {/* Top Profile Card Container */}
-          <div className="bg-[#f8f8f8] rounded-[6px] p-6 space-y-6 shadow-xs">
-            {/* Top Bar: Subtitle & Title & "New Order" Action */}
-            <div className="flex items-center justify-between">
+        {/* =====================================================================
+            RIGHT COLUMN: Client Dossier + Measurements + Order History
+            ===================================================================== */}
+        <div
+          className={cn(
+            'md:col-span-7 xl:col-span-8 space-y-4',
+            mobileTab === 'directory' ? 'hidden md:block' : 'block'
+          )}
+        >
+          {/* Client Profile Header Card */}
+          <div
+            className={cn(
+              'rounded-2xl bg-[var(--surface-1)] border border-[var(--border)] p-4 sm:p-6 space-y-4 transition-colors hover:border-[var(--border-strong)]',
+              mobileTab === 'orders' ? 'hidden md:block' : 'block'
+            )}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                <span className="text-[11px] font-medium text-[var(--text-muted)] tracking-wider uppercase block">
                   CLIENT PROFILE
                 </span>
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-950 font-sans tracking-tight">
+                <h1 className="text-base font-semibold tracking-[-0.01em] text-[var(--text)]">
                   {selectedClientProfile.name}
                 </h1>
               </div>
 
-              <button
-                type="button"
-                id="btn-client-new-order"
+              {/* EXACTLY ONE PRIMARY BUTTON: New Order */}
+              <Button
+                variant="primary"
+                size="md"
+                leftIcon={<Plus className="w-3.5 h-3.5" />}
                 onClick={() => onNewOrder(selectedClientProfile.id)}
-                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" weight="bold" />
-                <span>New Order</span>
-              </button>
+                New Order
+              </Button>
             </div>
 
-            {/* Centered Client Profile Hero */}
-            <div className="flex flex-col items-center justify-center text-center space-y-2 py-1">
-              <div className="w-16 h-16 rounded-full bg-black text-white font-bold text-lg flex items-center justify-center shadow-sm">
+            <div className="flex flex-col items-center justify-center text-center space-y-2 py-2">
+              <div className="w-14 h-14 rounded-full bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text)] font-semibold text-base flex items-center justify-center shadow-xs">
                 {selectedClientProfile.initials}
               </div>
               <div>
-                <h2 className="text-base font-bold text-gray-950">{selectedClientProfile.name}</h2>
-                <p className="text-[11px] text-gray-400">{selectedClientProfile.since}</p>
+                <h2 className="text-sm font-semibold text-[var(--text)]">
+                  {selectedClientProfile.name}
+                </h2>
+                <p className="text-xs text-[var(--text-muted)]">{selectedClientProfile.since}</p>
               </div>
-              <div className="flex items-center gap-4 text-[11px] text-gray-600 font-medium">
-                <span className="flex items-center gap-1">
-                  <Phone className="w-3.5 h-3.5 text-gray-700" weight="fill" />
+
+              <div className="flex flex-wrap items-center justify-center gap-2 pt-1 text-xs">
+                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text)] font-mono">
+                  <Phone className="w-3.5 h-3.5 text-[var(--text-muted)]" />
                   {selectedClientProfile.phone}
                 </span>
-                <span className="flex items-center gap-1">
-                  <EnvelopeSimple className="w-3.5 h-3.5 text-gray-700" weight="fill" />
+                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text)]">
+                  <Mail className="w-3.5 h-3.5 text-[var(--text-muted)]" />
                   {selectedClientProfile.email}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Section: Body Measurement History Container */}
-          <div className="bg-[#f8f8f8] rounded-[6px] p-5 space-y-4 shadow-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-200/60">
+          {/* Body Measurement History: EXPLICIT READ-ONLY MANNEQUIN */}
+          <div
+            className={cn(
+              'rounded-2xl bg-[var(--surface-1)] border border-[var(--border)] p-4 sm:p-6 space-y-4 transition-colors hover:border-[var(--border-strong)]',
+              mobileTab === 'orders' ? 'hidden md:block' : 'block'
+            )}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
               <div>
-                <h4 className="text-sm font-bold text-gray-950 font-sans tracking-tight">Body Measurement History</h4>
-                <p className="text-[10px] text-gray-400">All available points</p>
+                <h3 className="text-sm font-semibold tracking-[-0.01em] text-[var(--text)]">
+                  Body Measurement History
+                </h3>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Recorded anatomical landmarks (Read-Only)
+                </p>
               </div>
 
-              {/* Add Point Button & Toggle */}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPointModalData({
-                      key: 'sleeve',
-                      name: 'Sleeve',
-                      value: measurements.sleeve ? String(measurements.sleeve) : '60.0',
-                      isCustom: true,
-                    })
-                  }
-                  className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-full bg-[#1d4ed8] text-white text-xs font-semibold hover:bg-[#1e40af] transition-colors cursor-pointer shadow-xs"
-                >
-                  <Plus className="w-3.5 h-3.5" weight="bold" />
-                  <span>Add Point</span>
-                </button>
-
-                <div className="flex items-center bg-[#E5E7EB] p-0.5 rounded-full border border-gray-200/50 shadow-xs">
-                  <button
-                    type="button"
-                    onClick={() => setMannequinView('mannequin')}
-                    className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
-                      mannequinView === 'mannequin'
-                        ? 'bg-[#1d4ed8] text-white shadow-xs'
-                        : 'text-gray-500 hover:text-gray-900'
-                    }`}
-                  >
-                    <User className="w-3.5 h-3.5" weight="fill" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMannequinView('table')}
-                    className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
-                      mannequinView === 'table'
-                        ? 'bg-[#1d4ed8] text-white shadow-xs'
-                        : 'text-gray-500 hover:text-gray-900'
-                    }`}
-                  >
-                    <List className="w-3.5 h-3.5" weight="fill" />
-                  </button>
-                </div>
-              </div>
+              {/* No Add Point button in read-only state. Only view toggle */}
+              <SegmentedControl
+                name="client-profile-view-toggle"
+                size="sm"
+                value={mannequinView}
+                onChange={(v) => setMannequinView(v as 'mannequin' | 'table')}
+                options={[
+                  { value: 'mannequin', label: '', icon: <User className="w-3.5 h-3.5" /> },
+                  { value: 'table', label: '', icon: <Ruler className="w-3.5 h-3.5" /> },
+                ]}
+              />
             </div>
 
-            {/* Mannequin Graphic OR Table Cards */}
             {mannequinView === 'mannequin' ? (
               <div className="w-full flex items-center justify-center py-2">
                 <AtelierMannequin
                   gender="F"
                   unit="cm"
                   measurements={measurements}
-                  onMeasurementChange={handleMeasurementChange}
-                  onSelectLandmark={(key, name, currentVal) => {
-                    setPointModalData({
-                      key,
-                      name,
-                      value: String(currentVal),
-                      isCustom: false,
-                    });
-                  }}
+                  readOnly={true}
                 />
               </div>
             ) : (
-              <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 self-start py-2">
-                {[
-                  { id: 'shoulder', label: 'Shoulder width', val: measurements.shoulder || 42 },
-                  { id: 'neck', label: 'Neck', val: measurements.neck || 36 },
-                  { id: 'bust', label: 'Bust/Chest', val: measurements.bust || 92 },
-                  { id: 'waist', label: 'Waist', val: measurements.waist || 72 },
-                  { id: 'sleeve', label: 'Sleeve', val: measurements.sleeve || 60 },
-                  { id: 'thigh', label: 'Thigh', val: measurements.thigh || 54 },
-                  { id: 'hip', label: 'Hip', val: measurements.hip || 96 },
-                  { id: 'ankle', label: 'Ankle', val: measurements.ankle || 24 },
-                  { id: 'back', label: 'Back', val: measurements.back || 40 },
-                ].map((item) => (
+              <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2.5 self-start py-2">
+                {measurementList.map((item) => (
                   <div
                     key={item.id}
-                    className="p-3.5 rounded-[8px] bg-white border border-gray-200/70 flex flex-col justify-between h-20 shadow-xs"
+                    className="p-3 rounded-2xl bg-[var(--surface-1)] border border-[var(--border)] flex flex-col justify-between h-24 transition-colors hover:border-[var(--border-strong)]"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-gray-900 truncate">
+                      <span className="text-xs font-medium text-[var(--text)] truncate pr-1">
                         {item.label}
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteListItem(item.id)}
+                        className="text-[var(--text-faint)] hover:text-[var(--text)] p-1 transition-colors cursor-pointer"
+                        title="Remove point"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-xl font-bold font-mono text-gray-950">
-                        {typeof item.val === 'number' ? item.val.toFixed(1) : item.val}
-                      </span>
-                      <span className="text-[10px] text-gray-400 font-bold uppercase">CM</span>
+
+                    <div className="flex items-center justify-between bg-[var(--surface-2)] px-3 py-1.5 rounded-xl border border-[var(--border)]">
+                      <input
+                        type="text"
+                        value={item.value}
+                        onChange={(e) => handleListValueChange(item.id, e.target.value)}
+                        className="w-16 font-mono text-xs font-semibold text-[var(--text)] focus:outline-none bg-transparent tabular-nums"
+                      />
+                      <DrawCheckbox
+                        checked={item.confirmed}
+                        onChange={(chk) => {
+                          setMeasurementList((prev) =>
+                            prev.map((i) => (i.id === item.id ? { ...i, confirmed: chk } : i))
+                          );
+                        }}
+                      />
                     </div>
                   </div>
                 ))}
@@ -448,173 +491,89 @@ export function ClientsScreen({
             )}
           </div>
 
-          {/* Section: Order History Container */}
-          <div className="bg-[#f8f8f8] rounded-[6px] p-5 space-y-4 shadow-xs">
-            <h3 className="text-sm font-bold text-gray-950 font-sans tracking-tight">Order History</h3>
+          {/* Order History Container with 3-Up Thumbnails and Hairline Price Row */}
+          <div
+            className={cn(
+              'rounded-2xl bg-[var(--surface-1)] border border-[var(--border)] p-4 sm:p-6 space-y-4 transition-colors hover:border-[var(--border-strong)]',
+              mobileTab === 'profile' ? 'hidden md:block' : 'block'
+            )}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+              <h3 className="text-sm font-semibold tracking-[-0.01em] text-[var(--text)]">
+                Order History
+              </h3>
+              <span className="text-xs font-mono text-[var(--text-muted)]">3 recorded</span>
+            </div>
 
-            {/* 3 Horizontal Cards in a row matching Clients.png */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
               {orderHistoryCards.map((card) => (
                 <div
                   key={card.id}
-                  className="rounded-[8px] border-2 border-black overflow-hidden flex flex-col justify-between bg-white shadow-xs"
+                  className="rounded-2xl bg-[var(--surface-1)] border border-[var(--border)] p-4 flex flex-col justify-between space-y-3 transition-colors hover:border-[var(--border-strong)]"
                 >
-                  {/* Card Header */}
-                  <div className="p-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold text-gray-950">{card.title}</h4>
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${card.badgeClass}`}>
-                        {card.badge}
-                      </span>
+                  <div className="flex items-start justify-between gap-1.5">
+                    <div>
+                      <h4 className="text-xs font-semibold text-[var(--text)] tracking-[-0.01em]">
+                        {card.title}
+                      </h4>
+                      <p className="text-[11px] text-[var(--text-muted)] font-mono mt-0.5">
+                        {card.date}
+                      </p>
                     </div>
-                    <p className="text-[10px] text-gray-400">{card.date}</p>
-
-                    {/* Style references photos */}
-                    <div className="pt-2">
-                      <span className="text-[10px] text-gray-500 block mb-1.5">Style references</span>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {card.images.map((img, idx) => (
-                          <div key={idx} className="aspect-square rounded-[6px] overflow-hidden bg-gray-100 border border-gray-100">
-                            <img
-                              src={img}
-                              alt="Style reference"
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    <span
+                      className={cn(
+                        'px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 border',
+                        card.isUrgent
+                          ? 'bg-[var(--status-danger)]/15 text-[var(--status-danger)] border-[var(--status-danger)]/30'
+                          : 'bg-[var(--status-success)]/15 text-[var(--status-success)] border-[var(--status-success)]/30'
+                      )}
+                    >
+                      {card.badge}
+                    </span>
                   </div>
 
-                  {/* Dark Price Footer matching Clients.png */}
-                  <div className="bg-[#111827] text-white px-4 py-2.5 flex items-center justify-between text-xs">
-                    <span className="text-gray-400 text-[11px]">Price</span>
-                    <span className="font-bold font-mono">{card.price}</span>
+                  {/* 3-Up Grid of Rounded-xl Thumbnails */}
+                  <div className="grid grid-cols-3 gap-1.5 py-1">
+                    {card.images.map((img, i) => (
+                      <div
+                        key={i}
+                        className="aspect-square rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--surface-2)]"
+                      >
+                        <img
+                          src={img}
+                          alt="Garment style"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Hairline-separated Price Row in Geist Mono */}
+                  <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between text-xs">
+                    <span className="text-[var(--text-muted)]">Order Total</span>
+                    <span className="font-mono font-semibold text-[var(--text)]">
+                      <AnimatedNumberMorph value={card.price} />
+                    </span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
+
         </div>
+
       </div>
 
-      {/* =========================================================================
-          SET POINT SIZE: Responsive Modal (Web Backdrop Blur) & Bottom Sheet Drawer (Mobile)
-          ========================================================================= */}
-      {pointModalData && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-md transition-all animate-in fade-in duration-200">
-          {/* Backdrop dismiss */}
-          <div
-            className="absolute inset-0"
-            onClick={() => setPointModalData(null)}
-          />
-
-          {/* Modal / Bottom Sheet Card */}
-          <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-5 sm:p-7 shadow-2xl z-10 flex flex-col max-h-[85vh] overflow-y-auto pb-8 sm:pb-7 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200">
-            {/* Mobile Top Drag Handle */}
-            <div className="sm:hidden pt-1 pb-3 flex justify-center">
-              <div className="w-12 h-1 bg-black rounded-full" />
-            </div>
-
-            {/* Header */}
-            <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-gray-100">
-              <h2 className="text-lg sm:text-xl font-bold text-gray-950 font-sans tracking-tight">
-                {pointModalData.isCustom ? 'Add point size' : 'Set point size'}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setPointModalData(null)}
-                className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-900 transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" weight="bold" />
-              </button>
-            </div>
-
-            {/* Body: Landmark Label + Input Capsule matching Overview modal point.png */}
-            <div className="py-5 sm:py-6">
-              <div className="flex items-center justify-between gap-4">
-                {pointModalData.isCustom ? (
-                  <div className="flex-1">
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">
-                      Landmark Point
-                    </label>
-                    <input
-                      type="text"
-                      value={pointModalData.name}
-                      onChange={(e) =>
-                        setPointModalData({
-                          ...pointModalData,
-                          name: e.target.value,
-                          key: e.target.value.toLowerCase().replace(/\s+/g, '_'),
-                        })
-                      }
-                      placeholder="e.g. Sleeve, Neck, Bicep"
-                      className="w-full text-base font-semibold text-gray-900 bg-[#F8F8F8] border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#1d4ed8]"
-                    />
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#0084FF] shadow-[0_0_8px_#0084FF]" />
-                    <span className="text-base sm:text-lg font-semibold text-gray-900">
-                      {pointModalData.name}
-                    </span>
-                  </div>
-                )}
-
-                {/* Numerical Input Capsule */}
-                <div className="flex items-center bg-[#F8F8F8] border border-gray-200/90 rounded-xl px-3 sm:px-4 py-2 w-32 sm:w-40 justify-between focus-within:border-[#0084FF] focus-within:bg-white transition-colors">
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={pointModalData.value}
-                    onChange={(e) =>
-                      setPointModalData({ ...pointModalData, value: e.target.value })
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleSavePoint(
-                          pointModalData.key,
-                          pointModalData.name,
-                          pointModalData.value
-                        );
-                      }
-                    }}
-                    className="w-full bg-transparent text-right font-bold text-base sm:text-lg text-gray-950 focus:outline-none pr-1.5"
-                    placeholder="0.0"
-                  />
-                  <span className="text-xs font-bold text-gray-400 select-none uppercase tracking-wide">
-                    CM
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer Actions matching design */}
-            <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-2.5 sm:gap-3">
-              <button
-                type="button"
-                onClick={() => setPointModalData(null)}
-                className="flex-1 sm:flex-none px-6 py-2.5 rounded-full bg-[#f3f4f6] hover:bg-[#e5e7eb] text-gray-700 text-xs sm:text-sm font-semibold transition-colors text-center cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  handleSavePoint(
-                    pointModalData.key,
-                    pointModalData.name,
-                    pointModalData.value
-                  )
-                }
-                className="flex-1 sm:flex-none px-6 py-2.5 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs sm:text-sm font-semibold transition-colors shadow-xs text-center cursor-pointer"
-              >
-                {pointModalData.isCustom ? 'Add Point' : 'Update Point'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Floating Dock on Mobile */}
+      <SmallFloatingDock
+        activeTab={mobileTab}
+        onChange={setMobileTab}
+        tabs={[
+          { id: 'directory', label: 'Directory', icon: <Users className="w-4 h-4" /> },
+          { id: 'profile', label: 'Profile', icon: <UserCheck className="w-4 h-4" /> },
+          { id: 'orders', label: 'Orders', icon: <ShoppingBag className="w-4 h-4" /> },
+        ]}
+      />
     </div>
   );
 }
