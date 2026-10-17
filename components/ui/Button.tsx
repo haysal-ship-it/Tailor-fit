@@ -34,29 +34,30 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const shouldReduceMotion = useReducedMotion();
 
     const baseStyles =
-      'inline-flex items-center justify-center font-medium rounded-full cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] select-none disabled:cursor-not-allowed disabled:opacity-30';
+      'inline-flex items-center justify-center font-medium rounded-[24px] cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] select-none disabled:cursor-not-allowed disabled:opacity-30';
 
     const variantStyles = {
-      // Primary is inverted monochrome: --text background with --bg text
+      // Primary button: --primary fill, white 14px/500 text, radius 24px
       primary:
-        'bg-[var(--text)] text-[var(--bg)] hover:opacity-90 active:opacity-95 shadow-xs border border-transparent',
+        'bg-[var(--primary)] text-white hover:bg-[var(--primary)]/90 active:bg-[var(--primary)]/95 border border-transparent text-[14px]',
+      // Secondary/outline button: --chip fill, 1px --outline border, --text-2 text, 14px/500, radius 24px
       secondary:
-        'bg-[var(--surface-2)] text-[var(--text)] hover:bg-[var(--border)] border border-[var(--border)]',
+        'bg-[var(--chip)] text-[var(--text-2)] hover:bg-[#e8e8e8] border border-[var(--outline)] text-[14px]',
       outline:
-        'bg-transparent text-[var(--text)] border border-[var(--border)] hover:bg-[var(--surface-2)] hover:border-[var(--border-strong)]',
+        'bg-[var(--chip)] text-[var(--text-2)] border border-[var(--outline)] hover:bg-[#e8e8e8] text-[14px]',
       ghost:
-        'bg-transparent text-[var(--text)] hover:bg-[var(--surface-2)] border border-transparent',
+        'bg-transparent text-[var(--text-2)] hover:bg-[var(--chip)] border border-transparent text-[14px]',
       destructive:
-        'bg-[var(--status-danger)] text-white hover:opacity-90 border border-transparent',
+        'bg-[var(--status-danger)] text-white hover:opacity-90 border border-transparent text-[14px]',
       link:
-        'bg-transparent text-[var(--accent)] underline-offset-4 hover:underline p-0 h-auto border-0',
+        'bg-transparent text-[var(--primary)] underline-offset-4 hover:underline p-0 h-auto border-0 text-[14px]',
     };
 
     const sizeStyles = {
-      sm: 'h-8 px-3.5 text-xs gap-1.5',
-      md: 'h-10 min-h-[40px] px-5 text-sm gap-2 max-sm:min-h-[44px]',
-      lg: 'h-12 min-h-[44px] px-6 text-base gap-2.5',
-      icon: 'h-10 w-10 min-h-[40px] min-w-[40px] p-0 max-sm:min-h-[44px] max-sm:min-w-[44px]',
+      sm: 'py-2 px-3 text-[14px] gap-1',
+      md: 'py-3 px-5 text-[14px] gap-1',
+      lg: 'py-3.5 px-6 text-[14px] gap-1.5',
+      icon: 'h-10 w-10 p-0',
     };
 
     return (

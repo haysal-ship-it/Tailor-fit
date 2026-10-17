@@ -137,14 +137,14 @@ export const DEFAULT_HOTSPOTS: HotspotDefinition[] = [
 
 export const DEFAULT_TEMPLATES: GarmentTemplate[] = [
   {
-    id: 'bespoke_african_gown',
-    name: 'Bespoke African Gown',
-    fieldKeys: ['neck', 'shoulder_width', 'bust_chest', 'waist', 'hip', 'sleeve_length', 'arm_length', 'thigh', 'inseam'],
-    description: 'Bespoke traditional African couture gown, bridal styles, corset-backed silhouettes, and embellished trains.',
+    id: 'gown',
+    name: 'Gown/Dress',
+    fieldKeys: ['bust_chest', 'waist', 'hip', 'shoulder_width', 'torso_length', 'nape_to_waist', 'inseam'],
+    description: 'Evening wears, party gowns, wedding dress etc',
   },
   {
     id: 'suit',
-    name: 'Full 2-Piece Suit',
+    name: 'Suits/Blazers',
     fieldKeys: [
       'neck',
       'shoulder_width',
@@ -160,31 +160,19 @@ export const DEFAULT_TEMPLATES: GarmentTemplate[] = [
       'inseam',
       'ankle',
     ],
-    description: 'Full bespoke tailoring coverage for two-piece jacket and trouser ensembles.',
-  },
-  {
-    id: 'agbada',
-    name: 'Traditional Agbada / Kaftan',
-    fieldKeys: ['neck', 'shoulder_width', 'bust_chest', 'arm_length', 'torso_length', 'inseam'],
-    description: 'Flowing grand boubou, agbada outer robe, and matching tailored kaftan tunic & trousers.',
-  },
-  {
-    id: 'gown',
-    name: 'Gown / Dress',
-    fieldKeys: ['bust_chest', 'waist', 'hip', 'shoulder_width', 'torso_length', 'nape_to_waist', 'inseam'],
-    description: 'Evening wear, gala dresses, bridal silhouettes, and structured corsetry.',
+    description: 'Full bespoke fitting of two piece suits or blazers and trousers',
   },
   {
     id: 'trousers',
-    name: 'Trousers / Slacks',
+    name: 'Trousers/shorts',
     fieldKeys: ['waist', 'hip', 'thigh', 'inseam', 'ankle'],
-    description: 'Fittings for tailored dress pants, pleated trousers, and custom chinos.',
+    description: 'Fittings for tailored/pleated pants, trousers, pants and shorts.',
   },
   {
     id: 'shirt',
-    name: 'Shirt / Blouse',
+    name: 'Shirt/Blouse',
     fieldKeys: ['neck', 'shoulder_width', 'bust_chest', 'waist', 'sleeve_length', 'wrist', 'torso_length'],
-    description: 'Essential measurements for bespoke dress shirts, casual button-downs, and tailored blouses.',
+    description: 'Essential measurements for bespoke dress shirts/blouses',
   },
   {
     id: 'all',

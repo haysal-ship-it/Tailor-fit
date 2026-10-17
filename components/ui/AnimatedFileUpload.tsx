@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Upload, X, RefreshCw, Check } from 'lucide-react';
+import { Upload, CloudUpload, X, RefreshCw, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { springSmooth } from '@/lib/motion-tokens';
 
@@ -85,11 +85,11 @@ export function AnimatedFileUpload({
           handleFiles(e.dataTransfer.files);
         }}
         animate={{
-          borderColor: isDragOver ? 'var(--accent)' : 'var(--border)',
-          backgroundColor: isDragOver ? 'var(--surface-2)' : 'var(--surface-1)',
+          borderColor: isDragOver ? 'var(--primary)' : 'var(--dashed)',
+          backgroundColor: isDragOver ? 'rgba(29, 73, 232, 0.04)' : 'transparent',
         }}
         transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.15 }}
-        className="border border-dashed rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition-colors relative overflow-hidden min-h-[96px] select-none"
+        className="w-full h-[100px] border border-dashed border-[var(--dashed)] rounded-[8px] flex flex-col items-center justify-center cursor-pointer transition-colors relative overflow-hidden select-none"
       >
         <input
           type="file"
@@ -100,33 +100,30 @@ export function AnimatedFileUpload({
 
         {uploadProgress !== null ? (
           <div className="w-full max-w-[200px] flex flex-col items-center gap-2">
-            <div className="w-full h-1.5 rounded-full bg-[var(--surface-2)] overflow-hidden">
+            <div className="w-full h-1.5 rounded-full bg-[var(--chip)] overflow-hidden">
               <motion.div
-                className="h-full bg-[var(--text)]"
+                className="h-full bg-[var(--primary)]"
                 initial={{ width: '0%' }}
                 animate={{ width: `${uploadProgress}%` }}
                 transition={{ ease: 'easeOut', duration: 0.2 }}
               />
             </div>
-            <span className="text-[11px] text-[var(--text-muted)] font-mono">
+            <span className="text-[11px] text-[var(--text-2)] font-mono">
               Uploading {uploadProgress}%
             </span>
           </div>
         ) : uploadError ? (
           <div className="flex flex-col items-center gap-1.5 text-[var(--status-danger)]">
             <RefreshCw className="w-4 h-4 animate-spin" />
-            <span className="text-xs font-medium">Upload failed. Tap to retry</span>
+            <span className="text-[12px] font-medium">Upload failed. Tap to retry</span>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-1.5 text-[var(--text-muted)]">
-            <div className="w-8 h-8 rounded-full bg-[var(--surface-2)] flex items-center justify-center text-[var(--text)]">
-              <Upload className="w-4 h-4" />
+          <div className="flex flex-col items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-[var(--chip)] flex items-center justify-center text-[var(--text-2)]">
+              <CloudUpload className="w-4 h-4" />
             </div>
-            <span className="text-xs text-[var(--text)] font-medium">
-              Drop style references here or browse
-            </span>
-            <span className="text-[11px] text-[var(--text-faint)]">
-              PNG, JPG, or WEBP up to 10MB
+            <span className="text-[12px] font-medium text-[var(--text-2)] mt-2">
+              Tap to upload image
             </span>
           </div>
         )}

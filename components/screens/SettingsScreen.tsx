@@ -494,9 +494,22 @@ export function SettingsScreen() {
         {showAddTemplateModal && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
             <motion.div
-              initial={{ scale: 0.94, opacity: 0 }}
-              animate={{ scale: [0.94, 1.02, 1], opacity: 1 }}
-              exit={{ scale: 0.94, opacity: 0 }}
+              variants={{
+                initial: { opacity: 0, scale: 0.94 },
+                animate: {
+                  opacity: 1,
+                  scale: 1,
+                  transition: { type: 'spring', stiffness: 300, damping: 22, mass: 0.9 },
+                },
+                exit: {
+                  opacity: 0,
+                  scale: 0.96,
+                  transition: { duration: 0.15, ease: [0.2, 0, 0, 1] },
+                },
+              }}
+              initial="initial"
+              animate="animate"
+              exit="exit"
               className="w-full max-w-md rounded-2xl bg-[var(--surface-1)] border border-[var(--border)] p-6 shadow-2xl space-y-4"
             >
               <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
@@ -552,9 +565,22 @@ export function SettingsScreen() {
         {showAddMeasurementModal && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
             <motion.div
-              initial={{ scale: 0.94, opacity: 0 }}
-              animate={{ scale: [0.94, 1.02, 1], opacity: 1 }}
-              exit={{ scale: 0.94, opacity: 0 }}
+              variants={{
+                initial: { opacity: 0, scale: 0.94 },
+                animate: {
+                  opacity: 1,
+                  scale: 1,
+                  transition: { type: 'spring', stiffness: 300, damping: 22, mass: 0.9 },
+                },
+                exit: {
+                  opacity: 0,
+                  scale: 0.96,
+                  transition: { duration: 0.15, ease: [0.2, 0, 0, 1] },
+                },
+              }}
+              initial="initial"
+              animate="animate"
+              exit="exit"
               className="w-full max-w-md rounded-2xl bg-[var(--surface-1)] border border-[var(--border)] p-6 shadow-2xl space-y-4"
             >
               <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">

@@ -1,65 +1,105 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-serif: var(--font-serif), Georgia, Cambria, "Times New Roman", Times, serif;
-  --font-mono: var(--font-geist-mono), monospace;
+  --font-sans: var(--font-manrope), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-manrope), monospace;
 
-  --color-bg: var(--bg);
-  --color-surface-1: var(--surface-1);
-  --color-surface-2: var(--surface-2);
-  --color-border: var(--border);
-  --color-border-strong: var(--border-strong);
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-card: var(--card);
+  --color-chip: var(--chip);
+  --color-outline: var(--outline);
+  --color-dashed: var(--dashed);
   --color-text: var(--text);
-  --color-text-muted: var(--text-muted);
-  --color-text-faint: var(--text-faint);
-  --color-accent: var(--accent);
+  --color-text-strong: var(--text-strong);
+  --color-text-date: var(--text-date);
+  --color-text-2: var(--text-2);
+  --color-muted: var(--muted);
+  --color-weekday: var(--weekday);
+  --color-primary: var(--primary);
+  --color-annotation: var(--annotation);
+  --color-selected: var(--selected);
+  --color-selected-bg: var(--selected-bg);
+
+  --color-pending: var(--pending);
+  --color-completed: var(--completed);
+  --color-paused: var(--paused);
+
+  --color-track: var(--track);
+  --color-field-on-card: var(--field-on-card);
+  --color-pill-urgent: var(--pill-urgent);
+  --color-pill-pending: var(--pill-pending);
+  --color-pill-completed: var(--pill-completed);
+  --color-pill-paused: var(--pill-paused);
+  --color-band: var(--band);
+  --color-price-label: var(--price-label);
+  --color-sub: var(--sub);
 }
 
 :root {
-  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-serif: var(--font-serif), Georgia, Cambria, "Times New Roman", Times, serif;
-  --font-mono: var(--font-geist-mono), monospace;
+  --font-manrope: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
-  /* EasyUI Light Theme */
-  --bg: #FAFAFA;
-  --surface-1: #FFFFFF;
-  --surface-2: #F4F4F5;
-  --border: #E4E4E7;
-  --border-strong: #D4D4D8;
-  --text: #0A0A0A;
-  --text-muted: #525252;
-  --text-faint: #737373;
-  --accent: #0447FF;
+  /* Target Design Color Tokens */
+  --page: #F2F2F2;
+  --surface: #FFFFFF;
+  --card: #F8F8F8;
+  --chip: #F2F2F2;
+  --outline: #DDDBDB;
+  --dashed: #F2F2F2;
 
-  --status-success: #16A34A;
-  --status-warning: #D97706;
-  --status-danger: #DC2626;
-}
+  --text: #000000;
+  --text-strong: #100F0F;
+  --text-date: #1B1B1B;
+  --text-2: #595959;
+  --muted: #A2A2A2;
+  --weekday: #A8A8A8;
 
-.dark {
-  /* EasyUI Dark Theme */
-  --bg: #050505;
-  --surface-1: #0E0E0E;
-  --surface-2: #151515;
-  --border: #1F1F1F;
-  --border-strong: #2A2A2A;
-  --text: #FAFAFA;
-  --text-muted: #A3A3A3;
-  --text-faint: #8A8A8A;
-  --accent: #5B83FF;
+  --primary: #1D49E8;
+  --annotation: #079BF8;
+  --selected: #287CF1;
+  --selected-bg: #F8F9FF;
 
-  --status-success: #4ADE80;
-  --status-warning: #FBBF24;
-  --status-danger: #F87171;
+  --pending: #E7DD14;
+  --completed: #0FC16E;
+  --paused: #F24859;
+
+  /* Clients screen tokens */
+  --track: #D9D8D8;
+  --field-on-card: #F1F1F1;
+  --field-on-card-border: #EDEDED;
+  --pill-urgent: #F06B05;
+  --pill-pending: #A0B900;
+  --pill-completed: #0E9F5C;
+  --pill-paused: #D93A4D;
+  --band: #222222;
+  --price-label: #A09F9F;
+  --sub: #8D8D8D;
+
+  /* Compatibility bindings for existing components & other screens (Clients, Settings) */
+  --bg: var(--page);
+  --surface-1: var(--surface);
+  --surface-2: var(--card);
+  --border: var(--outline);
+  --border-strong: var(--outline);
+  --text-muted: var(--text-2);
+  --text-faint: var(--muted);
+  --accent: var(--primary);
+  --status-success: var(--completed);
+  --status-warning: var(--pending);
+  --status-danger: var(--paused);
 }
 
 body {
-  background-color: var(--bg);
+  background-color: var(--page);
   color: var(--text);
   font-family: var(--font-sans);
   min-height: 100vh;
-  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Tabular numbers on prices, dates, calendar numbers */
+.tabular-nums,
+[data-tabular-nums] {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Prevent unnatural mobile tap delays while allowing pinch-to-zoom */
@@ -74,7 +114,7 @@ html, body, button, input, select, textarea, a {
   }
 }
 
-/* Subtle scrollbar */
+/* Scrollbar */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -83,9 +123,9 @@ html, body, button, input, select, textarea, a {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
+  background: var(--outline);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: var(--muted);
 }

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { springSnappy, springMorph } from '@/lib/motion-tokens';
 
@@ -56,18 +56,18 @@ export function MorphingSaveButton({
       whileTap={disabled || status === 'loading' || shouldReduceMotion ? undefined : { scale: 0.97 }}
       transition={springSnappy}
       className={cn(
-        'relative inline-flex items-center justify-center rounded-full font-medium text-sm cursor-pointer select-none overflow-hidden transition-colors',
-        'h-10 min-h-[40px] px-7 max-sm:min-h-[44px]',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]',
+        'relative inline-flex items-center justify-center rounded-[24px] font-medium text-[14px] cursor-pointer select-none overflow-hidden transition-colors',
+        'h-10 px-5',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]',
         status === 'error'
           ? 'bg-[var(--status-danger)] text-white hover:opacity-90'
           : status === 'success'
-          ? 'bg-[var(--status-success)] text-white'
-          : 'bg-[var(--text)] text-[var(--bg)] hover:opacity-90',
+          ? 'bg-[var(--completed)] text-white'
+          : 'bg-[var(--primary)] text-white hover:bg-[var(--primary)]/90',
         disabled && 'opacity-30 cursor-not-allowed',
         className
       )}
-      style={{ minWidth: '120px' }}
+      style={{ width: '110px' }}
     >
       <AnimatePresence mode="wait" initial={false}>
         {status === 'idle' && (
@@ -77,9 +77,10 @@ export function MorphingSaveButton({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={springMorph}
-            className="inline-flex items-center gap-1.5"
+            className="inline-flex items-center gap-1 text-[14px] font-medium"
           >
-            {idleText}
+            <Save className="w-4 h-4 shrink-0" />
+            <span>{idleText}</span>
           </motion.span>
         )}
 

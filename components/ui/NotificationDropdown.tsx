@@ -16,7 +16,7 @@ interface NotificationItem {
 
 export function NotificationDropdown() {
   const [isOpen, setIsOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(2);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [shake, setShake] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const shouldReduceMotion = useReducedMotion();
@@ -27,14 +27,14 @@ export function NotificationDropdown() {
       title: 'Chloe Dallas fitting due today',
       time: '10:00 AM',
       description: 'Bespoke African Gown ready for final fitting in main studio.',
-      isNew: true,
+      isNew: false,
     },
     {
       id: 'notif-2',
       title: 'Urgent order: Bryan Muhammed',
       time: '04:15 PM',
       description: 'Silk Evening Gown requested priority completion.',
-      isNew: true,
+      isNew: false,
     },
     {
       id: 'notif-3',
@@ -75,18 +75,21 @@ export function NotificationDropdown() {
             setTimeout(() => setShake(false), 500);
           }
         }}
-        whileTap={shouldReduceMotion ? undefined : { scale: 0.95 }}
-        transition={springSnappy}
+        transition={
+          shake && !shouldReduceMotion
+            ? { type: 'tween', duration: 0.4, ease: [0.2, 0, 0, 1] }
+            : springSnappy
+        }
         animate={shake && !shouldReduceMotion ? { rotate: [-8, 8, -6, 6, 0] } : { rotate: 0 }}
         className={cn(
-          'relative w-9 h-9 min-h-[40px] min-w-[40px] max-sm:min-h-[44px] max-sm:min-w-[44px] rounded-full border border-[var(--border)] bg-[var(--surface-1)] text-[var(--text)] flex items-center justify-center transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] cursor-pointer select-none',
-          isOpen && 'border-[var(--border-strong)] bg-[var(--surface-2)]'
+          'relative w-10 h-10 rounded-full bg-white flex items-center justify-center p-2 text-black cursor-pointer select-none transition-colors hover:bg-neutral-100',
+          isOpen && 'bg-neutral-100'
         )}
         aria-label="Studio alerts"
       >
-        <Bell className="w-4 h-4 text-[var(--text)]" />
+        <Bell className="w-6 h-6 text-black shrink-0" />
         {unreadCount > 0 && (
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[var(--accent)] ring-2 ring-[var(--surface-1)]" />
+          <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[var(--primary)] ring-2 ring-white" />
         )}
       </motion.button>
 

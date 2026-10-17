@@ -31,11 +31,11 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
 
     return (
-      <div className="w-full space-y-1.5">
+      <div className="w-full flex flex-col gap-[2px]">
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-xs font-normal text-[var(--text-muted)] select-none"
+            className="block text-[11px] font-normal text-[var(--text)] select-none"
           >
             {label}
           </label>
@@ -43,7 +43,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
         <div className="relative flex items-center">
           {leftAddon && (
-            <div className="absolute left-3 flex items-center pointer-events-none text-[var(--text-muted)] z-10">
+            <div className="absolute left-2.5 flex items-center pointer-events-none text-[var(--muted)] z-10">
               {leftAddon}
             </div>
           )}
@@ -53,12 +53,11 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             id={inputId}
             disabled={disabled}
             className={cn(
-              'w-full rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-xs text-[var(--text)] placeholder:text-[var(--text-faint)] transition-colors',
-              'h-10 min-h-[40px] px-3.5 max-sm:min-h-[44px] max-sm:text-base',
-              leftAddon ? 'pl-9' : 'pl-3.5',
-              rightAddon ? 'pr-9' : 'pr-3.5',
-              'focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]',
-              error && 'border-[var(--status-danger)] focus:border-[var(--status-danger)] focus:ring-[var(--status-danger)]',
+              'w-full rounded-[8px] bg-[var(--card)] border border-[var(--card)] p-[8px] text-[12px] font-normal text-[var(--text)] placeholder:text-[var(--muted)] transition-all',
+              leftAddon ? 'pl-8' : 'pl-[8px]',
+              rightAddon ? 'pr-8' : 'pr-[8px]',
+              'focus:outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[rgba(29,73,232,0.15)]',
+              error && 'border-[var(--status-danger)] focus:border-[var(--status-danger)] focus:ring-[rgba(242,72,89,0.2)]',
               disabled && 'opacity-30 cursor-not-allowed',
               className
             )}
