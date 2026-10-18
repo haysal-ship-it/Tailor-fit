@@ -60,7 +60,12 @@ export function Navbar() {
   ];
 
   return (
-    <div className="w-full max-w-[1216px] mx-auto pt-4 px-4 sm:px-0 select-none">
+    <div
+      className={cn(
+        'w-full max-w-[1216px] mx-auto pt-4 px-4 sm:px-0 select-none',
+        isOverview && 'hidden lg:block'
+      )}
+    >
       {/* Outer white bar (2px padding, radius 8) */}
       <header className="w-full p-[2px] rounded-[8px] bg-[var(--surface)]">
         {/* Inner --card bar (radius 6, padding 4px 24px) */}

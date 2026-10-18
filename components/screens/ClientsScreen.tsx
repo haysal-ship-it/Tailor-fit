@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '@/lib/store';
 import { 
@@ -10,7 +10,6 @@ import {
   Mail, 
   User, 
   ClipboardList, 
-  Plus, 
   X,
   Users,
   UserCheck,
@@ -18,7 +17,6 @@ import {
 } from 'lucide-react';
 import { SmallFloatingDock } from '@/components/ui/SmallFloatingDock';
 import { AnimatedNumberMorph } from '@/components/ui/AnimatedNumberMorph';
-import { springSmooth } from '@/lib/motion-tokens';
 import { cn } from '@/lib/utils';
 
 interface ClientsScreenProps {
@@ -57,9 +55,26 @@ export function ClientsScreen({
   const [searchQuery, setSearchQuery] = useState('');
   const [mannequinView, setMannequinView] = useState<'mannequin' | 'table'>('mannequin');
 
-  // Floating Undo Toast state
-  const [undoToast, setUndoToast] = useState<{ id: string; item: MeasurementFieldItem } | null>(null);
-  const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Set Point Size Modal
+  const [pointModalData, setPointModalData] = useState<{
+    key?: string;
+    name: string;
+    value: string;
+    isCustom?: boolean;
+  } | null>(null);
+  const [pointModalError, setPointModalError] = useState('');
+
+  // Handle Escape key to close dialogs
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && pointModalData) {
+        setPointModalData(null);
+        setPointModalError('');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [pointModalData]);
 
   const defaultClients = useMemo(() => [
     {
@@ -68,7 +83,7 @@ export function ClientsScreen({
       name: 'Chloe Dallas',
       phone: '+234 809 489 2011',
       email: 'chloedallas@couture.com',
-      since: 'Client since October 2026',
+      since: 'Client since Aug 2025',
     },
     {
       id: 'c-2',
@@ -85,6 +100,22 @@ export function ClientsScreen({
       phone: '+237 409 302 990',
       email: 'a.billings@couture.com',
       since: 'Client since Aug 2025',
+    },
+    {
+      id: 'c-7',
+      initials: 'KA',
+      name: 'Kemi Adebayo',
+      phone: '+234 802 334 5511',
+      email: 'kemi.adebayo@couture.com',
+      since: 'Client since Jan 2026',
+    },
+    {
+      id: 'c-8',
+      initials: 'BO',
+      name: 'Bimpe Okonjo',
+      phone: '+234 812 445 6677',
+      email: 'bimpe.okonjo@gmail.com',
+      since: 'Client since Mar 2026',
     },
   ], []);
 
@@ -106,8 +137,8 @@ export function ClientsScreen({
           phone: c.phone || '+234 800 000 0000',
           email: c.email || 'client@couture.com',
           since: c.createdAt
-            ? `Client since ${new Date(c.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
-            : 'Client since October 2026',
+            ? `Client since ${new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
+            : 'Client since Aug 2025',
         });
       }
     });
@@ -145,34 +176,58 @@ export function ClientsScreen({
     );
   };
 
-  const handleRemoveField = (id: string) => {
-    const itemToRemove = clientFields.find((f) => f.id === id);
-    if (!itemToRemove) return;
-
-    setClientFields((prev) => prev.filter((f) => f.id !== id));
-
-    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
-    setUndoToast({ id, item: itemToRemove });
-    undoTimeoutRef.current = setTimeout(() => {
-      setUndoToast(null);
-    }, 5000);
+  const handleOpenPoint = (key: string, name: string) => {
+    const current = clientFields.find((f) => f.id === key);
+    setPointModalData({
+      key,
+      name,
+      value: current ? current.value : '0.0',
+      isCustom: false,
+    });
+    setPointModalError('');
   };
 
-  const handleUndoRemove = () => {
-    if (!undoToast) return;
-    setClientFields((prev) => [...prev, undoToast.item]);
-    setUndoToast(null);
-    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+  const handleSavePointModal = () => {
+    if (!pointModalData) return;
+    const num = parseFloat(pointModalData.value);
+    if (isNaN(num) || num <= 0) {
+      setPointModalError('Enter a valid positive number');
+      return;
+    }
+
+    if (pointModalData.key) {
+      setClientFields((prev) =>
+        prev.map((f) =>
+          f.id === pointModalData.key
+            ? { ...f, value: num.toFixed(1) }
+            : f
+        )
+      );
+    } else if (pointModalData.isCustom && pointModalData.name.trim()) {
+      const newId = pointModalData.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      setClientFields((prev) => [
+        ...prev,
+        {
+          id: newId,
+          name: pointModalData.name.trim(),
+          value: num.toFixed(1),
+          unit: 'cm',
+        },
+      ]);
+    }
+
+    setPointModalData(null);
+    setPointModalError('');
   };
 
+  // Section 4: Order History data with exact measurement dates ("Size taken on DD-MM-YYYY") and target colors
   const orderHistoryCards = [
     {
       id: 'ord-hist-1',
       title: 'Bespoke African Gown',
       badge: 'Urgent',
-      isUrgent: true,
-      badgeColor: 'var(--pill-urgent)',
-      date: 'Fitting on 09-10-2026',
+      badgeColor: '#F06B05',
+      date: 'Size taken on 09-10-2025',
       price: 130000,
       images: [
         'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
@@ -184,9 +239,8 @@ export function ClientsScreen({
       id: 'ord-hist-2',
       title: 'Oxford Three Piece Suit',
       badge: 'Ready',
-      isUrgent: false,
-      badgeColor: 'var(--pill-completed)',
-      date: 'Completed 02-10-2026',
+      badgeColor: '#0E9F5C',
+      date: 'Size taken on 02-10-2025',
       price: 230000,
       images: [
         'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=300&q=80',
@@ -198,9 +252,8 @@ export function ClientsScreen({
       id: 'ord-hist-3',
       title: 'Silk Evening Corset',
       badge: 'In Progress',
-      isUrgent: false,
-      badgeColor: 'var(--pill-pending)',
-      date: 'Scheduled 18-10-2026',
+      badgeColor: '#A0B900',
+      date: 'Size taken on 18-09-2025',
       price: 95000,
       images: [
         'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=300&q=80',
@@ -210,26 +263,24 @@ export function ClientsScreen({
     },
   ];
 
-  const filteredClients = useMemo(() => {
-    return allClientList.filter((c) =>
-      searchQuery.trim()
-        ? c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          c.phone.includes(searchQuery) ||
-          c.email.toLowerCase().includes(searchQuery.toLowerCase())
-        : true
-    );
-  }, [allClientList, searchQuery]);
-
-  // Lookup values for mannequin points
-  const getFieldVal = (id: string, fallback: string) => {
-    const found = clientFields.find((f) => f.id === id);
-    return found ? `${found.value} cm` : `${fallback} cm`;
-  };
+  // Section 5: List up to 5 most recently viewed clients, EXCLUDING the one currently open
+  const directoryClients = useMemo(() => {
+    return allClientList
+      .filter((c) => c.id !== selectedClientProfile.id)
+      .filter((c) =>
+        searchQuery.trim()
+          ? c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.phone.includes(searchQuery) ||
+            c.email.toLowerCase().includes(searchQuery.toLowerCase())
+          : true
+      )
+      .slice(0, 5);
+  }, [allClientList, selectedClientProfile.id, searchQuery]);
 
   return (
     <div className="w-full max-w-[1216px] mx-auto mt-4 px-4 sm:px-0 pb-20 select-none">
       {/* =======================================================================
-          A. Page layout (1280px design width; build fluidly)
+          Page layout (1280px design width; build fluidly)
           Below header (16px gap): two blocks side by side with a 24px gap:
           - Client Directory column (about 27.4% of width, 333px at 1280)
           - Main panel (the rest, 852px at 1280)
@@ -240,15 +291,17 @@ export function ClientsScreen({
       <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
         
         {/* =====================================================================
-            B. Client Directory column
+            5. CLIENT DIRECTORY COLUMN
+            White container (2px padding, radius 8) holding one flat --card card
+            (12px padding, 16px gap between groups).
             ===================================================================== */}
         <div
           className={cn(
-            'w-full lg:w-[333px] lg:shrink-0 p-[2px] rounded-[8px] bg-white shadow-xs',
+            'w-full lg:w-[333px] lg:shrink-0 p-[2px] rounded-[8px] bg-white',
             mobileTab !== 'directory' ? 'hidden lg:block' : 'block'
           )}
         >
-          {/* Client Directory Card: --card fill, radius 6, 12px padding, 16px gap between groups */}
+          {/* Client Directory Card */}
           <div className="w-full rounded-[6px] bg-[var(--card)] p-3 flex flex-col gap-4">
             
             {/* Title & Search group */}
@@ -257,7 +310,7 @@ export function ClientsScreen({
                 Client Directory
               </h2>
 
-              {/* Search field: 8px below title, --field-on-card fill, 1px #EDEDED border, radius 8, 8px padding, 8px gap */}
+              {/* Search field: --field-on-card fill, 1px #EDEDED border, radius 8, 8px padding, magnifier icon */}
               <div className="mt-2 flex items-center gap-2 bg-[var(--field-on-card)] border border-[#EDEDED] rounded-[8px] p-2">
                 <Search className="w-4 h-4 text-[var(--muted)] shrink-0" />
                 <input
@@ -287,44 +340,42 @@ export function ClientsScreen({
 
               {/* White list container (radius 8, 2px padding, 2px gaps) */}
               <div className="bg-white rounded-[8px] p-[2px] flex flex-col gap-[2px]">
-                {filteredClients.length === 0 ? (
+                {directoryClients.length === 0 ? (
                   <div className="p-4 text-center text-[12px] text-[var(--muted)]">
-                    No clients match &ldquo;{searchQuery}&rdquo;
+                    No other clients match &ldquo;{searchQuery}&rdquo;
                   </div>
                 ) : (
-                  filteredClients.map((client) => {
-                    const isSelected = selectedClientProfile.id === client.id;
+                  directoryClients.map((client) => {
                     return (
                       <button
                         key={client.id}
                         type="button"
                         onClick={() => handleSelectClient(client)}
-                        className={cn(
-                          'w-full p-2 rounded-[8px] flex items-center justify-between text-left transition-colors cursor-pointer border select-none',
-                          isSelected
-                            ? 'bg-[var(--selected-bg)] border-[var(--selected)]'
-                            : 'bg-[var(--chip)] border-transparent hover:bg-[#EAEAEA]'
-                        )}
+                        className="w-full p-2 rounded-[8px] flex items-center justify-between text-left transition-colors cursor-pointer select-none bg-[var(--chip)] hover:bg-[#EAEAEA]"
                       >
                         <div className="flex items-center gap-2 min-w-0 flex-1 pr-1">
                           {/* White circle avatar: 8px padding, initials 14px / 700 --text-strong */}
-                          <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shrink-0 shadow-xs border border-[#EDEDED]">
+                          <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shrink-0">
                             <span className="text-[14px] font-bold text-[var(--text-strong)]">
                               {client.initials}
                             </span>
                           </div>
 
                           <div className="min-w-0 flex-1">
-                            <h4 className="text-[12px] font-bold text-black truncate leading-tight">
+                            {/* Name 12px / 500 --text-strong above phone number 12px / 400 --muted */}
+                            <h4 className="text-[12px] font-medium text-[var(--text-strong)] truncate leading-tight">
                               {client.name}
                             </h4>
-                            <p className="text-[12px] text-[var(--sub)] truncate mt-0.5 leading-tight">
-                              {client.since}
+                            <p className="text-[12px] font-normal text-[var(--muted)] truncate leading-tight mt-0.5">
+                              {client.phone}
                             </p>
                           </div>
                         </div>
 
-                        <ChevronRight className="w-4 h-4 text-[var(--muted)] shrink-0 ml-1" />
+                        {/* 24px white circle button holding a 16px chevron */}
+                        <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center shrink-0 shadow-2xs">
+                          <ChevronRight className="w-4 h-4 text-[var(--text-2)]" />
+                        </div>
                       </button>
                     );
                   })
@@ -336,397 +387,452 @@ export function ClientsScreen({
         </div>
 
         {/* =====================================================================
-            MAIN PANEL (852px at 1280)
-            White container (2px padding, radius 8) holding --card cards (radius 6)
-            Sections stack with 2px gaps.
+            0. MAIN PANEL (852px at 1280)
+            White (#FFFFFF) container with 2px padding, radius 8, and 2px gaps
+            between sections. Sections are flat #F8F8F8 blocks with radius 6.
+            No borders, no shadows, no white boxes inside grey sections.
+            Exception: top header row is white.
             ===================================================================== */}
         <div
           className={cn(
-            'flex-1 w-full min-w-0 p-[2px] rounded-[8px] bg-white flex flex-col gap-[2px] shadow-xs',
+            'flex-1 w-full min-w-0 p-[2px] rounded-[8px] bg-white flex flex-col gap-[2px]',
             mobileTab === 'directory' ? 'hidden lg:flex' : 'flex'
           )}
         >
-          {/* SECTION 1: Client Profile (Dossier) */}
-          <div className="w-full rounded-[6px] bg-[var(--card)] p-3 flex flex-col gap-3">
-            {/* Header row: Eyebrow + Name (18px) on left, exactly ONE primary button on right */}
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-[12px] tracking-[0.3px] uppercase font-semibold text-[var(--sub)] leading-none block mb-1">
-                  CLIENT PROFILE
-                </span>
-                <h1 className="text-[18px] font-bold text-black leading-tight">
-                  {selectedClientProfile.name}
-                </h1>
-              </div>
-
-              {/* Exactly ONE primary button on this screen: New Order (14px) */}
-              <button
-                type="button"
-                onClick={() => onNewOrder(selectedClientProfile.id)}
-                className="h-9 px-4 rounded-[24px] bg-[var(--primary)] text-white text-[14px] font-medium flex items-center gap-1.5 hover:opacity-95 transition-opacity cursor-pointer shadow-xs"
-              >
-                <Plus className="w-4 h-4 stroke-[2.2]" />
-                <span>New Order</span>
-              </button>
+          {/* ===================================================================
+              1. MAIN PANEL HEADER ROW (WHITE)
+              White background, 24px padding, content on one row.
+              Left: Eyebrow "CLIENT PROFILE" (12px, --muted, 0.3px letter-spacing)
+              above client name (18px / 600, black, 0.48px letter-spacing).
+              Right: New Order button as secondary outline style: --chip fill,
+              1px --outline border, radius 24, 8px padding, text --text-2 14px / 500,
+              no plus icon and not blue.
+              =================================================================== */}
+          <div className="w-full rounded-[6px] bg-white p-6 flex items-center justify-between">
+            <div>
+              <span className="text-[12px] text-[var(--muted)] tracking-[0.3px] uppercase font-medium leading-none block mb-1">
+                CLIENT PROFILE
+              </span>
+              <h1 className="text-[18px] font-semibold text-black tracking-[0.48px] leading-tight">
+                {selectedClientProfile.name}
+              </h1>
             </div>
 
-            {/* Profile Detail Row */}
-            <div className="bg-white rounded-[8px] p-3 border border-[#EDEDED] flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-full bg-[var(--card)] border border-[#EDEDED] flex items-center justify-center text-[14px] font-bold text-[var(--text-strong)] shadow-xs shrink-0">
-                  {selectedClientProfile.initials}
-                </div>
-                <div>
-                  <h2 className="text-[14px] font-bold text-black leading-tight">
-                    {selectedClientProfile.name}
-                  </h2>
-                  <p className="text-[12px] text-[var(--sub)] mt-0.5">
-                    {selectedClientProfile.since}
-                  </p>
-                </div>
-              </div>
+            {/* Secondary outline style: --chip fill, 1px --outline border, radius 24, 8px padding, text --text-2 14px / 500, no plus icon */}
+            <button
+              type="button"
+              onClick={() => onNewOrder(selectedClientProfile.id)}
+              className="h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[var(--text-2)] text-[14px] font-medium hover:bg-[#EAEAEA] transition-colors cursor-pointer"
+            >
+              New Order
+            </button>
+          </div>
 
-              {/* Contact Pills */}
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-[var(--field-on-card)] border border-[#EDEDED] text-[12px] text-black font-medium">
-                  <Phone className="w-3.5 h-3.5 text-[var(--muted)]" />
-                  <span>{selectedClientProfile.phone}</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-[var(--field-on-card)] border border-[#EDEDED] text-[12px] text-black font-medium">
-                  <Mail className="w-3.5 h-3.5 text-[var(--muted)]" />
-                  <span>{selectedClientProfile.email}</span>
-                </div>
+          {/* ===================================================================
+              2. PROFILE CARD
+              --card block, radius 6, 24px padding, content centered in column with 8px gaps:
+              - 64px black circle with white initials (14px / 700)
+              - Name (16px / 500, black)
+              - "Client since Aug 2025" (12px, --muted)
+              - Centered row with 16px gap: 16px phone icon + phone, 16px envelope icon + email
+                (12px, black, icon 4px from text). Plain text and icons only, no chips.
+              =================================================================== */}
+          <div className="w-full rounded-[6px] bg-[var(--card)] p-6 flex flex-col items-center justify-center text-center gap-2">
+            {/* 64px black circle with white initials */}
+            <div className="w-16 h-16 rounded-full bg-black flex items-center justify-center text-[14px] font-bold text-white shadow-xs shrink-0">
+              {selectedClientProfile.initials}
+            </div>
+
+            {/* Name */}
+            <h2 className="text-[16px] font-medium text-black leading-tight">
+              {selectedClientProfile.name}
+            </h2>
+
+            {/* Client since line */}
+            <p className="text-[12px] text-[var(--muted)] leading-tight">
+              {selectedClientProfile.since}
+            </p>
+
+            {/* One centered row with 16px gap: phone and email plain text + icons */}
+            <div className="flex items-center justify-center gap-4 text-[12px] text-black pt-1">
+              <div className="flex items-center gap-1">
+                <Phone className="w-4 h-4 text-black shrink-0" />
+                <span>{selectedClientProfile.phone}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Mail className="w-4 h-4 text-black shrink-0" />
+                <span>{selectedClientProfile.email}</span>
               </div>
             </div>
           </div>
 
-          {/* SECTION 2: Body Measurement History (Read-Only) */}
-          <div className="w-full rounded-[6px] bg-[var(--card)] p-3 flex flex-col gap-3">
-            {/* Header: Title (16px) & Subtitle (12px, --sub) + Toggle Group on --card surface */}
-            <div className="flex items-center justify-between">
+          {/* ===================================================================
+              3. BODY MEASUREMENT HISTORY
+              --card block, radius 6, 24px padding, 8px gap.
+              No white bordered box around diagram. No "(Read-Only)" subtitle.
+              Title "Body Measurement History" (16px / 600, black).
+              Under it: left "Mannequin" (16px / 500) + "All available points • Feminine Form" (12px / 500, --muted).
+              Right: Add Point outline button (same style as New Order) + View toggle group.
+              View toggle group: --track background, radius 24, padding 6px 8px, 4px gap.
+              Active item: --primary blue circle with white icon; inactive item: white circle with --text-2 icon.
+              45px below header row: diagram horizontally centered on flat --card surface, min-height 633px at 1280.
+              Points and labels: 6 Overview points with dashed leader lines and ring styles. Labels show point name ONLY.
+              =================================================================== */}
+          <div className="w-full rounded-[6px] bg-[var(--card)] p-6 flex flex-col gap-2">
+            <h3 className="text-[16px] font-semibold text-black leading-tight">
+              Body Measurement History
+            </h3>
+
+            {/* Header row */}
+            <div className="flex items-start justify-between gap-2 mt-1">
               <div>
-                <h3 className="text-[16px] font-bold text-black leading-tight">
-                  Body Measurement History
-                </h3>
-                <p className="text-[12px] text-[var(--sub)] mt-0.5">
-                  Recorded anatomical landmarks (Read-Only)
-                </p>
+                <h4 className="text-[16px] font-medium text-black leading-tight">
+                  Mannequin
+                </h4>
+                <div className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--muted)] mt-1">
+                  <span>All available points</span>
+                  <span className="w-1 h-1 rounded-full bg-[var(--muted)]" />
+                  <span>Feminine Form</span>
+                </div>
               </div>
 
-              {/* Toggle Group on --card surface uses --track (#D9D8D8) background */}
-              <div className="flex items-center bg-[var(--track)] rounded-[24px] p-0.5 gap-0.5">
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Add Point outline button (same style as New Order: --chip fill, 1px --outline border, radius 24, text --text-2 14px / 500, no plus icon) */}
                 <button
                   type="button"
-                  onClick={() => setMannequinView('mannequin')}
-                  className={cn(
-                    'w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer',
-                    mannequinView === 'mannequin'
-                      ? 'bg-white text-black shadow-xs'
-                      : 'text-black/60 hover:text-black'
-                  )}
-                  title="Diagram View"
+                  onClick={() => {
+                    setPointModalData({
+                      name: '',
+                      value: '0.0',
+                      isCustom: true,
+                    });
+                    setPointModalError('');
+                  }}
+                  className="h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[var(--text-2)] text-[14px] font-medium hover:bg-[#EAEAEA] transition-colors cursor-pointer"
                 >
-                  <User className="w-3.5 h-3.5" />
+                  Add Point
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setMannequinView('table')}
-                  className={cn(
-                    'w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer',
-                    mannequinView === 'table'
-                      ? 'bg-[var(--selected)] text-white shadow-xs'
-                      : 'text-black/60 hover:text-black'
-                  )}
-                  title="Measurement List View"
-                >
-                  <ClipboardList className="w-3.5 h-3.5" />
-                </button>
+
+                {/* View toggle group: --track background, radius 24, padding 6px 8px, 4px gap */}
+                <div className="flex items-center bg-[var(--track)] rounded-[24px] px-2 py-1.5 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setMannequinView('mannequin')}
+                    className={cn(
+                      'w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer',
+                      mannequinView === 'mannequin'
+                        ? 'bg-[var(--primary)] text-white shadow-xs'
+                        : 'bg-white text-[var(--text-2)] hover:text-black'
+                    )}
+                    title="Diagram View"
+                  >
+                    <User className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMannequinView('table')}
+                    className={cn(
+                      'w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer',
+                      mannequinView === 'table'
+                        ? 'bg-[var(--primary)] text-white shadow-xs'
+                        : 'bg-white text-[var(--text-2)] hover:text-black'
+                    )}
+                    title="Measurement List View"
+                  >
+                    <ClipboardList className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Mannequin View OR Measurement List View */}
-            {mannequinView === 'mannequin' ? (
-              <div className="w-full flex items-center justify-center py-4 bg-white rounded-[8px] border border-[#EDEDED]">
-                <svg
-                  viewBox="0 0 304 467"
-                  className="w-full max-w-[304px] h-auto max-h-[467px] select-none"
-                  style={{ overflow: 'visible' }}
-                >
-                  {/* Plain transparent PNG mannequin, no code treatments/manipulations */}
-                  <image
-                    href="/assets/mannequin-female-front.png"
-                    x="20.7"
-                    y="0"
-                    width="262.8"
-                    height="467.2"
-                    preserveAspectRatio="xMidYMid meet"
-                  />
+            {/* 45px below the header row, the diagram horizontally centered on the flat --card surface. Minimum height of 633px at 1280 */}
+            <div className="mt-[45px]">
+              {mannequinView === 'mannequin' ? (
+                <div className="w-full min-h-[633px] flex items-center justify-center select-none py-2">
+                  <svg
+                    viewBox="0 0 304 467"
+                    className="w-full max-w-[304px] h-auto max-h-[467px] select-none"
+                    style={{ overflow: 'visible' }}
+                  >
+                    {/* Plain transparent PNG, no background rectangle, filter, blend mode or mask */}
+                    <image
+                      href="/assets/mannequin-female-front.png"
+                      x="20.7"
+                      y="0"
+                      width="262.8"
+                      height="467.2"
+                      preserveAspectRatio="xMidYMid meet"
+                    />
 
-                  {/* Leader lines: 1px, dashed (3px dash, 3px gap), #079BF8 */}
-                  {/* Neck: (77.5, 80.9) → (145.7, 80.9) */}
-                  <polyline
-                    points="77.5,80.9 145.7,80.9"
-                    fill="none"
-                    stroke="#079BF8"
-                    strokeWidth="1"
-                    strokeDasharray="3 3"
-                  />
-                  {/* Bust: (178.9, 124.0) → (252.9, 124.0) */}
-                  <polyline
-                    points="178.9,124.0 252.9,124.0"
-                    fill="none"
-                    stroke="#079BF8"
-                    strokeWidth="1"
-                    strokeDasharray="3 3"
-                  />
-                  {/* Sleeve: (221.0, 185.5) → (257.3, 185.5) */}
-                  <polyline
-                    points="221.0,185.5 257.3,185.5"
-                    fill="none"
-                    stroke="#079BF8"
-                    strokeWidth="1"
-                    strokeDasharray="3 3"
-                  />
-                  {/* Shoulder: (178.9, 93.1) → (210.5, 61.5) → (244.3, 61.5) */}
-                  <polyline
-                    points="178.9,93.1 210.5,61.5 244.3,61.5"
-                    fill="none"
-                    stroke="#079BF8"
-                    strokeWidth="1"
-                    strokeDasharray="3 3"
-                  />
-                  {/* Waist: (28.6, 177.1) → (60.2, 208.7) → (119.6, 208.7) */}
-                  <polyline
-                    points="28.6,177.1 60.2,208.7 119.6,208.7"
-                    fill="none"
-                    stroke="#079BF8"
-                    strokeWidth="1"
-                    strokeDasharray="3 3"
-                  />
-                  {/* Thigh: (178.9, 363.9) → (210.6, 393.0) → (267.8, 393.0) */}
-                  <polyline
-                    points="178.9,363.9 210.6,393.0 267.8,393.0"
-                    fill="none"
-                    stroke="#079BF8"
-                    strokeWidth="1"
-                    strokeDasharray="3 3"
-                  />
+                    {/* Leader lines: 1px, dashed (3px dash, 3px gap), #079BF8 */}
+                    {/* Neck: (77.5, 80.9) → (145.7, 80.9) */}
+                    <polyline
+                      points="77.5,80.9 145.7,80.9"
+                      fill="none"
+                      stroke="#079BF8"
+                      strokeWidth="1"
+                      strokeDasharray="3 3"
+                    />
+                    {/* Bust: (178.9, 124.0) → (252.9, 124.0) */}
+                    <polyline
+                      points="178.9,124.0 252.9,124.0"
+                      fill="none"
+                      stroke="#079BF8"
+                      strokeWidth="1"
+                      strokeDasharray="3 3"
+                    />
+                    {/* Sleeve: (221.0, 185.5) → (257.3, 185.5) */}
+                    <polyline
+                      points="221.0,185.5 257.3,185.5"
+                      fill="none"
+                      stroke="#079BF8"
+                      strokeWidth="1"
+                      strokeDasharray="3 3"
+                    />
+                    {/* Shoulder: (178.9, 93.1) → (210.5, 61.5) → (244.3, 61.5) */}
+                    <polyline
+                      points="178.9,93.1 210.5,61.5 244.3,61.5"
+                      fill="none"
+                      stroke="#079BF8"
+                      strokeWidth="1"
+                      strokeDasharray="3 3"
+                    />
+                    {/* Waist: (28.6, 177.1) → (60.2, 208.7) → (119.6, 208.7) */}
+                    <polyline
+                      points="28.6,177.1 60.2,208.7 119.6,208.7"
+                      fill="none"
+                      stroke="#079BF8"
+                      strokeWidth="1"
+                      strokeDasharray="3 3"
+                    />
+                    {/* Thigh: (178.9, 363.9) → (210.6, 393.0) → (267.8, 393.0) */}
+                    <polyline
+                      points="178.9,363.9 210.6,393.0 267.8,393.0"
+                      fill="none"
+                      stroke="#079BF8"
+                      strokeWidth="1"
+                      strokeDasharray="3 3"
+                    />
 
-                  {/* Six Point Markers: 10px circle (r=5) with 1px stroke, 15% fill, 4px solid center dot */}
-                  {/* Neck */}
-                  <g>
-                    <circle cx="145.7" cy="80.9" r="5" fill="rgba(7, 155, 248, 0.15)" stroke="#079BF8" strokeWidth="1" />
-                    <circle cx="145.7" cy="80.9" r="2" fill="#079BF8" />
-                  </g>
-                  {/* Shoulder */}
-                  <g>
-                    <circle cx="178.9" cy="93.1" r="5" fill="rgba(7, 155, 248, 0.15)" stroke="#079BF8" strokeWidth="1" />
-                    <circle cx="178.9" cy="93.1" r="2" fill="#079BF8" />
-                  </g>
-                  {/* Bust */}
-                  <g>
-                    <circle cx="178.9" cy="124.0" r="5" fill="rgba(7, 155, 248, 0.15)" stroke="#079BF8" strokeWidth="1" />
-                    <circle cx="178.9" cy="124.0" r="2" fill="#079BF8" />
-                  </g>
-                  {/* Sleeve */}
-                  <g>
-                    <circle cx="221.0" cy="185.7" r="5" fill="rgba(7, 155, 248, 0.15)" stroke="#079BF8" strokeWidth="1" />
-                    <circle cx="221.0" cy="185.7" r="2" fill="#079BF8" />
-                  </g>
-                  {/* Waist */}
-                  <g>
-                    <circle cx="119.6" cy="208.5" r="5" fill="rgba(7, 155, 248, 0.15)" stroke="#079BF8" strokeWidth="1" />
-                    <circle cx="119.6" cy="208.5" r="2" fill="#079BF8" />
-                  </g>
-                  {/* Thigh */}
-                  <g>
-                    <circle cx="178.9" cy="363.9" r="5" fill="rgba(7, 155, 248, 0.15)" stroke="#079BF8" strokeWidth="1" />
-                    <circle cx="178.9" cy="363.9" r="2" fill="#079BF8" />
-                  </g>
+                    {/* Six Point Markers */}
+                    {/* Neck */}
+                    <g className="cursor-pointer group" onClick={() => handleOpenPoint('neck', 'Neck')}>
+                      <circle cx="145.7" cy="80.9" r="5" fill="rgba(7, 155, 248, 0.15)" stroke="#079BF8" strokeWidth="1" />
+                      <circle cx="145.7" cy="80.9" r="2" fill="#079BF8" />
+                    </g>
+                    {/* Shoulder */}
+                    <g className="cursor-pointer group" onClick={() => handleOpenPoint('shoulder', 'Shoulder')}>
+                      <circle cx="178.9" cy="93.1" r="5" fill="rgba(7, 155, 248, 0.15)" stroke="#079BF8" strokeWidth="1" />
+                      <circle cx="178.9" cy="93.1" r="2" fill="#079BF8" />
+                    </g>
+                    {/* Bust */}
+                    <g className="cursor-pointer group" onClick={() => handleOpenPoint('bust', 'Bust')}>
+                      <circle cx="178.9" cy="124.0" r="5" fill="rgba(7, 155, 248, 0.15)" stroke="#079BF8" strokeWidth="1" />
+                      <circle cx="178.9" cy="124.0" r="2" fill="#079BF8" />
+                    </g>
+                    {/* Sleeve */}
+                    <g className="cursor-pointer group" onClick={() => handleOpenPoint('sleeve', 'Sleeve')}>
+                      <circle cx="221.0" cy="185.7" r="5" fill="rgba(7, 155, 248, 0.15)" stroke="#079BF8" strokeWidth="1" />
+                      <circle cx="221.0" cy="185.7" r="2" fill="#079BF8" />
+                    </g>
+                    {/* Waist */}
+                    <g className="cursor-pointer group" onClick={() => handleOpenPoint('waist', 'Waist')}>
+                      <circle cx="119.6" cy="208.5" r="5" fill="rgba(7, 155, 248, 0.15)" stroke="#079BF8" strokeWidth="1" />
+                      <circle cx="119.6" cy="208.5" r="2" fill="#079BF8" />
+                    </g>
+                    {/* Thigh */}
+                    <g className="cursor-pointer group" onClick={() => handleOpenPoint('thigh', 'Thigh')}>
+                      <circle cx="178.9" cy="363.9" r="5" fill="rgba(7, 155, 248, 0.15)" stroke="#079BF8" strokeWidth="1" />
+                      <circle cx="178.9" cy="363.9" r="2" fill="#079BF8" />
+                    </g>
 
-                  {/* Labels: Manrope 500, 13px, black */}
-                  {/* Neck */}
-                  <text
-                    x="48.5"
-                    y="69.7"
-                    fontFamily="var(--font-manrope), sans-serif"
-                    fontSize="13"
-                    fontWeight="500"
-                    fill="#000000"
-                    dominantBaseline="hanging"
-                  >
-                    Neck: {getFieldVal('neck', '36.0')}
-                  </text>
-                  {/* Waist */}
-                  <text
-                    x="0"
-                    y="165.5"
-                    fontFamily="var(--font-manrope), sans-serif"
-                    fontSize="13"
-                    fontWeight="500"
-                    fill="#000000"
-                    dominantBaseline="hanging"
-                  >
-                    Waist: {getFieldVal('waist', '72.0')}
-                  </text>
-                  {/* Shoulder */}
-                  <text
-                    x="244.3"
-                    y="50.5"
-                    fontFamily="var(--font-manrope), sans-serif"
-                    fontSize="13"
-                    fontWeight="500"
-                    fill="#000000"
-                    dominantBaseline="hanging"
-                  >
-                    Shoulder: {getFieldVal('shoulder', '42.0')}
-                  </text>
-                  {/* Bust */}
-                  <text
-                    x="252.9"
-                    y="114.4"
-                    fontFamily="var(--font-manrope), sans-serif"
-                    fontSize="13"
-                    fontWeight="500"
-                    fill="#000000"
-                    dominantBaseline="hanging"
-                  >
-                    Bust: {getFieldVal('bust', '92.0')}
-                  </text>
-                  {/* Sleeve */}
-                  <text
-                    x="259.9"
-                    y="175.5"
-                    fontFamily="var(--font-manrope), sans-serif"
-                    fontSize="13"
-                    fontWeight="500"
-                    fill="#000000"
-                    dominantBaseline="hanging"
-                  >
-                    Sleeve: {getFieldVal('sleeve', '60.0')}
-                  </text>
-                  {/* Thigh */}
-                  <text
-                    x="271.3"
-                    y="383.3"
-                    fontFamily="var(--font-manrope), sans-serif"
-                    fontSize="13"
-                    fontWeight="500"
-                    fill="#000000"
-                    dominantBaseline="hanging"
-                  >
-                    Ankle: {getFieldVal('ankle', '24.0')}
-                  </text>
-                </svg>
-              </div>
-            ) : (
-              /* Measurement List View: 3 equal columns, 8px gaps */
-              <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {clientFields.map((field) => (
-                  <div
-                    key={field.id}
-                    className="bg-white rounded-[16px] p-3 border border-[#EDEDED] flex flex-col justify-between gap-3 shadow-2xs"
-                  >
-                    {/* Top row: 14px / 600 black field name and 16px X remove icon */}
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[14px] font-semibold text-black truncate">
-                        {field.name}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveField(field.id)}
-                        className="w-5 h-5 flex items-center justify-center text-[var(--muted)] hover:text-black transition-colors cursor-pointer shrink-0"
-                        title="Remove field"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                    {/* Labels: Point name ONLY (Manrope 500, 13px, black) */}
+                    {/* Neck (48.5, 69.7) */}
+                    <text
+                      x="48.5"
+                      y="69.7"
+                      fontFamily="var(--font-manrope), sans-serif"
+                      fontSize="13"
+                      fontWeight="500"
+                      fill="#000000"
+                      dominantBaseline="hanging"
+                      className="cursor-pointer hover:fill-[#079BF8] transition-colors"
+                      onClick={() => handleOpenPoint('neck', 'Neck')}
+                    >
+                      Neck
+                    </text>
+                    {/* Waist (0, 165.5) */}
+                    <text
+                      x="0"
+                      y="165.5"
+                      fontFamily="var(--font-manrope), sans-serif"
+                      fontSize="13"
+                      fontWeight="500"
+                      fill="#000000"
+                      dominantBaseline="hanging"
+                      className="cursor-pointer hover:fill-[#079BF8] transition-colors"
+                      onClick={() => handleOpenPoint('waist', 'Waist')}
+                    >
+                      Waist
+                    </text>
+                    {/* Shoulder (244.3, 50.5) */}
+                    <text
+                      x="244.3"
+                      y="50.5"
+                      fontFamily="var(--font-manrope), sans-serif"
+                      fontSize="13"
+                      fontWeight="500"
+                      fill="#000000"
+                      dominantBaseline="hanging"
+                      className="cursor-pointer hover:fill-[#079BF8] transition-colors"
+                      onClick={() => handleOpenPoint('shoulder', 'Shoulder')}
+                    >
+                      Shoulder
+                    </text>
+                    {/* Bust (252.9, 114.4) */}
+                    <text
+                      x="252.9"
+                      y="114.4"
+                      fontFamily="var(--font-manrope), sans-serif"
+                      fontSize="13"
+                      fontWeight="500"
+                      fill="#000000"
+                      dominantBaseline="hanging"
+                      className="cursor-pointer hover:fill-[#079BF8] transition-colors"
+                      onClick={() => handleOpenPoint('bust', 'Bust')}
+                    >
+                      Bust
+                    </text>
+                    {/* Sleeve (259.9, 175.5) */}
+                    <text
+                      x="259.9"
+                      y="175.5"
+                      fontFamily="var(--font-manrope), sans-serif"
+                      fontSize="13"
+                      fontWeight="500"
+                      fill="#000000"
+                      dominantBaseline="hanging"
+                      className="cursor-pointer hover:fill-[#079BF8] transition-colors"
+                      onClick={() => handleOpenPoint('sleeve', 'Sleeve')}
+                    >
+                      Sleeve
+                    </text>
+                    {/* Thigh (271.3, 383.3) */}
+                    <text
+                      x="271.3"
+                      y="383.3"
+                      fontFamily="var(--font-manrope), sans-serif"
+                      fontSize="13"
+                      fontWeight="500"
+                      fill="#000000"
+                      dominantBaseline="hanging"
+                      className="cursor-pointer hover:fill-[#079BF8] transition-colors"
+                      onClick={() => handleOpenPoint('thigh', 'Thigh')}
+                    >
+                      Thigh
+                    </text>
+                  </svg>
+                </div>
+              ) : (
+                /* Field grid as Measurement List View with saved values: 3 columns, X icons hidden */
+                <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 py-1">
+                  {clientFields.map((field) => (
+                    <div
+                      key={field.id}
+                      className="bg-white rounded-[16px] p-4 flex flex-col justify-between gap-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[14px] font-semibold text-black truncate">
+                          {field.name}
+                        </span>
+                        {/* X icons hidden as requested */}
+                      </div>
+
+                      {/* Input wrapper: --card fill, 1px border, radius 8, 2px padding */}
+                      <div className="w-full bg-[var(--card)] border border-[#EDEDED] rounded-[8px] p-[2px] flex items-center">
+                        <input
+                          type="text"
+                          value={field.value}
+                          onChange={(e) => handleFieldValueChange(field.id, e.target.value)}
+                          placeholder="0.0"
+                          className="w-full bg-transparent px-2 py-1 text-[12px] text-black placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
+                        />
+                        <span className="pr-2 text-[12px] font-medium text-black select-none shrink-0">
+                          {field.unit}
+                        </span>
+                      </div>
                     </div>
-
-                    {/* Input wrapper: --card fill, 1px border, radius 8, 2px padding */}
-                    <div className="w-full bg-[var(--card)] border border-[#EDEDED] rounded-[8px] p-[2px] flex items-center">
-                      <input
-                        type="text"
-                        value={field.value}
-                        onChange={(e) => handleFieldValueChange(field.id, e.target.value)}
-                        placeholder="0.0"
-                        className="w-full bg-transparent px-2 py-1 text-[12px] text-black placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
-                      />
-                      <span className="pr-2 text-[12px] font-medium text-black select-none shrink-0">
-                        {field.unit}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* SECTION 3: Order History */}
-          <div className="w-full rounded-[6px] bg-[var(--card)] p-3 flex flex-col gap-3">
-            {/* Header: Title (16px) & Subtitle (12px, --sub) */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-[16px] font-bold text-black leading-tight">
-                  Order History
-                </h3>
-                <p className="text-[12px] text-[var(--sub)] mt-0.5">
-                  {orderHistoryCards.length} recorded
-                </p>
-              </div>
-            </div>
+          {/* ===================================================================
+              4. ORDER HISTORY
+              --card block, radius 6, 24px padding, 8px gap.
+              Title "Order History" (16px / 600, black). No "3 recorded" caption.
+              Three cards in a row with 8px gaps.
+              Each order card is rebuilt as a white container (--surface, radius 8, 2px padding, 2px gap between parts).
+              - Header: white, radius 8, padding 12px 8px, 12px gap. Left: garment name (14px / 600) + "Size taken on DD-MM-YYYY" (14px / 500, --sub). Right: status pill (radius 24, padding 2px 4px, 12px white text).
+              - Style references band: dark --band (#222222) block, radius 6, 8px padding, 4px gap. Label "Style references" (12px / 600, white), 3 thumbnails (equal widths, 66px tall, radius 8, object-fit cover, 4px gaps).
+              - Price row: white, radius 8, 8px padding, space-between: "Price" (12px, --price-label) on left, amount on right (16px / 600, black, tabular numerals). No hairline.
+              =================================================================== */}
+          <div className="w-full rounded-[6px] bg-[var(--card)] p-6 flex flex-col gap-2">
+            <h3 className="text-[16px] font-semibold text-black leading-tight">
+              Order History
+            </h3>
 
-            {/* 3 Order History Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* Three cards in a row with 8px gaps */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               {orderHistoryCards.map((card) => (
                 <div
                   key={card.id}
-                  className="bg-white rounded-[12px] p-3 border border-[#EDEDED] flex flex-col justify-between gap-3 shadow-2xs"
+                  className="bg-white rounded-[8px] p-[2px] flex flex-col gap-[2px]"
                 >
-                  {/* Top row: Order name (14px) + Date (12px) + Status Pill */}
-                  <div className="flex items-start justify-between gap-2">
+                  {/* Part 1: Header - white, radius 8, padding 12px 8px, 12px gap */}
+                  <div className="bg-white rounded-[8px] px-2 py-3 flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <h4 className="text-[14px] font-semibold text-black truncate leading-tight">
                         {card.title}
                       </h4>
-                      <p className="text-[12px] text-[var(--sub)] mt-0.5 leading-tight">
+                      <p className="text-[14px] font-medium text-[var(--sub)] mt-1 leading-tight">
                         {card.date}
                       </p>
                     </div>
 
-                    {/* Status Pill */}
+                    {/* Status pill: radius 24, padding 2px 4px, 12px white text */}
                     <span
-                      style={{
-                        backgroundColor: card.badgeColor,
-                        color: card.badgeColor === 'var(--pill-pending)' ? '#000000' : '#FFFFFF',
-                      }}
-                      className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wide shrink-0"
+                      style={{ backgroundColor: card.badgeColor }}
+                      className="px-2 py-0.5 rounded-[24px] text-[12px] font-medium text-white shrink-0 leading-tight"
                     >
                       {card.badge}
                     </span>
                   </div>
 
-                  {/* 3-Up Thumbnail Grid */}
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {card.images.map((img, idx) => (
-                      <div
-                        key={idx}
-                        className="aspect-square rounded-[8px] overflow-hidden bg-[var(--chip)] border border-[#EDEDED]"
-                      >
+                  {/* Part 2: Style references band: dark --band (#222222), radius 6, 8px padding, 4px gap */}
+                  <div className="bg-[var(--band)] rounded-[6px] p-2 flex flex-col gap-1">
+                    <span className="text-[12px] font-semibold text-white leading-tight">
+                      Style references
+                    </span>
+                    <div className="grid grid-cols-3 gap-1">
+                      {card.images.map((img, idx) => (
                         <img
+                          key={idx}
                           src={img}
-                          alt="Style"
-                          className="w-full h-full object-cover"
+                          alt="Style reference"
+                          className="w-full h-[66px] rounded-[8px] object-cover"
                         />
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
 
-                  {/* Hairline-separated Price Row */}
-                  <div className="pt-2 border-t border-[#EDEDED] flex items-center justify-between">
+                  {/* Part 3: Price row: white, radius 8, 8px padding, space-between: "Price" on left, amount on right. No hairline. */}
+                  <div className="bg-white rounded-[8px] p-2 flex items-center justify-between">
                     <span className="text-[12px] text-[var(--price-label)]">
-                      Order Total
+                      Price
                     </span>
-                    <span className="text-[14px] font-bold text-black tabular-nums">
+                    <span className="text-[16px] font-semibold text-black tabular-nums">
                       <AnimatedNumberMorph value={card.price} prefix="₦" />
                     </span>
                   </div>
@@ -739,37 +845,150 @@ export function ClientsScreen({
 
       </div>
 
-      {/* Floating Undo Toast (5 seconds) when a measurement field is removed */}
+      {/* =======================================================================
+          SET POINT SIZE DIALOG (prefilled with saved value)
+          ======================================================================= */}
       <AnimatePresence>
-        {undoToast && (
+        {pointModalData && (
           <motion.div
-            initial={{ opacity: 0, y: 16, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.95 }}
-            transition={springSmooth}
-            className="fixed bottom-6 right-6 z-50 bg-white rounded-[16px] px-4 py-3 shadow-xl border border-[var(--outline)] flex items-center gap-3 select-none"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50 backdrop-blur-[8px]"
           >
-            <span className="text-[12px] font-medium text-[var(--text-strong)]">
-              Removed &quot;{undoToast.item.name}&quot;
-            </span>
-            <button
-              type="button"
-              onClick={handleUndoRemove}
-              className="text-[12px] font-bold text-[var(--primary)] hover:underline cursor-pointer"
-            >
-              Undo
-            </button>
-            <button
-              type="button"
+            <div
+              className="absolute inset-0"
               onClick={() => {
-                setUndoToast(null);
-                if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+                setPointModalData(null);
+                setPointModalError('');
               }}
-              className="p-1 text-[var(--muted)] hover:text-black cursor-pointer"
-              aria-label="Dismiss toast"
+            />
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="client-point-dialog-title"
+              variants={{
+                initial: { opacity: 0, scale: 0.94 },
+                animate: {
+                  opacity: 1,
+                  scale: 1,
+                  transition: { type: 'spring', stiffness: 300, damping: 22, mass: 0.9 },
+                },
+                exit: {
+                  opacity: 0,
+                  scale: 0.96,
+                  transition: { duration: 0.15, ease: [0.2, 0, 0, 1] },
+                },
+              }}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              style={{
+                boxShadow: '-1px 3px 4.2px rgba(182, 182, 182, 0.15)',
+              }}
+              className="relative w-[400px] max-w-[calc(100vw-32px)] rounded-[16px] bg-white p-6 z-10 flex flex-col gap-6"
             >
-              <X className="w-3.5 h-3.5" />
-            </button>
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <h3 id="client-point-dialog-title" className="text-[16px] font-bold text-black">
+                  {pointModalData.key
+                    ? `Set ${pointModalData.name} Point Size`
+                    : pointModalData.isCustom
+                    ? 'Add Custom Point'
+                    : `Add ${pointModalData.name}`}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPointModalData(null);
+                    setPointModalError('');
+                  }}
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-black transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Form */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSavePointModal();
+                }}
+                className="flex flex-col gap-4"
+              >
+                {pointModalData.isCustom && (
+                  <div>
+                    <label className="block text-[11px] font-normal text-black mb-[2px]">
+                      Point Name
+                    </label>
+                    <div className="w-full bg-[var(--card)] border border-[#EDEDED] rounded-[8px] p-2">
+                      <input
+                        type="text"
+                        value={pointModalData.name}
+                        placeholder="e.g. Jacket Length"
+                        onChange={(e) => {
+                          setPointModalError('');
+                          setPointModalData({ ...pointModalData, name: e.target.value });
+                        }}
+                        autoFocus
+                        className="w-full bg-transparent text-[12px] text-black placeholder:text-[var(--muted)] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-[11px] font-normal text-black mb-[2px]">
+                    Measurement (CM)
+                  </label>
+                  <div className="w-full bg-[var(--card)] border border-[#EDEDED] rounded-[8px] p-2 flex items-center">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={pointModalData.value}
+                      placeholder="0.0"
+                      onChange={(e) => {
+                        setPointModalError('');
+                        setPointModalData({ ...pointModalData, value: e.target.value });
+                      }}
+                      autoFocus={!pointModalData.isCustom}
+                      className="w-full bg-transparent text-[12px] text-black placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
+                    />
+                    <span className="pr-1 text-[12px] font-medium text-black select-none shrink-0">
+                      cm
+                    </span>
+                  </div>
+                </div>
+
+                {pointModalError && (
+                  <p className="text-[12px] text-[var(--paused)] font-normal">
+                    {pointModalError}
+                  </p>
+                )}
+
+                {/* Footer Buttons */}
+                <div className="flex items-center justify-end gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPointModalData(null);
+                      setPointModalError('');
+                    }}
+                    className="h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[var(--text-2)] text-[14px] font-medium hover:bg-[#eaeaea] transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="h-9 px-6 rounded-[24px] bg-[var(--primary)] text-white text-[14px] font-medium hover:opacity-95 transition-opacity cursor-pointer shadow-xs"
+                  >
+                    Save
+                  </button>
+                </div>
+              </form>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
