@@ -1,8 +1,24 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Client, MeasurementSnapshot, Order, AppSettings, OrderStatus, HotspotDefinition, GarmentTemplate } from '@/types';
-import { SAMPLE_CLIENTS, SAMPLE_SNAPSHOTS, SAMPLE_ORDERS, DEFAULT_SETTINGS, DEFAULT_HOTSPOTS } from './initial-data';
+import {
+  Client,
+  MeasurementSnapshot,
+  Order,
+  AppSettings,
+  OrderStatus,
+  HotspotDefinition,
+  GarmentTemplate,
+} from '@/types';
+import {
+  SAMPLE_CLIENTS,
+  SAMPLE_SNAPSHOTS,
+  SAMPLE_ORDERS,
+  DEFAULT_SETTINGS,
+  DEFAULT_HOTSPOTS,
+  normalizeMeasurementsRecord,
+  resolveCanonicalKey,
+} from './initial-data';
 
 interface StoreContextType {
   clients: Client[];
@@ -38,6 +54,7 @@ interface StoreContextType {
   deleteCustomField: (key: string) => void;
   addTemplate: (template: GarmentTemplate) => void;
   updateTemplate: (id: string, updates: Partial<GarmentTemplate>) => void;
+  deleteTemplate: (id: string) => void;
 
   resetToDemoData: () => void;
   exportDataJson: () => void;
@@ -62,10 +79,10 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | null>(null);
 
 const STORAGE_KEYS = {
-  CLIENTS: 'tailorfit_clients_v1',
-  SNAPSHOTS: 'tailorfit_snapshots_v1',
-  ORDERS: 'tailorfit_orders_v1',
-  SETTINGS: 'tailorfit_settings_v1',
+  CLIENTS: 'tailorfit_clients_v2',
+  SNAPSHOTS: 'tailorfit_snapshots_v2',
+  ORDERS: 'tailorfit_orders_v2',
+  SETTINGS: 'tailorfit_settings_v2',
 };
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
@@ -79,7 +96,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null);
 
-  // Load from localStorage on mount
+  // Load from localStorage on mount with canonical key migration
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
@@ -88,10 +105,38 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const savedOrders = localStorage.getItem(STORAGE_KEYS.ORDERS);
         const savedSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
 
-        if (savedClients) setClients(JSON.parse(savedClients));
-        if (savedSnapshots) setSnapshots(JSON.parse(savedSnapshots));
-        if (savedOrders) setOrders(JSON.parse(savedOrders));
-        if (savedSettings) setSettings(JSON.parse(savedSettings));
+        if (savedClients) {
+          setClients(JSON.parse(savedClients));
+        }
+        if (savedSnapshots) {
+          const parsed: MeasurementSnapshot[] = JSON.parse(savedSnapshots);
+          setSnapshots(
+            parsed.map((s) => ({
+              ...s,
+              measurements: normalizeMeasurementsRecord(s.measurements),
+            }))
+          );
+        }
+        if (savedOrders) {
+          setOrders(JSON.parse(savedOrders));
+        }
+        if (savedSettings) {
+          const parsedSettings: AppSettings = JSON.parse(savedSettings);
+          const migratedTemplates = (parsedSettings.templates || DEFAULT_SETTINGS.templates)
+            .filter((t) => t.id !== 'all')
+            .map((t) => ({
+              ...t,
+              fieldKeys: Array.from(
+                new Set((t.fieldKeys || []).map((k) => resolveCanonicalKey(k)))
+              ),
+            }));
+          setSettings({
+            ...DEFAULT_SETTINGS,
+            ...parsedSettings,
+            templates:
+              migratedTemplates.length > 0 ? migratedTemplates : DEFAULT_SETTINGS.templates,
+          });
+        }
       } catch {
         // ignore storage error
       }
@@ -124,11 +169,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, [settings]);
 
-  // Combined hotspots: defaults + custom fields from settings
-  const allHotspots: HotspotDefinition[] = [
-    ...DEFAULT_HOTSPOTS,
-    ...(settings.customFields || []),
-  ];
+  // Combined hotspots: defaults + custom fields from settings (deduplicated by key)
+  const allHotspots: HotspotDefinition[] = React.useMemo(() => {
+    const map = new Map<string, HotspotDefinition>();
+    DEFAULT_HOTSPOTS.forEach((h) => map.set(h.key, h));
+    (settings.customFields || []).forEach((h) => {
+      if (!map.has(h.key)) {
+        map.set(h.key, h);
+      }
+    });
+    return Array.from(map.values());
+  }, [settings.customFields]);
 
   // Client actions
   const addClient = (clientData: Omit<Client, 'id' | 'createdAt'>): Client => {
@@ -220,7 +271,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const addTemplate = (template: GarmentTemplate) => {
     setSettings((prev) => ({
       ...prev,
-      templates: [...prev.templates, template],
+      templates: [...prev.templates.filter((t) => t.id !== template.id), template],
     }));
   };
 
@@ -228,6 +279,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setSettings((prev) => ({
       ...prev,
       templates: prev.templates.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+    }));
+  };
+
+  const deleteTemplate = (id: string) => {
+    setSettings((prev) => ({
+      ...prev,
+      templates: prev.templates.filter((t) => t.id !== id),
     }));
   };
 
@@ -243,7 +301,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const exportDataJson = () => {
     const payload = {
-      version: '1.0',
+      version: '2.0',
       exportedAt: new Date().toISOString(),
       clients,
       snapshots,
@@ -262,7 +320,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // Nav helpers
   const openClientProfile = (clientId: string) => {
     setSelectedClientId(clientId);
-    setActiveScreen('client-profile');
+    setActiveScreen('clients');
   };
 
   const openNewMeasurementForClient = (clientId?: string) => {
@@ -274,29 +332,28 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const openNewOrderForClient = (clientId?: string) => {
     if (clientId) setSelectedClientId(clientId);
     setSelectedOrderId(null);
-    setActiveScreen('new-order');
+    setActiveScreen('clients');
   };
 
   const openEditOrder = (orderId: string) => {
     setSelectedOrderId(orderId);
-    setActiveScreen('edit-order');
+    setActiveScreen('orders');
   };
 
   // Query helpers
   const getClientById = (id: string) => clients.find((c) => c.id === id);
 
   const getClientOrders = (clientId: string) =>
-    orders.filter((o) => o.clientId === clientId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    orders
+      .filter((o) => o.clientId === clientId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const getClientSnapshots = (clientId: string) =>
-    snapshots.filter((s) => s.clientId === clientId).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    snapshots.filter((s) => s.clientId === clientId);
 
   const getSnapshotById = (id: string) => snapshots.find((s) => s.id === id);
 
-  // Helper date parsing (simulated base date reference or current browser date)
-  // Let's use today's local date string YYYY-MM-DD
   const getTodayStr = () => {
-    // Current simulated date is 2026-09-09
     const d = new Date();
     return d.toISOString().slice(0, 10);
   };
@@ -372,6 +429,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         deleteCustomField,
         addTemplate,
         updateTemplate,
+        deleteTemplate,
 
         resetToDemoData,
         exportDataJson,

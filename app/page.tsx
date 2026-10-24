@@ -102,6 +102,7 @@ function TailorFitApp() {
             onOpenClient={handleOpenClient}
             onNewMeasurement={handleNewMeasurement}
             onNewOrder={(cid) => handleOpenNewOrder(cid)}
+            onEditOrder={handleEditOrder}
           />
         )}
 

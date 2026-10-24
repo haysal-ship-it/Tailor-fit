@@ -2,6 +2,16 @@ export type UnitType = 'cm' | 'in';
 
 export type OrderStatus = 'Pending' | 'Completed' | 'Paused' | 'In Progress' | 'Ready' | 'Picked Up';
 
+export type AnatomicalZoneId =
+  | 'head_neck'
+  | 'torso'
+  | 'upper_limb'
+  | 'lower_limb'
+  // Legacy compatibility aliases
+  | 'upper_body'
+  | 'lower_body'
+  | 'arms';
+
 export interface ReferenceImage {
   id: string;
   url: string;
@@ -47,12 +57,13 @@ export interface HotspotDefinition {
   key: string;
   label: string;
   view: 'front' | 'back' | 'both';
-  category: 'head_neck' | 'upper_body' | 'lower_body' | 'arms';
-  // SVG coordinates on 300x600 viewBox
+  category: AnatomicalZoneId;
+  // SVG coordinates on 300x600 legacy viewBox
   frontX?: number;
   frontY?: number;
   backX?: number;
   backY?: number;
+  defaultValCm?: number;
   hint: string;
   isCustom?: boolean;
 }

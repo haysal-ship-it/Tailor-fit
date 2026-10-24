@@ -4,19 +4,27 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useStore } from '@/lib/store';
 import { ReferenceImage, OrderStatus } from '@/types';
-import { 
-  Save, 
-  CloudUpload, 
-  Calendar as CalendarIcon, 
-  ChevronDown, 
+import {
+  Save,
+  CloudUpload,
+  Calendar as CalendarIcon,
+  ChevronDown,
   ChevronLeft,
-  User, 
-  ClipboardList, 
-  X, 
-  Check, 
-  Loader2 
+  User,
+  ClipboardList,
+  X,
+  Check,
+  Loader2,
 } from 'lucide-react';
 import { springSmooth } from '@/lib/motion-tokens';
+import { RotatableMannequin } from '@/components/mannequin/RotatableMannequin';
+import {
+  ANATOMICAL_ZONES,
+  getZoneLabel,
+  normalizeZoneId,
+  resolveCanonicalKey,
+  normalizeMeasurementsRecord,
+} from '@/lib/initial-data';
 import { cn } from '@/lib/utils';
 
 interface OrderFormModalProps {
@@ -30,35 +38,54 @@ let refImgSeq = 0;
 interface MeasurementFieldItem {
   id: string;
   name: string;
+  zone: string;
   value: string;
   unit: string;
 }
 
-const ORDER_MEASUREMENT_FIELDS: MeasurementFieldItem[] = [
-  { id: 'shoulder', name: 'Shoulder width', value: '42.0', unit: 'cm' },
-  { id: 'neck', name: 'Neck', value: '36.0', unit: 'cm' },
-  { id: 'bust', name: 'Bust/Chest', value: '92.0', unit: 'cm' },
-  { id: 'thigh', name: 'Thigh', value: '54.0', unit: 'cm' },
-  { id: 'hip', name: 'Hip', value: '96.0', unit: 'cm' },
-  { id: 'wrist', name: 'Wrist', value: '16.5', unit: 'cm' },
-  { id: 'sleeve', name: 'Sleeve', value: '60.0', unit: 'cm' },
-  { id: 'waist', name: 'Waist', value: '72.0', unit: 'cm' },
-  { id: 'back', name: 'Back', value: '40.0', unit: 'cm' },
-  { id: 'neckToWaist', name: 'Neck to Waist', value: '41.5', unit: 'cm' },
-  { id: 'neckToAnkle', name: 'Neck to Ankle', value: '135.0', unit: 'cm' },
-];
-
 export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormModalProps) {
-  const { 
-    clients, 
-    orders, 
-    addOrder, 
+  const {
+    clients,
+    orders,
+    settings,
+    allHotspots,
+    addOrder,
+    updateOrder,
     addSnapshot,
-    getClientSnapshots 
+    updateSnapshot,
+    getClientSnapshots,
+    getSnapshotById,
   } = useStore();
   const shouldReduceMotion = useReducedMotion();
 
+  const unitLabel = settings?.defaultUnit || 'cm';
+  const currencySymbol = settings?.currency || '₦';
+
   const existingOrder = orderId ? orders.find((o) => o.id === orderId) : null;
+
+  // Map canonical key -> hotspot metadata
+  const hotspotMap = useMemo(() => {
+    const map: Record<
+      string,
+      { key: string; label: string; zone: string; defaultValCm: number }
+    > = {};
+    allHotspots.forEach((h) => {
+      map[h.key] = {
+        key: h.key,
+        label: h.label,
+        zone: getZoneLabel(h.category),
+        defaultValCm: h.defaultValCm ?? 40,
+      };
+    });
+    return map;
+  }, [allHotspots]);
+
+  const hotspotsByZone = useMemo(() => {
+    return ANATOMICAL_ZONES.map((zone) => ({
+      ...zone,
+      items: allHotspots.filter((h) => normalizeZoneId(h.category) === zone.id),
+    }));
+  }, [allHotspots]);
 
   // Responsive state: >= 1024px is desktop right-docked sheet, < 1024px is bottom sheet
   const [isDesktop, setIsDesktop] = useState(true);
@@ -73,7 +100,6 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Visual viewport resize listener for mobile virtual keyboard
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return;
     const updateVp = () => {
@@ -104,22 +130,6 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
         email: found.email || 'client@couture.com',
       };
     }
-    if (clientId === 'c-2') {
-      return {
-        id: 'c-2',
-        name: 'Taylor Razaq',
-        phone: '+234 803 929 1100',
-        email: 't.razaq@tailorfit.design',
-      };
-    }
-    if (clientId === 'c-6') {
-      return {
-        id: 'c-6',
-        name: 'Amanda Billings',
-        phone: '+237 409 302 990',
-        email: 'a.billings@couture.com',
-      };
-    }
     return {
       id: 'c-1',
       name: 'Chloe Dallas',
@@ -128,82 +138,115 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
     };
   }, [clients, clientId]);
 
-  // Saved measurement sets for this client
+  // Combined saved measurement snapshots for this client + Garment Blueprints from Settings
   const savedTemplates = useMemo(() => {
+    const list: Array<{
+      id: string;
+      label: string;
+      garmentType: string;
+      measurements: Record<string, number>;
+      fieldKeys: string[];
+    }> = [];
+
+    // 1. Client's saved measurement snapshots
     const fromStore = getClientSnapshots(activeClient.id);
     if (fromStore && fromStore.length > 0) {
-      return fromStore.map((s) => ({
-        id: s.id,
-        label: `${s.date || '09-10-2025'} · ${s.garmentType || 'Gown/Dress'}`,
-        garmentType: s.garmentType || 'Bespoke African Gown',
-        measurements: s.measurements as Record<string, number>,
-      }));
+      fromStore.forEach((s) => {
+        const normalized = normalizeMeasurementsRecord(s.measurements);
+        const keys = Object.keys(normalized);
+        if (keys.length > 0) {
+          list.push({
+            id: s.id,
+            label: `Saved (${s.date || '09-10-2025'}) · ${s.garmentType || 'Gown/Dress'}`,
+            garmentType: s.garmentType || 'Bespoke African Gown',
+            measurements: normalized,
+            fieldKeys: keys,
+          });
+        }
+      });
     }
-    return [
-      {
-        id: 'tmpl-gown',
-        label: '09-10-2025 · Gown/Dress',
-        garmentType: 'Bespoke African Gown',
-        measurements: {
-          shoulder: 42,
-          neck: 36,
-          bust: 92,
-          thigh: 54,
-          hip: 96,
-          wrist: 16.5,
-          sleeve: 60,
-          waist: 72,
-          back: 40,
-          neckToWaist: 41.5,
-          neckToAnkle: 135,
-        },
-      },
-      {
-        id: 'tmpl-suit',
-        label: '14-06-2025 · 2-Piece Suit',
-        garmentType: 'Oxford Three Piece Suit',
-        measurements: {
-          shoulder: 44,
-          neck: 38,
-          bust: 96,
-          thigh: 56,
-          hip: 98,
-          wrist: 17,
-          sleeve: 62,
-          waist: 76,
-          back: 42,
-          neckToWaist: 43,
-          neckToAnkle: 138,
-        },
-      },
-    ];
-  }, [getClientSnapshots, activeClient.id]);
+
+    // 2. Garment Blueprint Templates from Settings
+    const blueprints = settings?.templates || [];
+    blueprints.forEach((bp) => {
+      const canonicalKeys = Array.from(
+        new Set((bp.fieldKeys || []).map((k) => resolveCanonicalKey(k)))
+      );
+      const defaultMeasurements: Record<string, number> = {};
+      canonicalKeys.forEach((k) => {
+        const baseCm = hotspotMap[k]?.defaultValCm ?? 40;
+        defaultMeasurements[k] =
+          unitLabel === 'in' ? parseFloat((baseCm / 2.54).toFixed(1)) : baseCm;
+      });
+      list.push({
+        id: `blueprint:${bp.id}`,
+        label: `Blueprint · ${bp.name}`,
+        garmentType: bp.name,
+        measurements: defaultMeasurements,
+        fieldKeys: canonicalKeys,
+      });
+    });
+
+    return list;
+  }, [getClientSnapshots, activeClient.id, settings?.templates, hotspotMap, unitLabel]);
+
+  // Initial state if editing an existing order vs creating a new order (Requirement D: new order starts EMPTY)
+  const initialFieldsForOrder = useMemo<MeasurementFieldItem[]>(() => {
+    if (!existingOrder) return [];
+    const snap = existingOrder.measurementSnapshotId
+      ? getSnapshotById(existingOrder.measurementSnapshotId)
+      : getClientSnapshots(existingOrder.clientId)[0];
+    if (!snap) return [];
+    const normalized = normalizeMeasurementsRecord(snap.measurements);
+    return Object.entries(normalized).map(([key, val]) => {
+      const meta = hotspotMap[key];
+      return {
+        id: key,
+        name: meta?.label || key,
+        zone: meta?.zone || 'Torso',
+        value: Number(val).toFixed(1),
+        unit: unitLabel,
+      };
+    });
+  }, [existingOrder, getSnapshotById, getClientSnapshots, hotspotMap, unitLabel]);
 
   // Desktop states
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(Boolean(existingOrder));
   const [paneView, setPaneView] = useState<'mannequin' | 'table'>('mannequin');
+  const [mannequinGender, setMannequinGender] = useState<'female' | 'male'>('female');
 
   // Mobile subscreen state: 'form' | 'mannequin'
   const [mobileSubScreen, setMobileSubScreen] = useState<'form' | 'mannequin'>('form');
 
-  // FORM STARTS COMPLETELY EMPTY as specified
-  const [selectedSavedTemplateId, setSelectedSavedTemplateId] = useState<string>('');
-  const [garmentType, setGarmentType] = useState<string>('');
-  const [price, setPrice] = useState<string>('');
-  const [dueDate, setDueDate] = useState<string>('');
-  const [notes, setNotes] = useState<string>('');
-  const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
+  // Form fields (starts empty for new order per Requirement D, or populated if editing existingOrder)
+  const [selectedSavedTemplateId, setSelectedSavedTemplateId] = useState<string>(
+    existingOrder?.measurementSnapshotId || ''
+  );
+  const [garmentType, setGarmentType] = useState<string>(existingOrder?.garmentType || '');
+  const [orderStatus, setOrderStatus] = useState<OrderStatus>(
+    existingOrder?.status || 'In Progress'
+  );
+  const [price, setPrice] = useState<string>(
+    existingOrder?.price ? String(existingOrder.price) : ''
+  );
+  const [dueDate, setDueDate] = useState<string>(
+    existingOrder?.pickupDateTime ? existingOrder.pickupDateTime.slice(0, 10) : ''
+  );
+  const [notes, setNotes] = useState<string>(existingOrder?.notes || '');
+  const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>(
+    existingOrder?.referenceImages || []
+  );
 
-  // Diagram & Measurement list state
-  const [fields, setFields] = useState<MeasurementFieldItem[]>(ORDER_MEASUREMENT_FIELDS);
-  const [hasDiagramEdited, setHasDiagramEdited] = useState(false);
+  // Diagram & Measurement list state (EMPTY for new order until user picks template or adds point)
+  const [fields, setFields] = useState<MeasurementFieldItem[]>(initialFieldsForOrder);
+  const [hasDiagramEdited, setHasDiagramEdited] = useState(Boolean(existingOrder));
   const [measurementValidationError, setMeasurementValidationError] = useState('');
   const [garmentTypeValidationError, setGarmentTypeValidationError] = useState('');
 
   // Discard Confirmation Dialog state
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
-  // Save button morphing state: idle | loading | success
+  // Save button morphing state
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success'>('idle');
   const [createdToastMessage, setCreatedToastMessage] = useState<string | null>(null);
 
@@ -211,12 +254,17 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
 
-  // Set Point Size Modal
+  /**
+   * Requirement C & D:
+   * - mode 'edit': Tapping an active touchpoint opens modal to update ONLY the size value (read-only name).
+   * - mode 'add': Clicking "Add Point" lets user pick from the 21 standard Sizing/Measurements.
+   */
   const [pointModalData, setPointModalData] = useState<{
-    key?: string;
+    mode: 'edit' | 'add';
+    key: string;
     name: string;
+    zone: string;
     value: string;
-    isCustom?: boolean;
   } | null>(null);
   const [pointModalError, setPointModalError] = useState('');
 
@@ -226,8 +274,22 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
 
+  // Active point keys and measurements map derived from `fields`
+  const activePointKeys = useMemo(() => fields.map((f) => f.id), [fields]);
+  const measurementsMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    fields.forEach((f) => {
+      const num = parseFloat(f.value);
+      if (!isNaN(num) && num > 0) {
+        map[f.id] = num;
+      }
+    });
+    return map;
+  }, [fields]);
+
   // Compute dirty state
   const isDirty = () => {
+    if (existingOrder) return hasDiagramEdited;
     return (
       garmentType.trim() !== '' ||
       price.trim() !== '' ||
@@ -235,7 +297,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
       notes.trim() !== '' ||
       referenceImages.length > 0 ||
       selectedSavedTemplateId !== '' ||
-      hasDiagramEdited
+      fields.length > 0
     );
   };
 
@@ -247,7 +309,6 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
     }
   };
 
-  // Restore focus on close
   useEffect(() => {
     previouslyFocusedElementRef.current = document.activeElement as HTMLElement | null;
     return () => {
@@ -257,7 +318,6 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
     };
   }, []);
 
-  // Lock background scroll on mobile while open
   useEffect(() => {
     if (!isDesktop) {
       const scrollY = window.scrollY;
@@ -299,6 +359,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
         }
       };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDesktop]);
 
   // Handle Escape key and focus trap
@@ -342,29 +403,51 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [pointModalData, isDatePickerOpen, showDiscardConfirm, garmentType, price, dueDate, notes, referenceImages, selectedSavedTemplateId, hasDiagramEdited]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    pointModalData,
+    isDatePickerOpen,
+    showDiscardConfirm,
+    garmentType,
+    price,
+    dueDate,
+    notes,
+    referenceImages,
+    selectedSavedTemplateId,
+    fields,
+  ]);
 
-  // Choose saved template
+  // Choose saved template or blueprint (Requirement D: populates the mannequin points)
   const handleSelectSavedTemplate = (tmplId: string) => {
     setSelectedSavedTemplateId(tmplId);
     setMeasurementValidationError('');
+    if (!tmplId) {
+      setFields([]);
+      return;
+    }
     const tmpl = savedTemplates.find((t) => t.id === tmplId);
     if (tmpl) {
-      setGarmentType(tmpl.garmentType);
-      setGarmentTypeValidationError('');
-      setFields((prev) =>
-        prev.map((f) => {
-          const val = tmpl.measurements[f.id];
-          return val !== undefined ? { ...f, value: Number(val).toFixed(1) } : f;
-        })
-      );
+      if (!garmentType.trim()) {
+        setGarmentType(tmpl.garmentType);
+        setGarmentTypeValidationError('');
+      }
+      const nextFields: MeasurementFieldItem[] = tmpl.fieldKeys.map((key) => {
+        const meta = hotspotMap[key];
+        const val = tmpl.measurements[key];
+        return {
+          id: key,
+          name: meta?.label || key,
+          zone: meta?.zone || 'Torso',
+          value: val !== undefined ? Number(val).toFixed(1) : '40.0',
+          unit: unitLabel,
+        };
+      });
+      setFields(nextFields);
     }
   };
 
   const handleFieldChange = (id: string, value: string) => {
-    setFields((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, value } : f))
-    );
+    setFields((prev) => prev.map((f) => (f.id === id ? { ...f, value } : f)));
     setHasDiagramEdited(true);
     setMeasurementValidationError('');
   };
@@ -388,6 +471,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
             title: file.name.replace(/\.[^/.]+$/, ''),
           };
           setReferenceImages((prev) => [...prev, newImg]);
+          setHasDiagramEdited(true);
         }
       };
       reader.readAsDataURL(file);
@@ -398,16 +482,36 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
 
   const handleRemoveRefImage = (id: string) => {
     setReferenceImages((prev) => prev.filter((img) => img.id !== id));
+    setHasDiagramEdited(true);
   };
 
-  // Open point size modal
+  // Requirement C: Tap on active mannequin touchpoint opens modal to update ONLY its size value
   const handleOpenPoint = (key: string, name: string) => {
-    const currentField = fields.find((f) => f.id === key);
+    const canonical = resolveCanonicalKey(key);
+    const currentField = fields.find((f) => f.id === canonical);
+    const meta = hotspotMap[canonical];
     setPointModalData({
+      mode: 'edit',
+      key: canonical,
+      name: currentField?.name || meta?.label || name,
+      zone: currentField?.zone || meta?.zone || 'Torso',
+      value: currentField ? currentField.value : '',
+    });
+    setPointModalError('');
+  };
+
+  // Requirement D: Click "Add Point" opens modal to select from the 21 standard Sizing/Measurements
+  const handleOpenAddPoint = () => {
+    const firstUnadded =
+      allHotspots.find((h) => !activePointKeys.includes(h.key)) || allHotspots[0];
+    const key = firstUnadded?.key || 'neck_circumference';
+    const existingField = fields.find((f) => f.id === key);
+    setPointModalData({
+      mode: 'add',
       key,
-      name,
-      value: currentField ? currentField.value : '0.0',
-      isCustom: false,
+      name: firstUnadded?.label || 'Neck circumference',
+      zone: firstUnadded ? getZoneLabel(firstUnadded.category) : 'Head/Neck',
+      value: existingField ? existingField.value : '',
     });
     setPointModalError('');
   };
@@ -415,31 +519,32 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
   const handleSavePointModal = () => {
     if (!pointModalData) return;
     const num = parseFloat(pointModalData.value);
-    if (isNaN(num) || num <= 0) {
-      setPointModalError('Enter a valid positive number');
+    if (isNaN(num) || num <= 0 || num > 300) {
+      setPointModalError('Enter a valid positive size (0.1 – 300)');
       return;
     }
 
-    if (pointModalData.key) {
-      setFields((prev) =>
-        prev.map((f) =>
-          f.id === pointModalData.key
-            ? { ...f, value: num.toFixed(1) }
-            : f
-        )
-      );
-    } else if (pointModalData.isCustom && pointModalData.name.trim()) {
-      const newId = pointModalData.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-      setFields((prev) => [
+    const canonical = resolveCanonicalKey(pointModalData.key);
+    const meta = hotspotMap[canonical];
+
+    setFields((prev) => {
+      const exists = prev.some((f) => f.id === canonical);
+      if (exists) {
+        return prev.map((f) =>
+          f.id === canonical ? { ...f, value: num.toFixed(1) } : f
+        );
+      }
+      return [
         ...prev,
         {
-          id: newId,
-          name: pointModalData.name.trim(),
+          id: canonical,
+          name: meta?.label || pointModalData.name,
+          zone: meta?.zone || pointModalData.zone || 'Torso',
           value: num.toFixed(1),
-          unit: 'cm',
+          unit: unitLabel,
         },
-      ]);
-    }
+      ];
+    });
 
     setHasDiagramEdited(true);
     setMeasurementValidationError('');
@@ -447,13 +552,12 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
     setPointModalError('');
   };
 
-  // Submit order
+  // Submit order (Create or Update)
   const handleCreateOrder = (e: React.FormEvent) => {
     e.preventDefault();
 
     let hasError = false;
 
-    // Garment Type validation
     if (!garmentType.trim()) {
       setGarmentTypeValidationError('Garment type is required');
       hasError = true;
@@ -461,11 +565,13 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
       setGarmentTypeValidationError('');
     }
 
-    // Measurements validation
-    if (!selectedSavedTemplateId && !hasDiagramEdited) {
-      setMeasurementValidationError('Choose saved measurements or take a new diagram');
+    if (!selectedSavedTemplateId && fields.length === 0) {
+      setMeasurementValidationError('Choose saved measurements or add points on the diagram');
       if (savedMeasurementsBlockRef.current) {
-        savedMeasurementsBlockRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        savedMeasurementsBlockRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
       }
       hasError = true;
     } else {
@@ -482,242 +588,91 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
       const measurementObj: Record<string, number> = {};
       fields.forEach((f) => {
         const val = parseFloat(f.value);
-        if (!isNaN(val)) measurementObj[f.id] = val;
+        if (!isNaN(val) && val > 0) measurementObj[f.id] = val;
       });
 
-      let snapshotIdToUse = selectedSavedTemplateId;
-      if (hasDiagramEdited) {
-        const createdSnapshot = addSnapshot({
-          clientId: activeClient.id,
-          date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-'),
-          garmentType: garmentType.trim() || 'Bespoke Order',
-          unit: 'cm',
-          measurements: measurementObj,
-          notes: 'Taken from New Order diagram',
-        });
-        snapshotIdToUse = createdSnapshot.id;
+      let snapshotIdToUse = selectedSavedTemplateId.startsWith('blueprint:')
+        ? ''
+        : selectedSavedTemplateId;
+
+      if (hasDiagramEdited || !snapshotIdToUse) {
+        if (existingOrder?.measurementSnapshotId && snapshotIdToUse) {
+          updateSnapshot(existingOrder.measurementSnapshotId, {
+            measurements: measurementObj,
+            garmentType: garmentType.trim() || 'Bespoke Order',
+          });
+          snapshotIdToUse = existingOrder.measurementSnapshotId;
+        } else {
+          const createdSnapshot = addSnapshot({
+            clientId: activeClient.id,
+            date: new Date()
+              .toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+              })
+              .replace(/\//g, '-'),
+            garmentType: garmentType.trim() || 'Bespoke Order',
+            unit: unitLabel,
+            measurements: measurementObj,
+            notes: notes || 'Taken from Order diagram',
+          });
+          snapshotIdToUse = createdSnapshot.id;
+        }
       }
 
-      addOrder({
-        clientId: activeClient.id,
-        garmentType: garmentType.trim() || 'Bespoke Order',
-        measurementSnapshotId: snapshotIdToUse || undefined,
-        price: rawPrice,
-        status: 'In Progress' as OrderStatus,
-        pickupDateTime: dueDate || new Date().toISOString().slice(0, 10),
-        notes,
-        referenceImages,
-      });
-
-      setSaveStatus('success');
-      setCreatedToastMessage('Order created');
+      if (existingOrder) {
+        updateOrder(existingOrder.id, {
+          garmentType: garmentType.trim() || 'Bespoke Order',
+          measurementSnapshotId: snapshotIdToUse || undefined,
+          price: rawPrice,
+          status: orderStatus,
+          pickupDateTime: dueDate || existingOrder.pickupDateTime,
+          notes,
+          referenceImages,
+        });
+        setSaveStatus('success');
+        setCreatedToastMessage('Order updated');
+      } else {
+        addOrder({
+          clientId: activeClient.id,
+          garmentType: garmentType.trim() || 'Bespoke Order',
+          measurementSnapshotId: snapshotIdToUse || undefined,
+          price: rawPrice,
+          status: orderStatus,
+          pickupDateTime: dueDate || new Date().toISOString().slice(0, 10),
+          notes,
+          referenceImages,
+        });
+        setSaveStatus('success');
+        setCreatedToastMessage('Order created');
+      }
 
       setTimeout(() => {
         onClose();
-      }, 700);
-    }, 600);
+      }, 650);
+    }, 450);
   };
 
-  // Shared Mannequin SVG Diagram component
+  // Shared Mannequin 3D Rotatable Diagram component
   const renderMannequinSvg = (isMobileView = false) => {
     return (
-      <svg
-        viewBox="0 0 304 467"
-        className={cn(
-          'w-full max-h-[467px] select-none',
-          isMobileView ? 'max-w-full' : 'max-w-[304px]'
-        )}
-        style={{ overflow: 'visible' }}
-        preserveAspectRatio="xMidYMid meet"
-      >
-        {/* Plain transparent PNG, no background rectangle, filter, blend mode or mask */}
-        <image
-          href="/assets/mannequin-female-front.png"
-          x="20.7"
-          y="0"
-          width="262.8"
-          height="467.2"
-          preserveAspectRatio="xMidYMid meet"
-        />
-
-        {/* Leader lines */}
-        {/* Neck: (77.5, 80.9) → (145.7, 80.9) */}
-        <polyline
-          points="77.5,80.9 145.7,80.9"
-          fill="none"
-          stroke="#079BF8"
-          strokeWidth="1"
-          strokeDasharray="3 3"
-        />
-        {/* Bust: (178.9, 124.0) → (252.9, 124.0) */}
-        <polyline
-          points="178.9,124.0 252.9,124.0"
-          fill="none"
-          stroke="#079BF8"
-          strokeWidth="1"
-          strokeDasharray="3 3"
-        />
-        {/* Sleeve: (221.0, 185.5) → (257.3, 185.5) */}
-        <polyline
-          points="221.0,185.5 257.3,185.5"
-          fill="none"
-          stroke="#079BF8"
-          strokeWidth="1"
-          strokeDasharray="3 3"
-        />
-        {/* Shoulder: (178.9, 93.1) → (210.5, 61.5) → (244.3, 61.5) */}
-        <polyline
-          points="178.9,93.1 210.5,61.5 244.3,61.5"
-          fill="none"
-          stroke="#079BF8"
-          strokeWidth="1"
-          strokeDasharray="3 3"
-        />
-        {/* Waist: (28.6, 177.1) → (60.2, 208.7) → (119.6, 208.7) */}
-        <polyline
-          points="28.6,177.1 60.2,208.7 119.6,208.7"
-          fill="none"
-          stroke="#079BF8"
-          strokeWidth="1"
-          strokeDasharray="3 3"
-        />
-        {/* Thigh: (178.9, 363.9) → (210.6, 393.0) → (267.8, 393.0) */}
-        <polyline
-          points="178.9,363.9 210.6,393.0 267.8,393.0"
-          fill="none"
-          stroke="#079BF8"
-          strokeWidth="1"
-          strokeDasharray="3 3"
-        />
-
-        {/* Six Point Markers (Neck, Shoulder, Bust, Waist, Sleeve, Thigh) with generous 44px hit circles */}
-        {/* Neck */}
-        <g className="cursor-pointer group" onClick={() => handleOpenPoint('neck', 'Neck')}>
-          <circle cx="145.7" cy="80.9" r="22" fill="transparent" />
-          <circle cx="145.7" cy="80.9" r="5" fill="rgba(7, 155, 248, 0.15)" stroke="#079BF8" strokeWidth="1" />
-          <circle cx="145.7" cy="80.9" r="2" fill="#079BF8" />
-        </g>
-        {/* Shoulder */}
-        <g className="cursor-pointer group" onClick={() => handleOpenPoint('shoulder', 'Shoulder')}>
-          <circle cx="178.9" cy="93.1" r="22" fill="transparent" />
-          <circle cx="178.9" cy="93.1" r="5" fill="rgba(7, 155, 248, 0.15)" stroke="#079BF8" strokeWidth="1" />
-          <circle cx="178.9" cy="93.1" r="2" fill="#079BF8" />
-        </g>
-        {/* Bust */}
-        <g className="cursor-pointer group" onClick={() => handleOpenPoint('bust', 'Bust')}>
-          <circle cx="178.9" cy="124.0" r="22" fill="transparent" />
-          <circle cx="178.9" cy="124.0" r="5" fill="rgba(7, 155, 248, 0.15)" stroke="#079BF8" strokeWidth="1" />
-          <circle cx="178.9" cy="124.0" r="2" fill="#079BF8" />
-        </g>
-        {/* Sleeve */}
-        <g className="cursor-pointer group" onClick={() => handleOpenPoint('sleeve', 'Sleeve')}>
-          <circle cx="221.0" cy="185.7" r="22" fill="transparent" />
-          <circle cx="221.0" cy="185.7" r="5" fill="rgba(7, 155, 248, 0.15)" stroke="#079BF8" strokeWidth="1" />
-          <circle cx="221.0" cy="185.7" r="2" fill="#079BF8" />
-        </g>
-        {/* Waist */}
-        <g className="cursor-pointer group" onClick={() => handleOpenPoint('waist', 'Waist')}>
-          <circle cx="119.6" cy="208.5" r="22" fill="transparent" />
-          <circle cx="119.6" cy="208.5" r="5" fill="rgba(7, 155, 248, 0.15)" stroke="#079BF8" strokeWidth="1" />
-          <circle cx="119.6" cy="208.5" r="2" fill="#079BF8" />
-        </g>
-        {/* Thigh (replaces Ankle) */}
-        <g className="cursor-pointer group" onClick={() => handleOpenPoint('thigh', 'Thigh')}>
-          <circle cx="178.9" cy="363.9" r="22" fill="transparent" />
-          <circle cx="178.9" cy="363.9" r="5" fill="rgba(7, 155, 248, 0.15)" stroke="#079BF8" strokeWidth="1" />
-          <circle cx="178.9" cy="363.9" r="2" fill="#079BF8" />
-        </g>
-
-        {/* Labels show the point name only (Manrope 500, 13px, black) */}
-        <text
-          x="48.5"
-          y="69.7"
-          fontFamily="var(--font-manrope), sans-serif"
-          fontSize="13"
-          fontWeight="500"
-          fill="#000000"
-          dominantBaseline="hanging"
-          className="cursor-pointer hover:fill-[#079BF8] transition-colors"
-          onClick={() => handleOpenPoint('neck', 'Neck')}
-        >
-          Neck
-        </text>
-        <text
-          x="0"
-          y="165.5"
-          fontFamily="var(--font-manrope), sans-serif"
-          fontSize="13"
-          fontWeight="500"
-          fill="#000000"
-          dominantBaseline="hanging"
-          className="cursor-pointer hover:fill-[#079BF8] transition-colors"
-          onClick={() => handleOpenPoint('waist', 'Waist')}
-        >
-          Waist
-        </text>
-        <text
-          x="244.3"
-          y="50.5"
-          fontFamily="var(--font-manrope), sans-serif"
-          fontSize="13"
-          fontWeight="500"
-          fill="#000000"
-          dominantBaseline="hanging"
-          className="cursor-pointer hover:fill-[#079BF8] transition-colors"
-          onClick={() => handleOpenPoint('shoulder', 'Shoulder')}
-        >
-          Shoulder
-        </text>
-        <text
-          x="252.9"
-          y="114.4"
-          fontFamily="var(--font-manrope), sans-serif"
-          fontSize="13"
-          fontWeight="500"
-          fill="#000000"
-          dominantBaseline="hanging"
-          className="cursor-pointer hover:fill-[#079BF8] transition-colors"
-          onClick={() => handleOpenPoint('bust', 'Bust')}
-        >
-          Bust
-        </text>
-        <text
-          x="259.9"
-          y="175.5"
-          fontFamily="var(--font-manrope), sans-serif"
-          fontSize="13"
-          fontWeight="500"
-          fill="#000000"
-          dominantBaseline="hanging"
-          className="cursor-pointer hover:fill-[#079BF8] transition-colors"
-          onClick={() => handleOpenPoint('sleeve', 'Sleeve')}
-        >
-          Sleeve
-        </text>
-        <text
-          x="271.3"
-          y="383.3"
-          fontFamily="var(--font-manrope), sans-serif"
-          fontSize="13"
-          fontWeight="500"
-          fill="#000000"
-          dominantBaseline="hanging"
-          className="cursor-pointer hover:fill-[#079BF8] transition-colors"
-          onClick={() => handleOpenPoint('thigh', 'Thigh')}
-        >
-          Thigh
-        </text>
-      </svg>
+      <RotatableMannequin
+        gender={mannequinGender}
+        onGenderChange={setMannequinGender}
+        showGenderToggle={true}
+        compact={!isMobileView}
+        measurements={measurementsMap}
+        activePointKeys={activePointKeys}
+        selectedPointKey={pointModalData?.key || null}
+        unit={unitLabel}
+        onSelectPoint={handleOpenPoint}
+      />
     );
   };
 
   return (
     <>
-      {/* =======================================================================
-          OVERLAY:
-          Desktop: rgba(0,0,0,0.5) with backdrop-filter: blur(8px)
-          Mobile: rgba(0,0,0,0.5) with backdrop-filter: blur(4px)
-          ======================================================================= */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -730,11 +685,6 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
         )}
       />
 
-      {/* =======================================================================
-          SHELL CONTAINER:
-          PART 1: Desktop (>= 1024px) right-docked sheet (390px / 815px)
-          PART 2: Mobile / Tablet (< 1024px) bottom sheet (up to 640px wide, max 92dvh)
-          ======================================================================= */}
       {isDesktop ? (
         /* DESKTOP RIGHT-DOCKED SHEET */
         <motion.div
@@ -744,7 +694,11 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
           aria-labelledby="new-order-sheet-title"
           initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, x: 24 }}
           animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, x: 0 }}
-          exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, x: 24, transition: { duration: 0.15, ease: [0.2, 0, 0, 1] } }}
+          exit={
+            shouldReduceMotion
+              ? { opacity: 0 }
+              : { opacity: 0, x: 24, transition: { duration: 0.15, ease: [0.2, 0, 0, 1] } }
+          }
           transition={{ type: 'spring', stiffness: 300, damping: 26, mass: 0.9 }}
           style={{
             boxShadow: '-4px 0 24px rgba(0, 0, 0, 0.12)',
@@ -752,9 +706,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
           }}
           className="fixed z-50 bg-white rounded-[8px] p-2 flex flex-col top-2 right-2 max-h-[calc(100dvh-16px)] h-fit transition-[width] duration-300"
         >
-          {/* Panes Row: flex: 1; min-height: 0; stretch heights */}
           <div className="flex-1 min-h-0 flex items-stretch gap-[2px] overflow-hidden">
-            
             {/* Expanded Mannequin Pane (410px wide on left) */}
             <AnimatePresence>
               {isExpanded && (
@@ -766,39 +718,37 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                   className="w-[410px] shrink-0 self-stretch rounded-[6px] bg-[#F8F8F8] p-3 flex flex-col overflow-y-auto"
                 >
                   <div className="rounded-[8px] bg-white p-[2px] flex-1 flex flex-col">
-                    <div className="rounded-[6px] bg-[#F8F8F8] py-3 px-3 flex-1 flex flex-col gap-6">
-                      
-                      {/* Pane header: Title "Mannequin" (16px / 700) with subtitle on ONE line */}
+                    <div className="rounded-[6px] bg-[#F8F8F8] py-3 px-3 flex-1 flex flex-col gap-4">
+                      {/* Pane header */}
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <h3 className="text-[16px] font-bold text-black leading-tight truncate">
                             Mannequin
                           </h3>
-                          <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#A2A2A2] mt-1 whitespace-nowrap">
-                            <span>All available points</span>
+                          <div className="flex items-center gap-1.5 text-[11px] font-medium text-[#A2A2A2] mt-1 whitespace-nowrap">
+                            <span>
+                              {activePointKeys.length === 0
+                                ? 'Empty state'
+                                : `${activePointKeys.length} active pts`}
+                            </span>
                             <span className="w-1 h-1 rounded-full bg-[#A2A2A2] shrink-0" />
-                            <span>Feminine Form</span>
+                            <span>
+                              {mannequinGender === 'female'
+                                ? 'Feminine Form'
+                                : 'Masculine Form'}
+                            </span>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
-                          {/* Add Point outline button with NO plus icon */}
                           <button
                             type="button"
-                            onClick={() => {
-                              setPointModalData({
-                                name: '',
-                                value: '0.0',
-                                isCustom: true,
-                              });
-                              setPointModalError('');
-                            }}
+                            onClick={handleOpenAddPoint}
                             className="h-7 px-3 rounded-[24px] border border-[var(--outline)] bg-white text-[12px] font-medium text-black hover:bg-[#F3F3F3] transition-colors cursor-pointer"
                           >
                             Add Point
                           </button>
 
-                          {/* View Toggle Group (#D9D8D8 track, blue circle for active item) */}
                           <div className="flex items-center bg-[#D9D8D8] rounded-[24px] p-0.5 gap-0.5">
                             <button
                               type="button"
@@ -835,17 +785,31 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                         <div className="flex-1 flex items-center justify-center select-none py-1">
                           {renderMannequinSvg(false)}
                         </div>
+                      ) : fields.length === 0 ? (
+                        <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-white rounded-[12px] gap-2">
+                          <p className="text-[13px] font-semibold text-black">
+                            No measurement points yet
+                          </p>
+                          <p className="text-[11px] text-[var(--text-2)]">
+                            Choose a saved template/blueprint on the right or click &ldquo;Add Point&rdquo; to begin.
+                          </p>
+                        </div>
                       ) : (
-                        <div className="flex-1 grid grid-cols-2 gap-2 overflow-y-auto max-h-[460px] pr-1">
+                        <div className="flex-1 grid grid-cols-2 gap-2 overflow-y-auto max-h-[460px] pr-1 content-start">
                           {fields.map((f) => (
                             <div
                               key={f.id}
                               className="bg-white rounded-[16px] p-2.5 border border-[#EDEDED] flex flex-col justify-between gap-2 shadow-2xs"
                             >
-                              <div className="flex items-center justify-between gap-1">
-                                <span className="text-[13px] font-semibold text-black truncate">
-                                  {f.name}
-                                </span>
+                              <div className="flex items-start justify-between gap-1">
+                                <div className="min-w-0">
+                                  <span className="text-[12px] font-semibold text-black block truncate">
+                                    {f.name}
+                                  </span>
+                                  <span className="text-[10px] text-[var(--muted)] block">
+                                    {f.zone}
+                                  </span>
+                                </div>
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveField(f.id)}
@@ -872,28 +836,37 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                           ))}
                         </div>
                       )}
-
                     </div>
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Form Card (always visible; equal stretch height on desktop) */}
-            <div className={cn(
-              'rounded-[6px] bg-white p-3 flex flex-col gap-6 overflow-y-auto self-stretch',
-              isExpanded ? 'w-[386px]' : 'w-full'
-            )}>
-              {/* Header: "New Bespoke Order" (20px / 700, black) with 1px --card line under */}
-              <div className="pb-2 border-b border-[var(--card)]">
-                <h2 id="new-order-sheet-title" className="text-[20px] font-bold text-black leading-tight">
-                  New Bespoke Order
+            {/* Form Card */}
+            <div
+              className={cn(
+                'rounded-[6px] bg-white p-3 flex flex-col gap-5 overflow-y-auto self-stretch',
+                isExpanded ? 'w-[386px]' : 'w-full'
+              )}
+            >
+              <div className="pb-2 border-b border-[var(--card)] flex items-center justify-between">
+                <h2
+                  id="new-order-sheet-title"
+                  className="text-[20px] font-bold text-black leading-tight"
+                >
+                  {existingOrder ? 'Edit Bespoke Order' : 'New Bespoke Order'}
                 </h2>
+                <button
+                  type="button"
+                  onClick={handleRequestClose}
+                  className="w-7 h-7 rounded-full bg-[var(--card)] flex items-center justify-center text-[var(--muted)] hover:text-black cursor-pointer"
+                  aria-label="Close order sheet"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
-              {/* Form Content */}
               <div className="flex flex-col gap-4">
-                
                 {/* Client summary */}
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between">
@@ -922,37 +895,38 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                   </div>
                 </div>
 
-                {/* Saved Measurements block */}
-                <div ref={savedMeasurementsBlockRef} className="bg-[var(--card)] rounded-[8px] px-4 py-3 flex flex-col gap-2">
+                {/* Saved Measurements & Blueprints block */}
+                <div
+                  ref={savedMeasurementsBlockRef}
+                  className="bg-[var(--card)] rounded-[8px] px-4 py-3 flex flex-col gap-2"
+                >
                   <div className="flex items-center justify-between">
                     <span className="text-[12px] font-medium text-[var(--muted)]">
-                      Saved Measurements
+                      Saved Measurements / Blueprints
                     </span>
                     <button
                       type="button"
                       onClick={() => {
                         setIsExpanded((prev) => !prev);
-                        if (!isExpanded) {
-                          setHasDiagramEdited(true);
-                          setMeasurementValidationError('');
-                        }
+                        setMeasurementValidationError('');
                       }}
                       className="text-[12px] font-semibold text-[var(--selected)] hover:underline cursor-pointer"
                     >
-                      {isExpanded ? 'Hide Diagram' : hasDiagramEdited ? 'Edit Diagram' : 'Take New Diagram'}
+                      {isExpanded
+                        ? 'Hide Diagram'
+                        : fields.length > 0
+                        ? `Edit Diagram (${fields.length})`
+                        : 'Take New Diagram'}
                     </button>
                   </div>
 
-                  {/* Select */}
                   <div className="relative">
                     <select
                       value={selectedSavedTemplateId}
                       onChange={(e) => handleSelectSavedTemplate(e.target.value)}
-                      className="w-full h-8 px-3 pr-8 rounded-[24px] border border-[var(--track)] bg-white text-[14px] text-[var(--text-2)] focus:outline-none appearance-none cursor-pointer"
+                      className="w-full h-8 px-3 pr-8 rounded-[24px] border border-[var(--track)] bg-white text-[13px] text-[var(--text-2)] focus:outline-none appearance-none cursor-pointer"
                     >
-                      <option value="">
-                        Choose Saved Template
-                      </option>
+                      <option value="">Choose Saved Measurements or Blueprint</option>
                       {savedTemplates.map((t) => (
                         <option key={t.id} value={t.id} className="text-black">
                           {t.label}
@@ -969,34 +943,60 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                   )}
                 </div>
 
-                {/* White section with sub-blocks */}
                 <div className="rounded-[8px] bg-white flex flex-col gap-2">
-                  
-                  {/* Garment Type: NO asterisk */}
-                  <div className="p-2">
-                    <label className="text-[12px] font-medium text-black mb-1 block">
-                      Garment Type
-                    </label>
-                    <div className="w-full bg-[var(--field-on-card)] border border-[#EDEDED] rounded-[8px] p-2">
-                      <input
-                        type="text"
-                        value={garmentType}
-                        onChange={(e) => {
-                          setGarmentType(e.target.value);
-                          setGarmentTypeValidationError('');
-                        }}
-                        placeholder="Bespoke African Gown"
-                        className="w-full bg-transparent text-[14px] text-black placeholder:text-[var(--muted)] focus:outline-none"
-                      />
+                  {/* Garment Type & Optional Order Status when editing */}
+                  <div className="p-2 grid grid-cols-1 gap-2">
+                    <div>
+                      <label className="text-[12px] font-medium text-black mb-1 block">
+                        Garment Type
+                      </label>
+                      <div className="w-full bg-[var(--field-on-card)] border border-[#EDEDED] rounded-[8px] p-2">
+                        <input
+                          type="text"
+                          value={garmentType}
+                          onChange={(e) => {
+                            setGarmentType(e.target.value);
+                            setGarmentTypeValidationError('');
+                            setHasDiagramEdited(true);
+                          }}
+                          placeholder="Bespoke African Gown"
+                          className="w-full bg-transparent text-[14px] text-black placeholder:text-[var(--muted)] focus:outline-none"
+                        />
+                      </div>
+                      {garmentTypeValidationError && (
+                        <p className="text-[12px] text-[var(--paused)] font-medium mt-1">
+                          {garmentTypeValidationError}
+                        </p>
+                      )}
                     </div>
-                    {garmentTypeValidationError && (
-                      <p className="text-[12px] text-[var(--paused)] font-medium mt-1">
-                        {garmentTypeValidationError}
-                      </p>
+
+                    {existingOrder && (
+                      <div>
+                        <label className="text-[12px] font-medium text-black mb-1 block">
+                          Order Status
+                        </label>
+                        <div className="relative">
+                          <select
+                            value={orderStatus}
+                            onChange={(e) => {
+                              setOrderStatus(e.target.value as OrderStatus);
+                              setHasDiagramEdited(true);
+                            }}
+                            className="w-full bg-[var(--field-on-card)] border border-[#EDEDED] rounded-[8px] p-2 text-[13px] font-medium text-black focus:outline-none appearance-none cursor-pointer"
+                          >
+                            <option value="In Progress">In Progress</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Ready">Ready</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Paused">Paused</option>
+                          </select>
+                          <ChevronDown className="w-4 h-4 text-[var(--text-2)] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        </div>
+                      </div>
                     )}
                   </div>
 
-                  {/* Style References with cloud-upload icon and EMPTY thumbnails initially */}
+                  {/* Style References */}
                   <div className="p-2">
                     <label className="text-[12px] font-medium text-black mb-1 block">
                       Style References
@@ -1054,14 +1054,17 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                   <div className="p-2 grid grid-cols-2 gap-2">
                     <div>
                       <label className="text-[12px] font-medium text-black mb-1 block">
-                        Price (₦)
+                        Price ({currencySymbol})
                       </label>
                       <div className="w-full bg-[var(--field-on-card)] border border-[#EDEDED] rounded-[8px] p-2">
                         <input
                           type="text"
                           value={price}
-                          onChange={(e) => setPrice(e.target.value)}
-                          placeholder="₦0.00"
+                          onChange={(e) => {
+                            setPrice(e.target.value);
+                            setHasDiagramEdited(true);
+                          }}
+                          placeholder={`${currencySymbol}0.00`}
                           className="w-full bg-transparent text-[14px] text-black placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
                         />
                       </div>
@@ -1075,7 +1078,10 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                         <input
                           type="text"
                           value={dueDate}
-                          onChange={(e) => setDueDate(e.target.value)}
+                          onChange={(e) => {
+                            setDueDate(e.target.value);
+                            setHasDiagramEdited(true);
+                          }}
                           placeholder="09/10/2026"
                           className="w-full bg-transparent text-[14px] text-black placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
                         />
@@ -1111,12 +1117,20 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                               </button>
                             </div>
                             <div className="grid grid-cols-3 gap-1.5 pt-1">
-                              {['09/10/2026', '16/10/2026', '23/10/2026', '30/10/2026', '06/11/2026', '13/11/2026'].map((d) => (
+                              {[
+                                '09/10/2026',
+                                '16/10/2026',
+                                '23/10/2026',
+                                '30/10/2026',
+                                '06/11/2026',
+                                '13/11/2026',
+                              ].map((d) => (
                                 <button
                                   key={d}
                                   type="button"
                                   onClick={() => {
                                     setDueDate(d);
+                                    setHasDiagramEdited(true);
                                     setIsDatePickerOpen(false);
                                   }}
                                   className={cn(
@@ -1136,7 +1150,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                     </div>
                   </div>
 
-                  {/* Notes: textarea 120px tall */}
+                  {/* Notes */}
                   <div className="p-2">
                     <label className="text-[12px] font-medium text-black mb-1 block">
                       Workroom notes and fabric details
@@ -1145,21 +1159,21 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                       <textarea
                         rows={4}
                         value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        placeholder="e.g hand stiched, monogram design on wrist and gold buttons"
+                        onChange={(e) => {
+                          setNotes(e.target.value);
+                          setHasDiagramEdited(true);
+                        }}
+                        placeholder="e.g hand stitched, monogram design on wrist and gold buttons"
                         className="w-full h-[100px] bg-transparent text-[14px] text-black placeholder:text-[var(--muted)] focus:outline-none resize-none"
                       />
                     </div>
                   </div>
-
                 </div>
-
               </div>
             </div>
-
           </div>
 
-          {/* Footer strip: plain strip, padding 8px 16px, content right-aligned, NO horizontal line above it */}
+          {/* Footer strip */}
           <div className="w-full px-4 py-2 flex items-center justify-end bg-white rounded-b-[8px]">
             <motion.button
               type="button"
@@ -1167,26 +1181,26 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
               onClick={handleCreateOrder}
               disabled={saveStatus !== 'idle'}
               className={cn(
-                'h-9 px-3.5 py-1.5 rounded-[24px] bg-[var(--primary)] text-white text-[14px] font-medium flex items-center gap-1 cursor-pointer shadow-xs transition-all',
+                'h-9 px-4 py-1.5 rounded-[24px] bg-[var(--primary)] text-white text-[14px] font-medium flex items-center gap-1.5 cursor-pointer shadow-xs transition-all',
                 saveStatus === 'success' && 'bg-[var(--completed)]'
               )}
             >
               {saveStatus === 'idle' && (
                 <>
                   <Save className="w-4 h-4 stroke-[2]" />
-                  <span>Create Order</span>
+                  <span>{existingOrder ? 'Save Changes' : 'Create Order'}</span>
                 </>
               )}
               {saveStatus === 'loading' && (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Creating Order...</span>
+                  <span>{existingOrder ? 'Saving...' : 'Creating Order...'}</span>
                 </>
               )}
               {saveStatus === 'success' && (
                 <>
                   <Check className="w-4 h-4 stroke-[2.5]" />
-                  <span>Order Created</span>
+                  <span>{existingOrder ? 'Saved' : 'Order Created'}</span>
                 </>
               )}
             </motion.button>
@@ -1203,14 +1217,19 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
           dragConstraints={{ top: 0, bottom: 0 }}
           dragElastic={{ top: 0, bottom: 0.5 }}
           onDragEnd={(_, info) => {
-            if (scrollContainerRef.current && scrollContainerRef.current.scrollTop > 5) return;
+            if (scrollContainerRef.current && scrollContainerRef.current.scrollTop > 5)
+              return;
             if (info.offset.y > 120 || info.velocity.y > 600) {
               handleRequestClose();
             }
           }}
           initial={shouldReduceMotion ? { opacity: 0 } : { y: '100%' }}
           animate={shouldReduceMotion ? { opacity: 1 } : { y: 0 }}
-          exit={shouldReduceMotion ? { opacity: 0 } : { y: '100%', transition: { duration: 0.2 } }}
+          exit={
+            shouldReduceMotion
+              ? { opacity: 0 }
+              : { y: '100%', transition: { duration: 0.2 } }
+          }
           transition={{ type: 'spring', stiffness: 320, damping: 34, mass: 0.9 }}
           style={{
             maxHeight: visualViewportHeight ? `${visualViewportHeight - 8}px` : '92dvh',
@@ -1220,17 +1239,27 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
             'rounded-t-[16px] sm:rounded-[16px] sm:mb-2 md:mb-4 shadow-2xl overflow-hidden'
           )}
         >
-          {/* Part A: 40x4px #D9D8D8 pill inside 24px-tall drag area */}
           <div className="w-full h-6 flex items-center justify-center pt-2 cursor-grab active:cursor-grabbing shrink-0 select-none">
             <div className="w-10 h-1 rounded-full bg-[#D9D8D8]" />
           </div>
 
-          {/* Part B: Header row (padding 8px 16px 12px) with 1px #F8F8F8 line under */}
           <div className="px-4 pt-2 pb-3 border-b border-[#F8F8F8] shrink-0">
             {mobileSubScreen === 'form' ? (
-              <h2 id="new-order-sheet-title-mobile" className="text-[20px] font-bold text-black leading-tight">
-                New Bespoke Order
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2
+                  id="new-order-sheet-title-mobile"
+                  className="text-[20px] font-bold text-black leading-tight"
+                >
+                  {existingOrder ? 'Edit Bespoke Order' : 'New Bespoke Order'}
+                </h2>
+                <button
+                  type="button"
+                  onClick={handleRequestClose}
+                  className="w-7 h-7 rounded-full bg-[#F2F2F2] flex items-center justify-center text-[var(--muted)] hover:text-black cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             ) : (
               <div className="flex items-center gap-3">
                 <button
@@ -1246,24 +1275,27 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                     Mannequin
                   </h3>
                   <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#A2A2A2] mt-0.5 whitespace-nowrap">
-                    <span>All available points</span>
+                    <span>
+                      {activePointKeys.length === 0
+                        ? 'Empty state'
+                        : `${activePointKeys.length} active points`}
+                    </span>
                     <span className="w-1 h-1 rounded-full bg-[#A2A2A2] shrink-0" />
-                    <span>Feminine Form</span>
+                    <span>
+                      {mannequinGender === 'female' ? 'Feminine Form' : 'Masculine Form'}
+                    </span>
                   </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Content Area with slide transition between Form & Mannequin */}
           <div
             ref={scrollContainerRef}
             className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4"
           >
             {mobileSubScreen === 'form' ? (
               <div className="flex flex-col gap-4">
-                
-                {/* Client summary: below 480px stack label above value */}
                 <div className="flex flex-col gap-2.5">
                   <div className="flex flex-col min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between gap-0.5">
                     <span className="text-[14px] font-medium text-[var(--muted)]">
@@ -1285,37 +1317,41 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                     <span className="text-[14px] font-medium text-[var(--muted)]">
                       Email Address
                     </span>
-                    <span className="text-[16px] font-semibold text-black break-all" style={{ overflowWrap: 'anywhere' }}>
+                    <span
+                      className="text-[16px] font-semibold text-black break-all"
+                      style={{ overflowWrap: 'anywhere' }}
+                    >
                       {activeClient.email}
                     </span>
                   </div>
                 </div>
 
-                {/* Saved Measurements block */}
-                <div ref={savedMeasurementsBlockRef} className="bg-[var(--card)] rounded-[8px] px-4 py-3 flex flex-col gap-2">
+                <div
+                  ref={savedMeasurementsBlockRef}
+                  className="bg-[var(--card)] rounded-[8px] px-4 py-3 flex flex-col gap-2"
+                >
                   <div className="flex items-center justify-between min-h-[44px]">
                     <span className="text-[12px] font-medium text-[var(--muted)]">
-                      Saved Measurements
+                      Saved Measurements / Blueprints
                     </span>
                     <button
                       type="button"
                       onClick={() => setMobileSubScreen('mannequin')}
                       className="text-[14px] font-semibold text-[var(--selected)] hover:underline cursor-pointer min-h-[44px] flex items-center"
                     >
-                      {hasDiagramEdited ? 'Edit Diagram' : 'Take New Diagram'}
+                      {fields.length > 0
+                        ? `Edit Diagram (${fields.length})`
+                        : 'Take New Diagram'}
                     </button>
                   </div>
 
-                  {/* Native 48px <select> */}
                   <div className="relative">
                     <select
                       value={selectedSavedTemplateId}
                       onChange={(e) => handleSelectSavedTemplate(e.target.value)}
                       className="w-full h-12 px-3 pr-8 rounded-[24px] border border-[var(--track)] bg-white text-[16px] text-[var(--text-2)] focus:outline-none appearance-none cursor-pointer"
                     >
-                      <option value="">
-                        Choose Saved Template
-                      </option>
+                      <option value="">Choose Saved Template</option>
                       {savedTemplates.map((t) => (
                         <option key={t.id} value={t.id} className="text-black">
                           {t.label}
@@ -1332,7 +1368,6 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                   )}
                 </div>
 
-                {/* Garment Type */}
                 <div>
                   <label className="text-[12px] font-medium text-black mb-1 block">
                     Garment Type
@@ -1341,7 +1376,6 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                     <input
                       type="text"
                       value={garmentType}
-                      onFocus={(e) => e.target.scrollIntoView({ block: 'center', behavior: 'smooth' })}
                       onChange={(e) => {
                         setGarmentType(e.target.value);
                         setGarmentTypeValidationError('');
@@ -1357,7 +1391,6 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                   )}
                 </div>
 
-                {/* Style References */}
                 <div>
                   <label className="text-[12px] font-medium text-black mb-1 block">
                     Style References
@@ -1400,7 +1433,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                               e.stopPropagation();
                               handleRemoveRefImage(img.id);
                             }}
-                            className="absolute top-1 right-1 w-11 h-11 flex items-center justify-center bg-black/60 text-white rounded-full cursor-pointer"
+                            className="absolute top-1 right-1 w-8 h-8 flex items-center justify-center bg-black/60 text-white rounded-full cursor-pointer"
                             title="Remove"
                           >
                             <X className="w-4 h-4" />
@@ -1411,19 +1444,17 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                   )}
                 </div>
 
-                {/* Price and Due Date: 2 columns when >= 400px, otherwise stacked */}
                 <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-2.5">
                   <div>
                     <label className="text-[12px] font-medium text-black mb-1 block">
-                      Price (₦)
+                      Price ({currencySymbol})
                     </label>
                     <div className="w-full bg-[var(--field-on-card)] border border-[#EDEDED] rounded-[8px] px-3 h-12 flex items-center">
                       <input
                         type="text"
                         value={price}
-                        onFocus={(e) => e.target.scrollIntoView({ block: 'center', behavior: 'smooth' })}
                         onChange={(e) => setPrice(e.target.value)}
-                        placeholder="₦0.00"
+                        placeholder={`${currencySymbol}0.00`}
                         className="w-full bg-transparent text-[16px] text-black placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
                       />
                     </div>
@@ -1437,7 +1468,6 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                       <input
                         type="text"
                         value={dueDate}
-                        onFocus={(e) => e.target.scrollIntoView({ block: 'center', behavior: 'smooth' })}
                         onChange={(e) => setDueDate(e.target.value)}
                         placeholder="09/10/2026"
                         className="w-full bg-transparent text-[16px] text-black placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
@@ -1450,50 +1480,9 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                         <CalendarIcon className="w-5 h-5" />
                       </button>
                     </div>
-
-                    <AnimatePresence>
-                      {isDatePickerOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 4, scale: 0.96 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 4, scale: 0.96 }}
-                          transition={springSmooth}
-                          className="absolute bottom-full right-0 mb-2 w-64 bg-white border border-[var(--outline)] rounded-[12px] p-3 shadow-xl z-30"
-                        >
-                          <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--outline)]">
-                            <span className="text-[13px] font-bold text-[var(--text-strong)]">
-                              October 2026
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setIsDatePickerOpen(false)}
-                              className="text-[var(--text-2)] hover:text-black p-1 cursor-pointer"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 pt-1">
-                            {['09/10/2026', '16/10/2026', '23/10/2026', '30/10/2026'].map((d) => (
-                              <button
-                                key={d}
-                                type="button"
-                                onClick={() => {
-                                  setDueDate(d);
-                                  setIsDatePickerOpen(false);
-                                }}
-                                className="py-2 px-2 rounded-[8px] text-[13px] font-medium border text-center transition-colors bg-[var(--card)] text-black border-[#EDEDED]"
-                              >
-                                {d}
-                              </button>
-                            ))}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
                   </div>
                 </div>
 
-                {/* Notes */}
                 <div>
                   <label className="text-[12px] font-medium text-black mb-1 block">
                     Workroom notes and fabric details
@@ -1502,14 +1491,12 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                     <textarea
                       rows={4}
                       value={notes}
-                      onFocus={(e) => e.target.scrollIntoView({ block: 'center', behavior: 'smooth' })}
                       onChange={(e) => setNotes(e.target.value)}
-                      placeholder="e.g hand stiched, monogram design on wrist and gold buttons"
+                      placeholder="e.g hand stitched, monogram design on wrist and gold buttons"
                       className="w-full h-[120px] bg-transparent text-[16px] text-black placeholder:text-[var(--muted)] focus:outline-none resize-none"
                     />
                   </div>
                 </div>
-
               </div>
             ) : (
               /* Mannequin Screen on Mobile */
@@ -1520,18 +1507,10 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                 transition={{ duration: 0.2 }}
                 className="flex flex-col gap-4"
               >
-                {/* Toolbar row */}
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      setPointModalData({
-                        name: '',
-                        value: '0.0',
-                        isCustom: true,
-                      });
-                      setPointModalError('');
-                    }}
+                    onClick={handleOpenAddPoint}
                     className="flex-1 h-11 px-4 rounded-[24px] border border-[var(--outline)] bg-white text-[14px] font-medium text-black hover:bg-[#F3F3F3] transition-colors cursor-pointer"
                   >
                     Add Point
@@ -1608,7 +1587,6 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
             )}
           </div>
 
-          {/* Sticky footer */}
           <div className="border-t border-[#F8F8F8] bg-white px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] flex flex-col gap-2 shrink-0">
             {mobileSubScreen === 'form' ? (
               <>
@@ -1630,19 +1608,19 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                   {saveStatus === 'idle' && (
                     <>
                       <Save className="w-5 h-5 stroke-[2]" />
-                      <span>Create Order</span>
+                      <span>{existingOrder ? 'Save Changes' : 'Create Order'}</span>
                     </>
                   )}
                   {saveStatus === 'loading' && (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Creating Order...</span>
+                      <span>{existingOrder ? 'Saving...' : 'Creating Order...'}</span>
                     </>
                   )}
                   {saveStatus === 'success' && (
                     <>
                       <Check className="w-5 h-5 stroke-[2.5]" />
-                      <span>Order Created</span>
+                      <span>{existingOrder ? 'Saved' : 'Order Created'}</span>
                     </>
                   )}
                 </motion.button>
@@ -1661,7 +1639,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
       )}
 
       {/* =======================================================================
-          SET POINT SIZE DIALOG (Appears above the sheet, z-60)
+          SET POINT SIZE / ADD POINT DIALOG (Requirement C & D)
           ======================================================================= */}
       <AnimatePresence>
         {pointModalData && (
@@ -1699,19 +1677,16 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
               initial="initial"
               animate="animate"
               exit="exit"
-              style={{
-                boxShadow: '-1px 3px 4.2px rgba(182, 182, 182, 0.15)',
-              }}
-              className="relative w-[400px] max-w-[calc(100vw-32px)] rounded-[16px] bg-white p-6 z-10 flex flex-col gap-6"
+              className="relative w-[430px] max-w-[calc(100vw-32px)] rounded-[16px] bg-white p-6 z-10 flex flex-col gap-5 shadow-2xl"
             >
-              {/* Header */}
               <div className="flex items-center justify-between">
-                <h3 id="order-point-dialog-title" className="text-[16px] font-bold text-black">
-                  {pointModalData.key
-                    ? `Set ${pointModalData.name} Point Size`
-                    : pointModalData.isCustom
-                    ? 'Add Custom Point'
-                    : `Add ${pointModalData.name}`}
+                <h3
+                  id="order-point-dialog-title"
+                  className="text-[16px] font-bold text-black"
+                >
+                  {pointModalData.mode === 'edit'
+                    ? `Update ${pointModalData.name}`
+                    : 'Add Measurement Point'}
                 </h3>
                 <button
                   type="button"
@@ -1725,7 +1700,6 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                 </button>
               </div>
 
-              {/* Form */}
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -1733,30 +1707,74 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                 }}
                 className="flex flex-col gap-4"
               >
-                {pointModalData.isCustom && (
-                  <div>
-                    <label className="block text-[11px] font-normal text-black mb-[2px]">
-                      Point Name
+                {pointModalData.mode === 'edit' ? (
+                  <div className="rounded-[10px] bg-[var(--card)] p-3 border border-[#EDEDED] flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.3px] text-[var(--muted)] block">
+                        {pointModalData.zone}
+                      </span>
+                      <span className="text-[14px] font-semibold text-black">
+                        {pointModalData.name}
+                      </span>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full bg-white text-[11px] font-medium text-[var(--text-2)] border border-[#EDEDED]">
+                      Size Only
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <label className="block text-[11px] font-semibold text-black">
+                      Select Sizing Measurement
                     </label>
-                    <div className="w-full bg-[var(--card)] border border-[#EDEDED] rounded-[8px] p-2">
-                      <input
-                        type="text"
-                        value={pointModalData.name}
-                        placeholder="e.g. Jacket Length"
-                        onChange={(e) => {
-                          setPointModalError('');
-                          setPointModalData({ ...pointModalData, name: e.target.value });
-                        }}
-                        autoFocus
-                        className="w-full bg-transparent text-[12px] text-black placeholder:text-[var(--muted)] focus:outline-none"
-                      />
+                    <div className="flex flex-col gap-2.5 max-h-[200px] overflow-y-auto rounded-[10px] bg-[var(--card)] p-2.5 border border-[#EDEDED]">
+                      {hotspotsByZone.map((zone) => (
+                        <div key={zone.id} className="flex flex-col gap-1">
+                          <span className="text-[10px] font-bold uppercase tracking-[0.3px] text-[var(--muted)]">
+                            {zone.label}
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {zone.items.map((item) => {
+                              const isSelected = pointModalData.key === item.key;
+                              const isAlreadyActive = activePointKeys.includes(item.key);
+                              return (
+                                <button
+                                  key={item.key}
+                                  type="button"
+                                  onClick={() => {
+                                    setPointModalError('');
+                                    const existing = fields.find((f) => f.id === item.key);
+                                    setPointModalData({
+                                      ...pointModalData,
+                                      key: item.key,
+                                      name: item.label,
+                                      zone: zone.label,
+                                      value: existing ? existing.value : pointModalData.value,
+                                    });
+                                  }}
+                                  className={cn(
+                                    'px-2.5 py-1 rounded-[16px] text-[11px] font-medium transition-all flex items-center gap-1 cursor-pointer border',
+                                    isSelected
+                                      ? 'bg-[var(--selected-bg)] border-[var(--selected)] text-[var(--primary)] font-semibold'
+                                      : isAlreadyActive
+                                      ? 'bg-[#F2F2F2] border-[#E0E0E0] text-black'
+                                      : 'bg-white border-[#E5E5E5] text-[var(--text-2)] hover:text-black'
+                                  )}
+                                >
+                                  <span>{item.label}</span>
+                                  {isSelected && <Check className="w-3 h-3 stroke-[2.5]" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-[11px] font-normal text-black mb-[2px]">
-                    Measurement (CM)
+                  <label className="block text-[11px] font-semibold text-black mb-1">
+                    Measurement Size ({unitLabel.toUpperCase()})
                   </label>
                   <div className="w-full bg-[var(--card)] border border-[#EDEDED] rounded-[8px] p-2 flex items-center">
                     <input
@@ -1768,22 +1786,21 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                         setPointModalError('');
                         setPointModalData({ ...pointModalData, value: e.target.value });
                       }}
-                      autoFocus={!pointModalData.isCustom}
-                      className="w-full bg-transparent text-[12px] text-black placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
+                      autoFocus
+                      className="w-full bg-transparent text-[14px] font-semibold text-black placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
                     />
-                    <span className="pr-1 text-[12px] font-medium text-black select-none shrink-0">
-                      cm
+                    <span className="pr-2 text-[12px] font-semibold text-[var(--text-2)] select-none shrink-0">
+                      {unitLabel}
                     </span>
                   </div>
                 </div>
 
                 {pointModalError && (
-                  <p className="text-[12px] text-[var(--paused)] font-normal">
+                  <p className="text-[12px] text-[var(--paused)] font-medium">
                     {pointModalError}
                   </p>
                 )}
 
-                {/* Footer Buttons */}
                 <div className="flex items-center justify-end gap-2.5 pt-2">
                   <button
                     type="button"
@@ -1799,7 +1816,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                     type="submit"
                     className="h-9 px-6 rounded-[24px] bg-[var(--primary)] text-white text-[14px] font-medium hover:opacity-95 transition-opacity cursor-pointer shadow-xs"
                   >
-                    Save
+                    {pointModalData.mode === 'edit' ? 'Update Size' : 'Add Point'}
                   </button>
                 </div>
               </form>
@@ -1808,9 +1825,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
         )}
       </AnimatePresence>
 
-      {/* =======================================================================
-          DISCARD CONFIRMATION DIALOG (Close safety)
-          ======================================================================= */}
+      {/* DISCARD CONFIRMATION DIALOG */}
       <AnimatePresence>
         {showDiscardConfirm && (
           <div className="fixed inset-0 z-70 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
@@ -1821,7 +1836,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
               className="w-full max-w-xs rounded-[16px] bg-white p-5 shadow-2xl flex flex-col gap-4 text-center"
             >
               <h4 className="text-[16px] font-bold text-black leading-tight">
-                Discard this order?
+                Discard changes?
               </h4>
               <p className="text-[12px] text-[var(--muted)] leading-normal">
                 You have unsaved changes. Are you sure you want to discard them?

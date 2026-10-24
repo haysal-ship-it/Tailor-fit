@@ -14,6 +14,7 @@ interface MorphingSaveButtonProps {
   idleText?: string;
   className?: string;
   disabled?: boolean;
+  style?: React.CSSProperties;
 }
 
 export function MorphingSaveButton({
@@ -22,6 +23,7 @@ export function MorphingSaveButton({
   idleText = 'Save',
   className,
   disabled = false,
+  style,
 }: MorphingSaveButtonProps) {
   const [internalStatus, setInternalStatus] = useState<MorphingButtonStatus>('idle');
   const shouldReduceMotion = useReducedMotion();
@@ -67,7 +69,7 @@ export function MorphingSaveButton({
         disabled && 'opacity-30 cursor-not-allowed',
         className
       )}
-      style={{ width: '110px' }}
+      style={{ width: '110px', ...style }}
     >
       <AnimatePresence mode="wait" initial={false}>
         {status === 'idle' && (

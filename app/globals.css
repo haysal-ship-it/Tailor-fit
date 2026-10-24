@@ -34,12 +34,14 @@
   --color-band: var(--band);
   --color-price-label: var(--price-label);
   --color-sub: var(--sub);
+  --color-hairline: var(--hairline);
 }
 
 :root {
   --font-manrope: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
   /* Target Design Color Tokens */
+  --hairline: #EDEDED;
   --page: #F2F2F2;
   --surface: #FFFFFF;
   --card: #F8F8F8;
