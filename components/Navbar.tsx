@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useStore } from '@/lib/store';
-import { House, UsersRound, Settings } from 'lucide-react';
+import { House, UsersRound, Settings, Clapperboard } from 'lucide-react';
 import { springSnappy } from '@/lib/motion-tokens';
 import { NotificationDropdown } from '@/components/ui/NotificationDropdown';
 import { cn } from '@/lib/utils';
@@ -113,8 +114,16 @@ export function Navbar() {
             ))}
           </nav>
 
-          {/* Right: white circular bell button (8px padding, 24px icon). No badge by default. */}
+          {/* Right: white circular bell button & Motion Film link */}
           <div className="flex items-center gap-2">
+            <Link
+              href="/motion"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-[#141312] text-white hover:bg-neutral-800 text-[11px] font-semibold tracking-wide transition-colors cursor-pointer border border-[#C9AB84]/40 shadow-xs"
+              title="Watch 60s Motion Graphics Film (16:9)"
+            >
+              <Clapperboard className="w-3.5 h-3.5 text-[#C9AB84]" />
+              <span className="hidden sm:inline">Motion Film (16:9)</span>
+            </Link>
             <NotificationDropdown />
           </div>
         </div>
