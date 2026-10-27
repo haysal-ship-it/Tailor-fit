@@ -43,6 +43,9 @@ export function MorphingSaveButton({
           }, 1600);
         } catch {
           setInternalStatus('error');
+          setTimeout(() => {
+            setInternalStatus('idle');
+          }, 2000);
         }
       } else {
         onClick();

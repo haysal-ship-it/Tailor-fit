@@ -2,13 +2,14 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Check, Undo2, X } from 'lucide-react';
+import { Check, Undo2, X, AlertCircle, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { springSmooth } from '@/lib/motion-tokens';
 
 export interface ToastMessage {
   id: string;
-  type: 'velocity' | 'undo';
+  type: 'velocity' | 'undo' | 'warning' | 'error' | 'success';
+  title?: string;
   message: string;
   onUndo?: () => void;
   duration?: number;
@@ -73,6 +74,8 @@ function ToastItem({
 
   return (
     <motion.div
+      role="alert"
+      aria-live={toast.type === 'error' || toast.type === 'warning' ? 'assertive' : 'polite'}
       initial={{ opacity: 0, y: 16, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 12, scale: 0.95 }}
@@ -80,22 +83,42 @@ function ToastItem({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       className={cn(
-        'pointer-events-auto w-full rounded-2xl p-3.5 bg-[var(--surface-1)] border border-[var(--border)] shadow-xl flex items-center justify-between gap-3 overflow-hidden relative'
+        'pointer-events-auto w-full rounded-2xl p-3.5 bg-[var(--surface-1)] border shadow-xl flex items-center justify-between gap-3 overflow-hidden relative',
+        toast.type === 'warning'
+          ? 'border-amber-300 bg-amber-50/40 dark:bg-amber-950/20 dark:border-amber-600/40'
+          : toast.type === 'error'
+          ? 'border-red-300 bg-red-50/40 dark:bg-red-950/20 dark:border-red-600/40'
+          : 'border-[var(--border)]'
       )}
     >
-      <div className="flex items-center gap-2.5">
-        {toast.type === 'velocity' ? (
-          <div className="w-6 h-6 rounded-full bg-[var(--status-success)]/15 text-[var(--status-success)] flex items-center justify-center shrink-0">
+      <div className="flex items-start gap-2.5">
+        {toast.type === 'warning' ? (
+          <div className="w-6 h-6 rounded-full bg-amber-500/15 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
+            <AlertTriangle className="w-3.5 h-3.5" />
+          </div>
+        ) : toast.type === 'error' ? (
+          <div className="w-6 h-6 rounded-full bg-red-500/15 text-red-600 flex items-center justify-center shrink-0 mt-0.5">
+            <AlertCircle className="w-3.5 h-3.5" />
+          </div>
+        ) : toast.type === 'velocity' || toast.type === 'success' ? (
+          <div className="w-6 h-6 rounded-full bg-[var(--status-success)]/15 text-[var(--status-success)] flex items-center justify-center shrink-0 mt-0.5">
             <Check className="w-3.5 h-3.5" />
           </div>
         ) : (
-          <div className="w-6 h-6 rounded-full bg-[var(--text)] text-[var(--bg)] flex items-center justify-center shrink-0">
+          <div className="w-6 h-6 rounded-full bg-[var(--text)] text-[var(--bg)] flex items-center justify-center shrink-0 mt-0.5">
             <Undo2 className="w-3.5 h-3.5" />
           </div>
         )}
-        <span className="text-xs text-[var(--text)] font-medium">
-          {toast.message}
-        </span>
+        <div className="flex flex-col">
+          {toast.title && (
+            <span className="text-xs font-bold text-[var(--text)] leading-tight">
+              {toast.title}
+            </span>
+          )}
+          <span className="text-xs text-[var(--text)] font-medium leading-normal">
+            {toast.message}
+          </span>
+        </div>
       </div>
 
       <div className="flex items-center gap-2">

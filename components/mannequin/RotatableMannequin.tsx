@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { RotateCw, MoveHorizontal } from 'lucide-react';
+import { RotateCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { resolveCanonicalKey } from '@/lib/initial-data';
+import { ROTATION, type RotationConfig } from '@/lib/rotation-config';
+import { TAU, wrapPi, smoothDamp, estimateReleaseVelocity } from '@/lib/rotation-math';
 
 export type MannequinGender = 'female' | 'male';
 export type MannequinViewAngle = 0 | 90 | 180 | 270;
@@ -30,16 +32,14 @@ export interface RotatableLandmark3D {
 }
 
 /**
- * All 21 Canonical Anatomical Sizing Landmarks mapped onto the 636x730 3D Mannequin:
+ * All 21 Canonical Anatomical Sizing Landmarks mapped onto the 636x730 Studio Mannequin:
  * 1. Head/Neck: Head circumference, Neck circumference, Neckline, Shoulder to Neck
  * 2. Torso: Shoulder width, Bust/chest, Waist circumference, Body length, Front length, Hip Height
  * 3. Upper Limb: Sleeve length, Biceps, Wrist circumference, Armhole, Elbow length
  * 4. Lower limb: Inseam, Outseam, Thigh circumference, Knee circumference, Rise, Thigh length
  */
 export const MANNEQUIN_LANDMARKS_3D: RotatableLandmark3D[] = [
-  // =========================================================================
   // 1. HEAD / NECK (4 items)
-  // =========================================================================
   {
     key: 'head_circumference',
     label: 'Head circumference',
@@ -50,7 +50,7 @@ export const MANNEQUIN_LANDMARKS_3D: RotatableLandmark3D[] = [
     z3dFemale: 24,
     z3dMale: 26,
     visibleViews: [0, 90, 180, 270],
-    sideByView: { 0: 'left', 90: 'left', 180: 'left', 270: 'right' },
+    sideByView: { 0: 'left', 90: 'right', 180: 'left', 270: 'left' },
     labelYOffset: -18,
   },
   {
@@ -63,7 +63,7 @@ export const MANNEQUIN_LANDMARKS_3D: RotatableLandmark3D[] = [
     z3dFemale: 18,
     z3dMale: 21,
     visibleViews: [0, 90, 180, 270],
-    sideByView: { 0: 'left', 90: 'left', 180: 'left', 270: 'right' },
+    sideByView: { 0: 'left', 90: 'right', 180: 'left', 270: 'left' },
     labelYOffset: -12,
   },
   {
@@ -76,7 +76,7 @@ export const MANNEQUIN_LANDMARKS_3D: RotatableLandmark3D[] = [
     z3dFemale: 26,
     z3dMale: 28,
     visibleViews: [0, 90, 270],
-    sideByView: { 0: 'left', 90: 'left', 180: 'left', 270: 'right' },
+    sideByView: { 0: 'left', 90: 'right', 180: 'left', 270: 'left' },
     labelYOffset: 10,
   },
   {
@@ -89,13 +89,11 @@ export const MANNEQUIN_LANDMARKS_3D: RotatableLandmark3D[] = [
     z3dFemale: 8,
     z3dMale: 10,
     visibleViews: [0, 90, 180, 270],
-    sideByView: { 0: 'left', 90: 'left', 180: 'right', 270: 'right' },
+    sideByView: { 0: 'left', 90: 'left', 180: 'right', 270: 'left' },
     labelYOffset: -24,
   },
 
-  // =========================================================================
   // 2. TORSO (6 items)
-  // =========================================================================
   {
     key: 'shoulder_width',
     label: 'Shoulder width',
@@ -119,7 +117,7 @@ export const MANNEQUIN_LANDMARKS_3D: RotatableLandmark3D[] = [
     z3dFemale: 40,
     z3dMale: 36,
     visibleViews: [0, 90, 270],
-    sideByView: { 0: 'right', 90: 'left', 180: 'right', 270: 'right' },
+    sideByView: { 0: 'right', 90: 'right', 180: 'right', 270: 'left' },
     labelYOffset: -8,
   },
   {
@@ -132,7 +130,7 @@ export const MANNEQUIN_LANDMARKS_3D: RotatableLandmark3D[] = [
     z3dFemale: 30,
     z3dMale: 34,
     visibleViews: [0, 90, 180, 270],
-    sideByView: { 0: 'left', 90: 'left', 180: 'right', 270: 'right' },
+    sideByView: { 0: 'left', 90: 'right', 180: 'right', 270: 'left' },
     labelYOffset: -18,
   },
   {
@@ -145,7 +143,7 @@ export const MANNEQUIN_LANDMARKS_3D: RotatableLandmark3D[] = [
     z3dFemale: -34,
     z3dMale: -38,
     visibleViews: [0, 90, 180, 270],
-    sideByView: { 0: 'right', 90: 'right', 180: 'right', 270: 'left' },
+    sideByView: { 0: 'right', 90: 'left', 180: 'right', 270: 'right' },
     labelYOffset: 12,
   },
   {
@@ -158,7 +156,7 @@ export const MANNEQUIN_LANDMARKS_3D: RotatableLandmark3D[] = [
     z3dFemale: 36,
     z3dMale: 35,
     visibleViews: [0, 90, 270],
-    sideByView: { 0: 'left', 90: 'left', 180: 'left', 270: 'right' },
+    sideByView: { 0: 'left', 90: 'right', 180: 'left', 270: 'left' },
     labelYOffset: 0,
   },
   {
@@ -171,13 +169,11 @@ export const MANNEQUIN_LANDMARKS_3D: RotatableLandmark3D[] = [
     z3dFemale: -36,
     z3dMale: -34,
     visibleViews: [0, 90, 180, 270],
-    sideByView: { 0: 'right', 90: 'right', 180: 'left', 270: 'left' },
+    sideByView: { 0: 'right', 90: 'left', 180: 'left', 270: 'right' },
     labelYOffset: 0,
   },
 
-  // =========================================================================
   // 3. UPPER LIMB (5 items)
-  // =========================================================================
   {
     key: 'armhole',
     label: 'Armhole',
@@ -188,7 +184,7 @@ export const MANNEQUIN_LANDMARKS_3D: RotatableLandmark3D[] = [
     z3dFemale: 12,
     z3dMale: 14,
     visibleViews: [0, 90, 180, 270],
-    sideByView: { 0: 'left', 90: 'left', 180: 'right', 270: 'right' },
+    sideByView: { 0: 'left', 90: 'right', 180: 'right', 270: 'left' },
     labelYOffset: -14,
   },
   {
@@ -244,9 +240,7 @@ export const MANNEQUIN_LANDMARKS_3D: RotatableLandmark3D[] = [
     labelYOffset: 52,
   },
 
-  // =========================================================================
   // 4. LOWER LIMB (6 items)
-  // =========================================================================
   {
     key: 'rise',
     label: 'Rise',
@@ -257,7 +251,7 @@ export const MANNEQUIN_LANDMARKS_3D: RotatableLandmark3D[] = [
     z3dFemale: 32,
     z3dMale: 34,
     visibleViews: [0, 90, 180, 270],
-    sideByView: { 0: 'left', 90: 'left', 180: 'left', 270: 'right' },
+    sideByView: { 0: 'left', 90: 'right', 180: 'left', 270: 'left' },
     labelYOffset: 12,
   },
   {
@@ -270,7 +264,7 @@ export const MANNEQUIN_LANDMARKS_3D: RotatableLandmark3D[] = [
     z3dFemale: 24,
     z3dMale: 26,
     visibleViews: [0, 90, 180, 270],
-    sideByView: { 0: 'right', 90: 'left', 180: 'left', 270: 'right' },
+    sideByView: { 0: 'right', 90: 'right', 180: 'left', 270: 'left' },
     labelYOffset: 0,
   },
   {
@@ -283,7 +277,7 @@ export const MANNEQUIN_LANDMARKS_3D: RotatableLandmark3D[] = [
     z3dFemale: 24,
     z3dMale: 26,
     visibleViews: [0, 90, 270],
-    sideByView: { 0: 'left', 90: 'left', 180: 'right', 270: 'right' },
+    sideByView: { 0: 'left', 90: 'right', 180: 'right', 270: 'left' },
     labelYOffset: 0,
   },
   {
@@ -296,7 +290,7 @@ export const MANNEQUIN_LANDMARKS_3D: RotatableLandmark3D[] = [
     z3dFemale: 18,
     z3dMale: 20,
     visibleViews: [0, 90, 180, 270],
-    sideByView: { 0: 'right', 90: 'left', 180: 'left', 270: 'right' },
+    sideByView: { 0: 'right', 90: 'right', 180: 'left', 270: 'left' },
     labelYOffset: 0,
   },
   {
@@ -327,34 +321,41 @@ export const MANNEQUIN_LANDMARKS_3D: RotatableLandmark3D[] = [
   },
 ];
 
-const VIEW_METADATA: Array<{
+/**
+ * 4 Cardinal views in the studio coordinate system:
+ * 0° = Front
+ * 90° = Right profile (model faces right)
+ * 180° = Back
+ * 270° = Left profile (model faces left)
+ */
+export const VIEW_METADATA: Array<{
   angle: MannequinViewAngle;
   shortLabel: string;
   fullLabel: string;
-  suffix: 'front' | 'left' | 'back' | 'right';
+  suffix: 'front' | 'right' | 'back' | 'left';
 }> = [
   { angle: 0, shortLabel: 'Front', fullLabel: 'FRONT VIEW (0°)', suffix: 'front' },
-  { angle: 90, shortLabel: 'Left', fullLabel: 'LEFT SIDE (90°)', suffix: 'left' },
+  { angle: 270, shortLabel: 'Left', fullLabel: 'LEFT SIDE (270°)', suffix: 'left' },
   { angle: 180, shortLabel: 'Back', fullLabel: 'BACK VIEW (180°)', suffix: 'back' },
-  { angle: 270, shortLabel: 'Right', fullLabel: 'RIGHT SIDE (270°)', suffix: 'right' },
+  { angle: 90, shortLabel: 'Right', fullLabel: 'RIGHT SIDE (90°)', suffix: 'right' },
 ];
 
-function normalizeAngle(deg: number): number {
+function normalizeAngleDeg(deg: number): number {
   return ((deg % 360) + 360) % 360;
 }
 
-function nearestCardinal(deg: number): MannequinViewAngle {
-  const norm = normalizeAngle(deg);
+function shortestAngleDiffDeg(from: number, to: number): number {
+  let diff = ((to - from + 540) % 360) - 180;
+  if (diff === -180) diff = 180;
+  return diff;
+}
+
+function nearestCardinalDeg(deg: number): MannequinViewAngle {
+  const norm = normalizeAngleDeg(deg);
   if (norm >= 315 || norm < 45) return 0;
   if (norm >= 45 && norm < 135) return 90;
   if (norm >= 135 && norm < 225) return 180;
   return 270;
-}
-
-function shortestAngleDiff(from: number, to: number): number {
-  let diff = ((to - from + 540) % 360) - 180;
-  if (diff === -180) diff = 180;
-  return diff;
 }
 
 export interface RotatableMannequinProps {
@@ -365,14 +366,7 @@ export interface RotatableMannequinProps {
   activeView?: 'front' | 'back' | 'left' | 'right';
   onViewChange?: (view: 'front' | 'back' | 'left' | 'right') => void;
   measurements?: Record<string, number | string>;
-  /**
-   * Explicit list of active measurement keys to display on the mannequin.
-   * Per Requirement D: When `activePointKeys` is empty (`[]`), NO touchpoints are rendered
-   * (clean empty state of only the rotatable mannequin).
-   * If omitted (`undefined`), falls back to keys present in `measurements`.
-   */
   activePointKeys?: string[];
-  /** Currently open/focused measurement key so its leader line stays visible while modal is open */
   selectedPointKey?: string | null;
   unit?: string;
   onSelectPoint?: (key: string, label: string) => void;
@@ -399,23 +393,7 @@ export function RotatableMannequin({
   compact = false,
   className = '',
 }: RotatableMannequinProps) {
-  // Smooth continuous turntable angle in degrees [0..360)
-  const [angle, setAngle] = useState<number>(initialAngle);
-  const [isDragging, setIsDragging] = useState(false);
-  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
-
-  // Physics state refs for 60fps spring & momentum glide
-  const currentAngleRef = useRef<number>(initialAngle);
-  const targetAngleRef = useRef<number>(initialAngle);
-  const velocityRef = useRef<number>(0);
-  const isPointerDownRef = useRef<boolean>(false);
-  const isGlidingRef = useRef<boolean>(false);
-  const rafRef = useRef<number | null>(null);
-
-  const dragHistoryRef = useRef<Array<{ x: number; time: number }>>([]);
-  const dragStartRef = useRef<{ x: number; startAngle: number; moved: boolean } | null>(null);
-
-  // Preload all 8 orthographic mannequin PNGs once on mount for zero-flicker 60fps rotation
+  // Preload all 8 studio mannequin PNGs once on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const genders: MannequinGender[] = ['female', 'male'];
@@ -428,259 +406,40 @@ export function RotatableMannequin({
     });
   }, []);
 
-  // Unified 60fps Spring + Inertial Physics Loop
-  const startPhysicsLoop = useCallback(() => {
-    if (rafRef.current !== null) return;
-
-    let lastTime = performance.now();
-
-    const tick = (now: number) => {
-      const dt = Math.min(0.05, Math.max(0.004, (now - lastTime) / 1000));
-      lastTime = now;
-
-      if (isPointerDownRef.current) {
-        // Plush spring-follow while dragging so motion feels fluid, weighted, and never stiff
-        const diff = shortestAngleDiff(currentAngleRef.current, targetAngleRef.current);
-        const step = diff * Math.min(1, dt * 22);
-        currentAngleRef.current = normalizeAngle(currentAngleRef.current + step);
-        setAngle(currentAngleRef.current);
-        rafRef.current = requestAnimationFrame(tick);
-        return;
-      }
-
-      if (isGlidingRef.current) {
-        // Momentum coasting after flick release + soft magnetic attraction to nearest cardinal view when slow
-        currentAngleRef.current = normalizeAngle(
-          currentAngleRef.current + velocityRef.current * dt
-        );
-        // Exponential friction decay
-        velocityRef.current *= Math.pow(0.035, dt);
-
-        if (Math.abs(velocityRef.current) < 42) {
-          // Smoothly transition from momentum glide into gentle cardinal settle
-          isGlidingRef.current = false;
-          const cardinal = nearestCardinal(currentAngleRef.current);
-          targetAngleRef.current = cardinal;
-          if (onViewChange) {
-            const viewName =
-              cardinal === 0
-                ? 'front'
-                : cardinal === 90
-                ? 'left'
-                : cardinal === 180
-                ? 'back'
-                : 'right';
-            onViewChange(viewName);
-          }
-        }
-        setAngle(currentAngleRef.current);
-        rafRef.current = requestAnimationFrame(tick);
-        return;
-      }
-
-      // Smooth spring settle toward targetAngleRef
-      const diff = shortestAngleDiff(currentAngleRef.current, targetAngleRef.current);
-      if (Math.abs(diff) > 0.12 || Math.abs(velocityRef.current) > 0.8) {
-        // Critically-damped spring
-        const stiffness = 170;
-        const damping = 24;
-        const accel = stiffness * diff - damping * velocityRef.current;
-        velocityRef.current += accel * dt;
-        currentAngleRef.current = normalizeAngle(
-          currentAngleRef.current + velocityRef.current * dt
-        );
-        setAngle(currentAngleRef.current);
-        rafRef.current = requestAnimationFrame(tick);
-      } else {
-        currentAngleRef.current = normalizeAngle(targetAngleRef.current);
-        velocityRef.current = 0;
-        setAngle(currentAngleRef.current);
-        rafRef.current = null;
-      }
-    };
-
-    rafRef.current = requestAnimationFrame(tick);
-  }, [onViewChange]);
-
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  const hoveredKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    return () => {
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
+    hoveredKeyRef.current = hoveredKey;
+    invalidateRef.current?.();
+  }, [hoveredKey]);
+
+  // Reduced motion
+  const reducedMotionRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    reducedMotionRef.current = mq.matches;
+    const onChange = (e: MediaQueryListEvent) => {
+      reducedMotionRef.current = e.matches;
     };
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
   }, []);
 
-  // Sync with external activeView prop if provided
-  useEffect(() => {
-    if (!activeView) return;
-    const targetMap: Record<'front' | 'left' | 'back' | 'right', MannequinViewAngle> = {
-      front: 0,
-      left: 90,
-      back: 180,
-      right: 270,
-    };
-    const target = targetMap[activeView];
-    if (
-      target !== undefined &&
-      nearestCardinal(targetAngleRef.current) !== target &&
-      !isPointerDownRef.current
-    ) {
-      isGlidingRef.current = false;
-      targetAngleRef.current = target;
-      startPhysicsLoop();
-    }
-  }, [activeView, startPhysicsLoop]);
+  // DOM Refs for direct 60fps updates (0 React re-renders per second during drag)
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const imageRefs = useRef<Record<string, SVGImageElement | null>>({});
+  const landmarkGroupRefs = useRef<Record<string, SVGGElement | null>>({});
+  const touchpointCircleRefs = useRef<Record<string, SVGCircleElement | null>>({});
+  const touchpointRingRefs = useRef<Record<string, SVGCircleElement | null>>({});
+  const touchpointDotRefs = useRef<Record<string, SVGCircleElement | null>>({});
+  const leaderLineRefs = useRef<Record<string, SVGPolylineElement | null>>({});
+  const leaderTickRefs = useRef<Record<string, SVGCircleElement | null>>({});
+  const leaderTextNameRefs = useRef<Record<string, SVGTextElement | null>>({});
+  const leaderTextValRefs = useRef<Record<string, SVGTextElement | null>>({});
+  const buttonRefs = useRef<Record<number, HTMLButtonElement | null>>({});
 
-  const animateToAngle = useCallback(
-    (targetDeg: number) => {
-      const normTarget = normalizeAngle(targetDeg);
-      isGlidingRef.current = false;
-      targetAngleRef.current = normTarget;
-      startPhysicsLoop();
-
-      if (onViewChange) {
-        const c = nearestCardinal(normTarget);
-        const viewName =
-          c === 0 ? 'front' : c === 90 ? 'left' : c === 180 ? 'back' : 'right';
-        onViewChange(viewName);
-      }
-    },
-    [onViewChange, startPhysicsLoop]
-  );
-
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    // Do not start drag if clicking an interactive point or button
-    const targetEl = e.target as HTMLElement;
-    if (targetEl.closest('button') || targetEl.closest('[data-mannequin-point="true"]')) {
-      return;
-    }
-
-    e.currentTarget.setPointerCapture(e.pointerId);
-    const now = performance.now();
-    isPointerDownRef.current = true;
-    isGlidingRef.current = false;
-    velocityRef.current = 0;
-
-    dragStartRef.current = {
-      x: e.clientX,
-      startAngle: currentAngleRef.current,
-      moved: false,
-    };
-    dragHistoryRef.current = [{ x: e.clientX, time: now }];
-    targetAngleRef.current = currentAngleRef.current;
-    setIsDragging(true);
-    startPhysicsLoop();
-  };
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragStartRef.current || !isPointerDownRef.current) return;
-    const now = performance.now();
-    const dx = e.clientX - dragStartRef.current.x;
-
-    if (Math.abs(dx) > 3) {
-      dragStartRef.current.moved = true;
-    }
-
-    // Track recent pointer samples (last 90ms) for accurate flick velocity
-    dragHistoryRef.current.push({ x: e.clientX, time: now });
-    while (dragHistoryRef.current.length > 2 && now - dragHistoryRef.current[0].time > 90) {
-      dragHistoryRef.current.shift();
-    }
-
-    // Smooth sensitivity: 0.78 deg per pixel
-    targetAngleRef.current = normalizeAngle(dragStartRef.current.startAngle + dx * 0.78);
-    startPhysicsLoop();
-  };
-
-  const handlePointerUp = () => {
-    if (!dragStartRef.current) return;
-    const wasMoved = dragStartRef.current.moved;
-    isPointerDownRef.current = false;
-    dragStartRef.current = null;
-    setIsDragging(false);
-
-    if (wasMoved) {
-      const history = dragHistoryRef.current;
-      let releaseVelocityDegPerSec = 0;
-      if (history.length >= 2) {
-        const first = history[0];
-        const last = history[history.length - 1];
-        const dtSec = Math.max(0.008, (last.time - first.time) / 1000);
-        const vxPxPerSec = (last.x - first.x) / dtSec;
-        releaseVelocityDegPerSec = Math.max(-720, Math.min(720, vxPxPerSec * 0.78));
-      }
-
-      if (Math.abs(releaseVelocityDegPerSec) > 65) {
-        // Momentum flick glide!
-        velocityRef.current = releaseVelocityDegPerSec;
-        isGlidingRef.current = true;
-        startPhysicsLoop();
-      } else {
-        // Gentle settle to nearest cardinal view
-        const cardinal = nearestCardinal(currentAngleRef.current);
-        targetAngleRef.current = cardinal;
-        startPhysicsLoop();
-        if (onViewChange) {
-          const viewName =
-            cardinal === 0
-              ? 'front'
-              : cardinal === 90
-              ? 'left'
-              : cardinal === 180
-              ? 'back'
-              : 'right';
-          onViewChange(viewName);
-        }
-      }
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      const next = ((nearestCardinal(currentAngleRef.current) + 90) % 360) as MannequinViewAngle;
-      animateToAngle(next);
-    } else if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      const prev = ((nearestCardinal(currentAngleRef.current) + 270) % 360) as MannequinViewAngle;
-      animateToAngle(prev);
-    }
-  };
-
-  const cardinalAngle = nearestCardinal(angle);
-  const normAngle = normalizeAngle(angle);
-  const rad = (normAngle * Math.PI) / 180;
-
-  /**
-   * 3D Cylindrical Turntable Projection for the 4 Orthographic Studio Layers:
-   * Uses a sharper S-curve blend near the 45° silhouette transition and cylindrical
-   * horizontal foreshortening so the mannequin feels like a solid rotating 3D figure
-   * rather than a wide ghosted double-exposure.
-   */
-  const getLayerTransform = (viewAngle: MannequinViewAngle) => {
-    const diff = shortestAngleDiff(viewAngle, normAngle);
-    const absDiff = Math.abs(diff);
-    if (absDiff >= 88) {
-      return { opacity: 0, scaleX: 0.78, translateX: 0 };
-    }
-    // Sharper quintic smoothstep centered around 45° so cardinal views stay crisp longer
-    const t = Math.max(0, Math.min(1, (absDiff - 12) / 66));
-    const smooth = t * t * t * (t * (t * 6 - 15) + 10);
-    const opacity = 1 - smooth;
-
-    const radDiff = (diff * Math.PI) / 180;
-    const scaleX = Math.max(0.76, Math.cos(radDiff * 0.82));
-    const translateX = Math.sin(radDiff) * 18;
-    return { opacity, scaleX, translateX };
-  };
-
-  /**
-   * Requirement D: Determine which touchpoints are active on the mannequin.
-   * - If `activePointKeys` is explicitly provided (even if `[]`), ONLY show those keys.
-   * - If `activePointKeys` is `[]`, zero touchpoints are shown (clean empty state).
-   * - If `activePointKeys` is `undefined`, infer active keys from `measurements` keys with values.
-   */
+  // Active point keys set
   const resolvedActiveKeySet = useMemo(() => {
     const set = new Set<string>();
     if (Array.isArray(activePointKeys)) {
@@ -697,7 +456,6 @@ export function RotatableMannequin({
     return set;
   }, [activePointKeys, measurements]);
 
-  // Normalized measurements map for displaying value in hover tooltip
   const canonicalMeasurements = useMemo(() => {
     const map: Record<string, number | string> = {};
     if (!measurements) return map;
@@ -709,14 +467,463 @@ export function RotatableMannequin({
     return map;
   }, [measurements]);
 
-  // Filter landmarks: must be in `resolvedActiveKeySet` AND visible in the current cardinal view
-  const visibleLandmarks = useMemo(() => {
-    return MANNEQUIN_LANDMARKS_3D.filter(
-      (lm) => resolvedActiveKeySet.has(lm.key) && lm.visibleViews.includes(cardinalAngle)
-    );
-  }, [resolvedActiveKeySet, cardinalAngle]);
-
   const resolvedSelectedKey = selectedPointKey ? resolveCanonicalKey(selectedPointKey) : null;
+
+  // Active landmarks
+  const activeLandmarks = useMemo(() => {
+    return MANNEQUIN_LANDMARKS_3D.filter((lm) => resolvedActiveKeySet.has(lm.key));
+  }, [resolvedActiveKeySet]);
+
+  const activeLandmarksRef = useRef(activeLandmarks);
+  useEffect(() => {
+    activeLandmarksRef.current = activeLandmarks;
+    invalidateRef.current?.();
+  }, [activeLandmarks]);
+
+  const genderRef = useRef(gender);
+  useEffect(() => {
+    genderRef.current = gender;
+    invalidateRef.current?.();
+  }, [gender]);
+
+  // Dedicated physics state in a single ref — NEVER React state
+  const initialAngleRad = (initialAngle * Math.PI) / 180;
+  const physicsRef = useRef({
+    target: initialAngleRad, // unbounded radians
+    display: initialAngleRad, // unbounded radians
+    dv: { v: 0 },
+    vel: 0,
+    dragging: false,
+    snapping: false,
+    buttonTurning: false,
+    pointerId: -1,
+    startX: 0,
+    startY: 0,
+    startT: 0,
+    lastX: 0,
+    moved: 0,
+    samples: [] as Array<{ x: number; t: number }>,
+    activeCardinal: initialAngle as MannequinViewAngle,
+  });
+
+  const invalidateRef = useRef<(() => void) | null>(null);
+
+  // Shortest-path turn to angle
+  const animateToAngleRad = useCallback((desiredRad: number) => {
+    const s = physicsRef.current;
+    s.vel = 0;
+    s.dragging = false;
+    s.snapping = false;
+    s.buttonTurning = true;
+    s.target += wrapPi(desiredRad - s.target);
+    invalidateRef.current?.();
+  }, []);
+
+  const animateToAngleDeg = useCallback(
+    (deg: number) => {
+      animateToAngleRad((deg * Math.PI) / 180);
+    },
+    [animateToAngleRad]
+  );
+
+  // Sync external activeView prop if changed
+  useEffect(() => {
+    if (!activeView) return;
+    const viewMap: Record<string, number> = { front: 0, right: 90, back: 180, left: 270 };
+    const targetDeg = viewMap[activeView];
+    if (targetDeg !== undefined) {
+      const currentNorm = normalizeAngleDeg((physicsRef.current.display * 180) / Math.PI);
+      if (nearestCardinalDeg(currentNorm) !== targetDeg) {
+        animateToAngleDeg(targetDeg);
+      }
+    }
+  }, [activeView, animateToAngleDeg]);
+
+  // Main 60fps Spring + Momentum Physics & Direct DOM/SVG Projection Loop
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    let rafId: number | null = null;
+    let lastTimeMs = performance.now();
+
+    const updateViewButtonStyles = (cardinal: MannequinViewAngle) => {
+      const s = physicsRef.current;
+      if (cardinal === s.activeCardinal) return;
+      s.activeCardinal = cardinal;
+
+      VIEW_METADATA.forEach((v) => {
+        const btn = buttonRefs.current[v.angle];
+        if (!btn) return;
+        const isActive = v.angle === cardinal;
+        btn.className = cn(
+          'px-2.5 h-6 rounded-full text-[11px] font-medium transition-all cursor-pointer',
+          isActive
+            ? 'bg-[var(--primary)] text-white shadow-2xs'
+            : 'text-[var(--text-2)] hover:text-black'
+        );
+      });
+
+      if (onViewChange) {
+        const viewName =
+          cardinal === 0 ? 'front' : cardinal === 90 ? 'right' : cardinal === 180 ? 'back' : 'left';
+        onViewChange(viewName);
+      }
+    };
+
+    const renderLayersAndLandmarks = (rad: number) => {
+      const normDeg = normalizeAngleDeg((rad * 180) / Math.PI);
+      const cardinal = nearestCardinalDeg(normDeg);
+      updateViewButtonStyles(cardinal);
+
+      // 1. Update 4 Studio Orthographic Layers via direct SVG image transforms
+      VIEW_METADATA.forEach((v) => {
+        const img = imageRefs.current[v.suffix];
+        if (!img) return;
+
+        const diff = shortestAngleDiffDeg(v.angle, normDeg);
+        const absDiff = Math.abs(diff);
+
+        if (absDiff >= 88) {
+          img.style.opacity = '0';
+          return;
+        }
+
+        // Quintic smoothstep centered around 45° for seamless studio cross-fade
+        const t = Math.max(0, Math.min(1, (absDiff - 12) / 66));
+        const smooth = t * t * t * (t * (t * 6 - 15) + 10);
+        const opacity = 1 - smooth;
+
+        const radDiff = (diff * Math.PI) / 180;
+        const scaleX = Math.max(0.76, Math.cos(radDiff * 0.82));
+        const translateX = Math.sin(radDiff) * 18;
+
+        img.style.opacity = opacity.toFixed(3);
+        img.style.transform = `translateX(${translateX.toFixed(2)}px) scaleX(${scaleX.toFixed(3)})`;
+      });
+
+      // 2. Update Landmarks Projection in 636x730 viewBox
+      const g = genderRef.current;
+      const hovered = hoveredKeyRef.current;
+      const items = activeLandmarksRef.current;
+
+      items.forEach((lm) => {
+        const x3d = g === 'male' ? lm.x3dMale : lm.x3dFemale;
+        const z3d = g === 'male' ? lm.z3dMale : lm.z3dFemale;
+
+        // Orthographic projection: rotate around vertical spine center (X = 318)
+        // With rad increasing on right drag (+dx), front surface (+z) moves to viewer's right (+X)
+        const projX = 318 + x3d * Math.cos(rad) + z3d * Math.sin(rad);
+        const projY = lm.y;
+
+        // Depth/facing check: is point on the visible hemisphere?
+        const depth = z3d * Math.cos(rad) - x3d * Math.sin(rad);
+        const isFacing = depth > -12; // smoothly visible when facing camera
+
+        const groupEl = landmarkGroupRefs.current[lm.key];
+        const circleEl = touchpointCircleRefs.current[lm.key];
+        const ringEl = touchpointRingRefs.current[lm.key];
+        const dotEl = touchpointDotRefs.current[lm.key];
+        const polylineEl = leaderLineRefs.current[lm.key];
+        const tickEl = leaderTickRefs.current[lm.key];
+        const textNameEl = leaderTextNameRefs.current[lm.key];
+        const textValEl = leaderTextValRefs.current[lm.key];
+
+        if (groupEl) {
+          groupEl.style.opacity = isFacing ? '1' : '0.15';
+          groupEl.style.pointerEvents = isFacing ? 'auto' : 'none';
+        }
+
+        if (circleEl) {
+          circleEl.setAttribute('cx', projX.toFixed(1));
+          circleEl.setAttribute('cy', projY.toFixed(1));
+        }
+        if (ringEl) {
+          ringEl.setAttribute('cx', projX.toFixed(1));
+          ringEl.setAttribute('cy', projY.toFixed(1));
+        }
+        if (dotEl) {
+          dotEl.setAttribute('cx', projX.toFixed(1));
+          dotEl.setAttribute('cy', projY.toFixed(1));
+        }
+
+        const isHoveredOrActive = hovered === lm.key || resolvedSelectedKey === lm.key;
+        if (polylineEl && tickEl && textNameEl) {
+          if (!isHoveredOrActive || !isFacing) {
+            polylineEl.style.opacity = '0';
+            tickEl.style.opacity = '0';
+            textNameEl.style.opacity = '0';
+            if (textValEl) textValEl.style.opacity = '0';
+          } else {
+            const side = lm.sideByView[cardinal] || (projX < 318 ? 'left' : 'right');
+            const isLeft = side === 'left';
+            const yOff = lm.labelYOffset ?? 0;
+            const labelAnchorX = isLeft ? 88 : 548;
+            const labelAnchorY = Math.max(42, Math.min(685, projY + yOff));
+
+            let pointsStr: string;
+            if (Math.abs(yOff) > 2) {
+              const kinkX = isLeft
+                ? Math.max(labelAnchorX + 12, projX - Math.abs(yOff))
+                : Math.min(labelAnchorX - 12, projX + Math.abs(yOff));
+              pointsStr = `${projX.toFixed(1)},${projY.toFixed(1)} ${kinkX.toFixed(1)},${labelAnchorY.toFixed(1)} ${labelAnchorX.toFixed(1)},${labelAnchorY.toFixed(1)}`;
+            } else {
+              pointsStr = `${projX.toFixed(1)},${projY.toFixed(1)} ${labelAnchorX.toFixed(1)},${labelAnchorY.toFixed(1)}`;
+            }
+
+            polylineEl.setAttribute('points', pointsStr);
+            polylineEl.style.opacity = '1';
+
+            tickEl.setAttribute('cx', String(labelAnchorX));
+            tickEl.setAttribute('cy', String(labelAnchorY));
+            tickEl.style.opacity = '1';
+
+            textNameEl.setAttribute('x', String(isLeft ? labelAnchorX - 8 : labelAnchorX + 8));
+            textNameEl.setAttribute('text-anchor', isLeft ? 'end' : 'start');
+            textNameEl.style.opacity = '1';
+
+            if (textValEl) {
+              textValEl.setAttribute('x', String(isLeft ? labelAnchorX - 8 : labelAnchorX + 8));
+              textValEl.setAttribute('text-anchor', isLeft ? 'end' : 'start');
+              textValEl.style.opacity = '1';
+            }
+          }
+        }
+      });
+    };
+
+    const stepFrame = (nowMs: number) => {
+      rafId = null;
+
+      const rawDt = Math.max(0.001, (nowMs - lastTimeMs) / 1000);
+      lastTimeMs = nowMs;
+      const dt = Math.min(rawDt, 0.05);
+
+      const s = physicsRef.current;
+      const c = ROTATION;
+      const reducedMotion = reducedMotionRef.current;
+
+      if (!s.dragging) {
+        if (Math.abs(s.vel) >= c.stopSpeed) {
+          s.target += s.vel * dt;
+          s.vel *= Math.exp(-c.friction * dt);
+          if (Math.abs(s.vel) < c.stopSpeed) {
+            s.vel = 0;
+            if (!reducedMotion && c.snap.enabled) {
+              const nearest = Math.round(s.target / (Math.PI / 2)) * (Math.PI / 2);
+              if (Math.abs(wrapPi(s.target - nearest)) <= (c.snap.radiusDeg * Math.PI) / 180) {
+                s.target = nearest;
+                s.snapping = true;
+              }
+            }
+          }
+        }
+      }
+
+      const smoothTime = reducedMotion
+        ? s.dragging
+          ? 0.01
+          : 0.12
+        : s.dragging
+          ? c.smoothDrag
+          : s.buttonTurning
+            ? c.smoothButton
+            : s.snapping
+              ? c.smoothSnap
+              : c.smoothCoast;
+
+      s.display = smoothDamp(s.display, s.target, s.dv, smoothTime, dt);
+
+      const settled =
+        !s.dragging &&
+        Math.abs(s.vel) < c.stopSpeed &&
+        Math.abs(s.target - s.display) < 0.0005 &&
+        Math.abs(s.dv.v) < 0.001;
+
+      if (settled) {
+        s.display = s.target;
+        s.dv.v = 0;
+        s.snapping = false;
+        s.buttonTurning = false;
+      }
+
+      renderLayersAndLandmarks(s.display);
+
+      if (!settled) {
+        rafId = window.requestAnimationFrame(stepFrame);
+      }
+    };
+
+    const invalidate = () => {
+      if (rafId === null) {
+        lastTimeMs = performance.now();
+        rafId = window.requestAnimationFrame(stepFrame);
+      }
+    };
+
+    invalidateRef.current = invalidate;
+
+    // Render initial frame
+    renderLayersAndLandmarks(physicsRef.current.display);
+
+    // Native pointer gestures (1:1 tracking, zero dead-zone, surface follows finger)
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.button !== 0 && e.pointerType === 'mouse') return;
+      const targetEl = e.target as HTMLElement | null;
+      if (targetEl?.closest('button') || targetEl?.closest('[data-mannequin-point="true"]')) {
+        return;
+      }
+
+      const s = physicsRef.current;
+      try {
+        stage.setPointerCapture(e.pointerId);
+      } catch {
+        // Ignore
+      }
+      s.dragging = true;
+      s.snapping = false;
+      s.buttonTurning = false;
+      s.vel = 0;
+      s.target = s.display;
+      s.dv.v = 0;
+      s.pointerId = e.pointerId;
+      s.startX = e.clientX;
+      s.startY = e.clientY;
+      s.lastX = e.clientX;
+      s.startT = performance.now();
+      s.moved = 0;
+      s.samples = [{ x: e.clientX, t: s.startT }];
+      stage.style.cursor = 'grabbing';
+      invalidate();
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      const s = physicsRef.current;
+      if (!s.dragging || e.pointerId !== s.pointerId) return;
+      const now = performance.now();
+      const dx = e.clientX - s.lastX;
+      s.lastX = e.clientX;
+      s.moved = Math.hypot(e.clientX - s.startX, e.clientY - s.startY);
+      // Front surface follows finger (+dx turns front surface right)
+      s.target += dx * ROTATION.radPerPx;
+      s.samples.push({ x: e.clientX, t: now });
+      const cutoff = now - 180;
+      while (s.samples.length > 2 && s.samples[0].t < cutoff) {
+        s.samples.shift();
+      }
+      invalidate();
+    };
+
+    const onPointerUp = (e: PointerEvent) => {
+      const s = physicsRef.current;
+      if (!s.dragging || e.pointerId !== s.pointerId) return;
+      s.dragging = false;
+      s.pointerId = -1;
+      stage.style.cursor = 'grab';
+      try {
+        if (stage.hasPointerCapture(e.pointerId)) {
+          stage.releasePointerCapture(e.pointerId);
+        }
+      } catch {
+        // Ignore
+      }
+
+      const now = performance.now();
+      const c = ROTATION;
+      const reducedMotion = reducedMotionRef.current;
+
+      // Tap (< 6px and < 300ms)
+      if (s.moved < c.tapSlopPx && now - s.startT < c.tapMaxMs) {
+        s.vel = 0;
+        invalidate();
+        return;
+      }
+
+      const v = reducedMotion ? 0 : estimateReleaseVelocity(s.samples, now, c);
+
+      // Gentle magnet to the 4 views when released slowly (< 0.8 rad/s) within 8 deg
+      const nearest = Math.round(s.target / (Math.PI / 2)) * (Math.PI / 2);
+      const distToNearest = Math.abs(wrapPi(s.target - nearest));
+      const withinSnapRadius = distToNearest <= (c.snap.radiusDeg * Math.PI) / 180;
+
+      if (!reducedMotion && c.snap.enabled && Math.abs(v) < c.snap.maxReleaseSpeed && withinSnapRadius) {
+        s.vel = 0;
+        s.target = nearest;
+        s.snapping = true;
+      } else if (Math.abs(v) >= c.minFlingSpeed) {
+        s.vel = v;
+        s.snapping = false;
+      } else {
+        s.vel = 0;
+      }
+
+      invalidate();
+    };
+
+    const onDoubleClick = (e: MouseEvent) => {
+      const targetEl = e.target as HTMLElement | null;
+      if (targetEl?.closest('button') || targetEl?.closest('[data-mannequin-point="true"]')) {
+        return;
+      }
+      animateToAngleRad(0);
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 0.5) {
+        const s = physicsRef.current;
+        s.vel = 0;
+        s.snapping = false;
+        s.buttonTurning = false;
+        s.target += e.deltaX * ROTATION.wheelRadPerPx;
+        invalidate();
+      }
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      const stepDeg = e.shiftKey ? ROTATION.keyStepShiftDeg : ROTATION.keyStepDeg;
+      const stepRad = (stepDeg * Math.PI) / 180;
+      const dir = e.key === 'ArrowRight' ? 1 : -1;
+      const s = physicsRef.current;
+      s.vel = 0;
+      s.snapping = false;
+      s.buttonTurning = true;
+      s.target += dir * stepRad;
+      invalidate();
+    };
+
+    stage.addEventListener('pointerdown', onPointerDown);
+    stage.addEventListener('pointermove', onPointerMove);
+    stage.addEventListener('pointerup', onPointerUp);
+    stage.addEventListener('pointercancel', onPointerUp);
+    stage.addEventListener('lostpointercapture', onPointerUp);
+    stage.addEventListener('dblclick', onDoubleClick);
+    stage.addEventListener('wheel', onWheel, { passive: true });
+    stage.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      if (rafId !== null) window.cancelAnimationFrame(rafId);
+      stage.removeEventListener('pointerdown', onPointerDown);
+      stage.removeEventListener('pointermove', onPointerMove);
+      stage.removeEventListener('pointerup', onPointerUp);
+      stage.removeEventListener('pointercancel', onPointerUp);
+      stage.removeEventListener('lostpointercapture', onPointerUp);
+      stage.removeEventListener('dblclick', onDoubleClick);
+      stage.removeEventListener('wheel', onWheel);
+      stage.removeEventListener('keydown', onKeyDown);
+    };
+  }, [animateToAngleRad, onViewChange]);
+
+  const handleRotate90 = () => {
+    const s = physicsRef.current;
+    s.vel = 0;
+    s.dragging = false;
+    s.snapping = false;
+    s.buttonTurning = true;
+    s.target += Math.PI / 2;
+    invalidateRef.current?.();
+  };
 
   return (
     <div
@@ -724,19 +931,16 @@ export function RotatableMannequin({
         'w-full flex flex-col items-center justify-center select-none relative outline-none',
         className
       )}
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
-      aria-label={`Rotatable 3D ${gender} mannequin, currently at ${Math.round(normAngle)} degrees`}
     >
       {/* Interactive 360° Turntable Stage */}
       <div
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
+        ref={stageRef}
+        tabIndex={0}
+        role="application"
+        aria-label="Mannequin viewer. Drag or use the arrow keys to rotate."
+        style={{ touchAction: 'pan-y', cursor: 'grab' }}
         className={cn(
-          'relative w-full flex items-center justify-center touch-pan-y',
-          isDragging ? 'cursor-grabbing' : 'cursor-grab',
+          'relative w-full flex items-center justify-center overflow-visible focus:outline-none',
           compact ? 'max-w-[340px]' : 'max-w-[440px]'
         )}
       >
@@ -754,124 +958,92 @@ export function RotatableMannequin({
             cy="702"
             rx="116"
             ry="14"
-            fill="rgba(0, 0, 0, 0.035)"
-            stroke="rgba(0, 0, 0, 0.08)"
-            strokeWidth="1"
-            strokeDasharray="4 4"
-            style={{
-              transform: `rotate(${(normAngle * 0.25).toFixed(1)}deg)`,
-              transformOrigin: '318px 702px',
-            }}
+            fill="rgba(0, 0, 0, 0.04)"
+            className="pointer-events-none"
           />
 
-          {/* 4 Orthographic Studio Layers with Smooth 3D Cylindrical Turntable Blending */}
+          {/* 4 Orthographic Studio Mannequin Layers (Female & Male from https://tailorfit-beta.vercel.app/) */}
           {VIEW_METADATA.map((v) => {
-            const { opacity, scaleX, translateX } = getLayerTransform(v.angle);
-            if (opacity <= 0.008) return null;
             const href = `/assets/mannequin-${gender}-${v.suffix}.png`;
-
             return (
-              <g
+              <image
                 key={`${gender}-${v.suffix}`}
-                style={{
-                  opacity,
-                  transform: `translateX(${translateX.toFixed(2)}px) scaleX(${scaleX.toFixed(3)})`,
-                  transformOrigin: '318px 365px',
-                  willChange: 'transform, opacity',
+                ref={(el) => {
+                  imageRefs.current[v.suffix] = el;
                 }}
-              >
-                <image
-                  href={href}
-                  x="0"
-                  y="0"
-                  width="636"
-                  height="730"
-                  preserveAspectRatio="xMidYMid meet"
-                  className="pointer-events-none"
-                />
-              </g>
+                href={href}
+                x="0"
+                y="18"
+                width="636"
+                height="684"
+                preserveAspectRatio="xMidYMid meet"
+                style={{
+                  opacity: v.angle === 0 ? 1 : 0,
+                  transformOrigin: '318px center',
+                  pointerEvents: 'none',
+                }}
+              />
             );
           })}
 
-          {/* Requirement C & D: Active Touchpoints Only by Default; Leader Line & Label ONLY on Hover/Focus */}
-          {visibleLandmarks.map((lm) => {
-            const x3d = gender === 'female' ? lm.x3dFemale : lm.x3dMale;
-            const z3d = gender === 'female' ? lm.z3dFemale : lm.z3dMale;
-
-            // Orthographic 3D projection around spine axis X = 318
-            const projX = 318 + x3d * Math.cos(rad) - z3d * Math.sin(rad);
-            const projY = lm.y;
-
-            const side = lm.sideByView[cardinalAngle];
-            const isLeft = side === 'left';
-            const yOff = lm.labelYOffset ?? 0;
-
-            // Outer label anchor coordinates in 636x730 viewBox
-            const labelAnchorX = isLeft ? 88 : 548;
-            const labelAnchorY = Math.max(42, Math.min(685, projY + yOff));
-
-            let polyPoints: string;
-            if (Math.abs(yOff) > 2) {
-              const kinkX = isLeft
-                ? Math.max(labelAnchorX + 12, projX - Math.abs(yOff))
-                : Math.min(labelAnchorX - 12, projX + Math.abs(yOff));
-              polyPoints = `${projX.toFixed(1)},${projY.toFixed(1)} ${kinkX.toFixed(1)},${labelAnchorY.toFixed(1)} ${labelAnchorX.toFixed(1)},${labelAnchorY.toFixed(1)}`;
-            } else {
-              polyPoints = `${projX.toFixed(1)},${projY.toFixed(1)} ${labelAnchorX.toFixed(1)},${labelAnchorY.toFixed(1)}`;
-            }
-
+          {/* 21 Anatomical Sizing Touchpoints (Requirement D: Empty state when activePointKeys is empty) */}
+          {activeLandmarks.map((lm) => {
             const displayLabel = gender === 'male' && lm.maleLabel ? lm.maleLabel : lm.label;
             const rawVal = canonicalMeasurements[lm.key];
             const hasValue = rawVal !== undefined && rawVal !== '' && Number(rawVal) > 0;
             const formattedVal = hasValue ? `${Number(rawVal).toFixed(1)} ${unit}` : '';
-
-            // Requirement C: Leader line & label ONLY visible on hover or when its modal is open
             const isHoveredOrActive = hoveredKey === lm.key || resolvedSelectedKey === lm.key;
 
-            const handlePointClick = (e: React.MouseEvent) => {
-              e.stopPropagation();
-              if (readOnly || !onSelectPoint) return;
-              onSelectPoint(lm.key, displayLabel);
-            };
+            const rad = physicsRef.current.display;
+            const x3d = gender === 'male' ? lm.x3dMale : lm.x3dFemale;
+            const z3d = gender === 'male' ? lm.z3dMale : lm.z3dFemale;
+            const initProjX = 318 + x3d * Math.cos(rad) + z3d * Math.sin(rad);
+            const initProjY = lm.y;
 
             return (
               <g
                 key={lm.key}
+                ref={(el) => {
+                  landmarkGroupRefs.current[lm.key] = el;
+                }}
                 data-mannequin-point="true"
                 onMouseEnter={() => setHoveredKey(lm.key)}
                 onMouseLeave={() => setHoveredKey((prev) => (prev === lm.key ? null : prev))}
-                onFocus={() => setHoveredKey(lm.key)}
-                onBlur={() => setHoveredKey((prev) => (prev === lm.key ? null : prev))}
-                onClick={handlePointClick}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!readOnly && onSelectPoint) {
+                    onSelectPoint(lm.key, displayLabel);
+                  }
+                }}
                 className={cn(
                   'transition-opacity duration-150',
-                  isDragging ? 'opacity-50' : 'opacity-100',
                   readOnly ? 'pointer-events-none' : 'cursor-pointer'
                 )}
               >
-                {/* Hover-Only Trailing Dotted Leader Line & Description Badge (Requirement C) */}
-                <g
-                  className={cn(
-                    'pointer-events-none transition-opacity duration-150',
-                    isHoveredOrActive && !isDragging ? 'opacity-100' : 'opacity-0'
-                  )}
-                >
+                {/* Trailing Dotted Line & Floating Value Pill (Requirement C: Only visible on hover or when modal is open) */}
+                <g className="pointer-events-none">
                   <polyline
-                    points={polyPoints}
+                    ref={(el) => {
+                      leaderLineRefs.current[lm.key] = el;
+                    }}
                     fill="none"
                     stroke="#079BF8"
                     strokeWidth="1.75"
                     strokeDasharray="4.5 4.5"
+                    style={{ opacity: 0 }}
                   />
-
-                  {/* Small terminal anchor tick at the end of the dotted line */}
-                  <circle cx={labelAnchorX} cy={labelAnchorY} r="2.5" fill="#079BF8" />
-
-                  {/* Point Name & Current Size Pill Background for crisp legibility */}
+                  <circle
+                    ref={(el) => {
+                      leaderTickRefs.current[lm.key] = el;
+                    }}
+                    r="2.5"
+                    fill="#079BF8"
+                    style={{ opacity: 0 }}
+                  />
                   <text
-                    x={isLeft ? labelAnchorX - 8 : labelAnchorX + 8}
-                    y={hasValue ? labelAnchorY - 8 : labelAnchorY}
-                    textAnchor={isLeft ? 'end' : 'start'}
+                    ref={(el) => {
+                      leaderTextNameRefs.current[lm.key] = el;
+                    }}
                     dominantBaseline="central"
                     fontFamily="var(--font-manrope), sans-serif"
                     fontSize="18"
@@ -880,16 +1052,16 @@ export function RotatableMannequin({
                     stroke="#FFFFFF"
                     strokeWidth="4"
                     paintOrder="stroke"
+                    style={{ opacity: 0 }}
                     className="select-none"
                   >
                     {displayLabel}
                   </text>
-
                   {hasValue && (
                     <text
-                      x={isLeft ? labelAnchorX - 8 : labelAnchorX + 8}
-                      y={labelAnchorY + 12}
-                      textAnchor={isLeft ? 'end' : 'start'}
+                      ref={(el) => {
+                        leaderTextValRefs.current[lm.key] = el;
+                      }}
                       dominantBaseline="central"
                       fontFamily="var(--font-manrope), sans-serif"
                       fontSize="15"
@@ -898,6 +1070,7 @@ export function RotatableMannequin({
                       stroke="#FFFFFF"
                       strokeWidth="3.5"
                       paintOrder="stroke"
+                      style={{ opacity: 0 }}
                       className="select-none tabular-nums"
                     >
                       {formattedVal}
@@ -905,13 +1078,24 @@ export function RotatableMannequin({
                   )}
                 </g>
 
-                {/* Generous 44px+ Equivalent Invisible Hit Target for Touch & Mouse */}
-                <circle cx={projX} cy={projY} r="26" fill="transparent" />
-
-                {/* Active Touchpoint Ring & Center Dot (Always visible for active points) */}
+                {/* 44px+ Hit Target for Touch & Mouse */}
                 <circle
-                  cx={projX}
-                  cy={projY}
+                  ref={(el) => {
+                    touchpointCircleRefs.current[lm.key] = el;
+                  }}
+                  cx={initProjX}
+                  cy={initProjY}
+                  r="26"
+                  fill="transparent"
+                />
+
+                {/* Touchpoint Outer Cyan Ring */}
+                <circle
+                  ref={(el) => {
+                    touchpointRingRefs.current[lm.key] = el;
+                  }}
+                  cx={initProjX}
+                  cy={initProjY}
                   r={isHoveredOrActive ? '10.5' : '8'}
                   fill={
                     isHoveredOrActive
@@ -924,12 +1108,17 @@ export function RotatableMannequin({
                   strokeWidth={isHoveredOrActive ? '2' : '1.6'}
                   className="transition-all duration-150"
                 />
+
+                {/* Touchpoint Inner Cyan Dot */}
                 <circle
-                  cx={projX}
-                  cy={projY}
-                  r={isHoveredOrActive ? '4.2' : '3.4'}
+                  ref={(el) => {
+                    touchpointDotRefs.current[lm.key] = el;
+                  }}
+                  cx={initProjX}
+                  cy={initProjY}
+                  r={isHoveredOrActive ? '3.5' : '2.5'}
                   fill="#079BF8"
-                  className="transition-all duration-150"
+                  className="transition-all duration-150 pointer-events-none"
                 />
               </g>
             );
@@ -937,102 +1126,79 @@ export function RotatableMannequin({
         </svg>
       </div>
 
-      {/* Interactive 360° Rotation & View Control Strip */}
+      {/* Direction Toolbar at the BOTTOM of the Mannequin Container (Matching https://tailorfit-beta.vercel.app/) */}
       {showControls && (
-        <div className="mt-2 flex flex-col items-center justify-center gap-2 z-10 w-full max-w-[360px]">
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            {/* Optional M / F Gender Toggle when parent doesn't render one */}
-            {showGenderToggle && onGenderChange && (
-              <div className="h-8 bg-white border border-[#EDEDED] rounded-full px-1.5 py-1 flex items-center gap-1 shadow-2xs">
-                <button
-                  type="button"
-                  onClick={() => onGenderChange('female')}
-                  className={cn(
-                    'px-2.5 h-6 rounded-full text-[11px] font-semibold transition-all cursor-pointer',
-                    gender === 'female'
-                      ? 'bg-[var(--primary)] text-white shadow-2xs'
-                      : 'text-[var(--text-2)] hover:text-black'
-                  )}
-                >
-                  Female
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onGenderChange('male')}
-                  className={cn(
-                    'px-2.5 h-6 rounded-full text-[11px] font-semibold transition-all cursor-pointer',
-                    gender === 'male'
-                      ? 'bg-[var(--primary)] text-white shadow-2xs'
-                      : 'text-[var(--text-2)] hover:text-black'
-                  )}
-                >
-                  Male
-                </button>
-              </div>
-            )}
-
-            {/* 4-View Orthographic Angle Pill Selector */}
-            <div className="h-8 bg-white border border-[#EDEDED] rounded-full p-1 flex items-center gap-0.5 shadow-2xs">
-              {VIEW_METADATA.map((v) => {
-                const isActive = cardinalAngle === v.angle;
-                return (
-                  <button
-                    key={v.angle}
-                    type="button"
-                    onClick={() => animateToAngle(v.angle)}
-                    className={cn(
-                      'px-2.5 h-6 rounded-full text-[11px] font-medium transition-all cursor-pointer',
-                      isActive
-                        ? 'bg-[var(--primary)] text-white shadow-2xs'
-                        : 'text-[var(--text-2)] hover:text-black'
-                    )}
-                    title={v.fullLabel}
-                  >
-                    {v.shortLabel}
-                  </button>
-                );
-              })}
-
-              <div className="w-[1px] h-4 bg-[#EDEDED] mx-0.5" />
-
+        <div className="mt-2 flex items-center justify-center gap-2 z-10 w-full">
+          {/* Optional M / F Gender Toggle when parent doesn't render one */}
+          {showGenderToggle && onGenderChange && (
+            <div className="h-8 bg-white border border-[#EDEDED] rounded-full px-1.5 py-1 flex items-center gap-1 shadow-2xs">
               <button
                 type="button"
-                onClick={() =>
-                  animateToAngle(((cardinalAngle + 90) % 360) as MannequinViewAngle)
-                }
-                className="w-6 h-6 rounded-full flex items-center justify-center text-[var(--text-2)] hover:text-black hover:bg-[#F2F2F2] transition-colors cursor-pointer"
-                title="Rotate 90°"
+                onClick={() => onGenderChange('female')}
+                className={cn(
+                  'px-2.5 h-6 rounded-full text-[11px] font-semibold transition-all cursor-pointer',
+                  gender === 'female'
+                    ? 'bg-[var(--primary)] text-white shadow-2xs'
+                    : 'text-[var(--text-2)] hover:text-black'
+                )}
               >
-                <RotateCw className="w-3.5 h-3.5" />
+                Female
+              </button>
+              <button
+                type="button"
+                onClick={() => onGenderChange('male')}
+                className={cn(
+                  'px-2.5 h-6 rounded-full text-[11px] font-semibold transition-all cursor-pointer',
+                  gender === 'male'
+                    ? 'bg-[var(--primary)] text-white shadow-2xs'
+                    : 'text-[var(--text-2)] hover:text-black'
+                )}
+              >
+                Male
               </button>
             </div>
-          </div>
+          )}
 
-          {/* Smooth 360° Turntable Scrubber Bar */}
-          <div className="w-full max-w-[260px] flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 border border-[#EDEDED] shadow-2xs">
-            <MoveHorizontal className="w-3.5 h-3.5 text-[var(--muted)] shrink-0" />
-            <input
-              type="range"
-              min={0}
-              max={360}
-              step={1}
-              value={Math.round(normAngle)}
-              onChange={(e) => {
-                const next = Number(e.target.value);
-                isGlidingRef.current = false;
-                currentAngleRef.current = normalizeAngle(next);
-                targetAngleRef.current = normalizeAngle(next);
-                setAngle(currentAngleRef.current);
-              }}
-              aria-label="Smooth 360 degree rotation scrubber"
-              className="w-full h-1 bg-[#E5E5E5] rounded-lg appearance-none cursor-ew-resize accent-[var(--primary)]"
-            />
-            <span className="text-[10px] font-semibold text-[var(--text-2)] tabular-nums w-7 text-right shrink-0">
-              {Math.round(normAngle)}°
-            </span>
+          {/* 4-View Orthographic Angle Pill Selector (Front, Left, Back, Right, RotateCw 90°) */}
+          <div className="h-8 bg-white border border-[#EDEDED] rounded-full p-1 flex items-center gap-0.5 shadow-2xs">
+            {VIEW_METADATA.map((v) => {
+              const isActive = v.angle === 0;
+              return (
+                <button
+                  key={v.angle}
+                  ref={(el) => {
+                    buttonRefs.current[v.angle] = el;
+                  }}
+                  type="button"
+                  onClick={() => animateToAngleDeg(v.angle)}
+                  className={cn(
+                    'px-2.5 h-6 rounded-full text-[11px] font-medium transition-all cursor-pointer',
+                    isActive
+                      ? 'bg-[var(--primary)] text-white shadow-2xs'
+                      : 'text-[var(--text-2)] hover:text-black'
+                  )}
+                  title={v.fullLabel}
+                >
+                  {v.shortLabel}
+                </button>
+              );
+            })}
+
+            <div className="w-[1px] h-4 bg-[#EDEDED] mx-0.5" />
+
+            <button
+              type="button"
+              onClick={handleRotate90}
+              className="w-6 h-6 rounded-full flex items-center justify-center text-[var(--text-2)] hover:text-black hover:bg-[#F2F2F2] transition-colors cursor-pointer"
+              title="Rotate 90°"
+            >
+              <RotateCw className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       )}
     </div>
   );
 }
+
+export default RotatableMannequin;

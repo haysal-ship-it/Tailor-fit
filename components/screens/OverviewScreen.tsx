@@ -15,7 +15,9 @@ import {
   UsersRound,
   Settings,
   Trash2,
+  AlertCircle,
 } from 'lucide-react';
+import { ToastContainer, type ToastMessage } from '@/components/ui/Toasts';
 import { springSmooth, springSnappy } from '@/lib/motion-tokens';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
@@ -81,6 +83,27 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
   const [clientDueDate, setClientDueDate] = useState('');
   const [clientNotes, setClientNotes] = useState('');
   const [styleImages, setStyleImages] = useState<string[]>([]);
+  const [clientFormErrors, setClientFormErrors] = useState<{
+    name?: string;
+    phone?: string;
+    email?: string;
+    garment?: string;
+  }>({});
+
+  const clientNameInputRef = useRef<HTMLInputElement>(null);
+  const clientPhoneInputRef = useRef<HTMLInputElement>(null);
+  const clientEmailInputRef = useRef<HTMLInputElement>(null);
+  const clientGarmentInputRef = useRef<HTMLInputElement>(null);
+
+  // System toasts
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const showToast = (toast: Omit<ToastMessage, 'id'>) => {
+    const id = `toast-${Date.now()}-${Math.random()}`;
+    setToasts((prev) => [...prev, { ...toast, id }]);
+  };
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
 
   // Mannequin state: F is selected by default
   const [gender, setGender] = useState<'male' | 'female'>('female');
@@ -472,16 +495,63 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
   };
 
   const handleSaveOrder = async () => {
-    const name = clientName.trim() || 'New Bespoke Client';
-    const garment =
-      clientGarment.trim() || selectedTemplateName || 'Bespoke African Gown';
+    const trimmedName = clientName.trim();
+    const trimmedPhone = clientPhone.trim();
+    const trimmedEmail = clientEmail.trim();
+    const trimmedGarment = clientGarment.trim() || selectedTemplateName;
     const priceNum = parseFloat(clientPrice.replace(/[^0-9.]/g, '')) || 0;
 
+    const errors: { name?: string; phone?: string; email?: string; garment?: string } = {};
+    const missing: string[] = [];
+
+    if (!trimmedName) {
+      errors.name = 'Client Name is required';
+      missing.push('Client Name');
+    }
+    if (!trimmedPhone) {
+      errors.phone = 'Phone Number is required';
+      missing.push('Phone Number');
+    }
+    if (!trimmedEmail) {
+      errors.email = 'Email Address is required';
+      missing.push('Email Address');
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      errors.email = 'Enter a valid email address';
+      missing.push('Valid Email Address');
+    }
+    if (!trimmedGarment) {
+      errors.garment = 'Garment Type is required';
+      missing.push('Garment Type');
+    }
+
+    if (missing.length > 0) {
+      setClientFormErrors(errors);
+      showToast({
+        type: 'warning',
+        title: 'Incomplete Client Details',
+        message: `Please complete all required fields (${missing.join(', ')}) before saving.`,
+        duration: 5000,
+      });
+
+      if (errors.name) {
+        clientNameInputRef.current?.focus();
+      } else if (errors.garment) {
+        clientGarmentInputRef.current?.focus();
+      } else if (errors.phone) {
+        clientPhoneInputRef.current?.focus();
+      } else if (errors.email) {
+        clientEmailInputRef.current?.focus();
+      }
+      throw new Error(`Incomplete client fields: ${missing.join(', ')}`);
+    }
+
+    setClientFormErrors({});
+
     const newCl = addClient({
-      name,
-      phone: clientPhone || '+234 -',
-      email: clientEmail || '',
-      notes: clientNotes,
+      name: trimmedName,
+      phone: trimmedPhone,
+      email: trimmedEmail,
+      notes: clientNotes.trim(),
     });
 
     const activeMeasurementsOnly: Record<string, number> = {};
@@ -501,14 +571,14 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
         })
         .replace(/\//g, '-'),
       unit: unitLabel,
-      garmentType: garment,
+      garmentType: trimmedGarment,
       measurements: activeMeasurementsOnly,
       notes: clientNotes,
     });
 
     addOrder({
       clientId: newCl.id,
-      garmentType: garment,
+      garmentType: trimmedGarment,
       measurementSnapshotId: snapshot.id,
       status: 'In Progress',
       pickupDateTime: clientDueDate ? `${clientDueDate}T12:00:00` : '2026-10-31T12:00:00',
@@ -519,6 +589,13 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
         title: `Style Ref ${i + 1}`,
       })),
       notes: clientNotes,
+    });
+
+    showToast({
+      type: 'success',
+      title: 'Client & Order Saved',
+      message: `Created profile for "${trimmedName}" and booked order for "${trimmedGarment}".`,
+      duration: 4000,
     });
   };
 
@@ -589,29 +666,73 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
             <Input
-              label="Client"
+              ref={clientNameInputRef}
+              label="Client *"
               placeholder="e.g Adriana Kunle"
               value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
+              error={clientFormErrors.name}
+              onChange={(e) => {
+                setClientName(e.target.value);
+                if (clientFormErrors.name) {
+                  setClientFormErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.name;
+                    return next;
+                  });
+                }
+              }}
             />
             <Input
-              label="Garment Type"
+              ref={clientGarmentInputRef}
+              label="Garment Type *"
               placeholder="Bespoke African Gown"
               value={clientGarment}
-              onChange={(e) => setClientGarment(e.target.value)}
+              error={clientFormErrors.garment}
+              onChange={(e) => {
+                setClientGarment(e.target.value);
+                if (clientFormErrors.garment) {
+                  setClientFormErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.garment;
+                    return next;
+                  });
+                }
+              }}
             />
             <Input
-              label="Phone Number"
+              ref={clientPhoneInputRef}
+              label="Phone Number *"
               placeholder="+234 -"
               value={clientPhone}
-              onChange={(e) => setClientPhone(e.target.value)}
+              error={clientFormErrors.phone}
+              onChange={(e) => {
+                setClientPhone(e.target.value);
+                if (clientFormErrors.phone) {
+                  setClientFormErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.phone;
+                    return next;
+                  });
+                }
+              }}
             />
             <Input
-              label="Email Address"
+              ref={clientEmailInputRef}
+              label="Email Address *"
               placeholder="name@example.com"
               type="email"
               value={clientEmail}
-              onChange={(e) => setClientEmail(e.target.value)}
+              error={clientFormErrors.email}
+              onChange={(e) => {
+                setClientEmail(e.target.value);
+                if (clientFormErrors.email) {
+                  setClientFormErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.email;
+                    return next;
+                  });
+                }
+              }}
             />
           </div>
         </div>
@@ -1426,94 +1547,100 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
       {/* =======================================================================
           PART A: MOBILE OVERVIEW (< 1024px)
           ======================================================================= */}
-      <div className="w-full px-2 sm:px-4 max-w-[720px] mx-auto pt-2 pb-[88px] lg:hidden flex flex-col gap-2">
-        <div className="w-full bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
-          <div className="w-full bg-[var(--surface)] p-[2px] rounded-[8px]">
-            <div className="w-full rounded-[6px] bg-[var(--card)] px-6 py-1 flex items-center justify-between min-h-[45px]">
-              <div
-                onClick={() => setActiveScreen('overview')}
-                className="flex items-center gap-2 cursor-pointer text-black"
-              >
-                <OrigamiTailorFitLogo className="w-[44px] h-[31px] text-black" />
-                <span className="text-[24px] font-bold text-black tracking-[-0.02em]">
-                  TailorFit
-                </span>
+      {!isDesktop && (
+        <>
+          <div className="w-full px-2 sm:px-4 max-w-[720px] mx-auto pt-2 pb-[88px] lg:hidden flex flex-col gap-2">
+            <div className="w-full bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
+              <div className="w-full bg-[var(--surface)] p-[2px] rounded-[8px]">
+                <div className="w-full rounded-[6px] bg-[var(--card)] px-6 py-1 flex items-center justify-between min-h-[45px]">
+                  <div
+                    onClick={() => setActiveScreen('overview')}
+                    className="flex items-center gap-2 cursor-pointer text-black"
+                  >
+                    <OrigamiTailorFitLogo className="w-[44px] h-[31px] text-black" />
+                    <span className="text-[24px] font-bold text-black tracking-[-0.02em]">
+                      TailorFit
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <NotificationDropdown />
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <NotificationDropdown />
-              </div>
+
+              {renderNewClientCard(true)}
+              {renderMannequinCard(true)}
+              {renderCalendarCard()}
+              {renderRecentOrdersCard()}
             </div>
           </div>
 
-          {renderNewClientCard(true)}
-          {renderMannequinCard(true)}
-          {renderCalendarCard()}
-          {renderRecentOrdersCard()}
-        </div>
-      </div>
-
-      {/* Floating Navigation on Mobile (< 1024px) */}
-      <div className="lg:hidden fixed bottom-4 inset-x-0 z-40 flex justify-center px-4 pointer-events-none">
-        <nav
-          className="pointer-events-auto bg-black rounded-[32px] p-1 flex items-center gap-1 shadow-2xl select-none"
-          aria-label="Mobile Navigation"
-        >
-          <button
-            type="button"
-            onClick={() => setActiveScreen('overview')}
-            className="flex items-center gap-1 bg-white text-black rounded-[28px] px-3.5 py-2 text-[12px] font-semibold cursor-pointer"
-          >
-            <House className="w-4 h-4 shrink-0" />
-            <span>Overview</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveScreen('clients')}
-            className="flex items-center gap-1 text-white hover:text-white/80 rounded-[28px] px-3 py-2 text-[12px] font-medium transition-colors cursor-pointer"
-          >
-            <UsersRound className="w-4 h-4 shrink-0" />
-            <span>Clients</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveScreen('settings')}
-            className="flex items-center gap-1 text-white hover:text-white/80 rounded-[28px] px-3 py-2 text-[12px] font-medium transition-colors cursor-pointer"
-          >
-            <Settings className="w-4 h-4 shrink-0" />
-            <span>Settings</span>
-          </button>
-        </nav>
-      </div>
+          {/* Floating Navigation on Mobile (< 1024px) */}
+          <div className="lg:hidden fixed bottom-4 inset-x-0 z-40 flex justify-center px-4 pointer-events-none">
+            <nav
+              className="pointer-events-auto bg-black rounded-[32px] p-1 flex items-center gap-1 shadow-2xl select-none"
+              aria-label="Mobile Navigation"
+            >
+              <button
+                type="button"
+                onClick={() => setActiveScreen('overview')}
+                className="flex items-center gap-1 bg-white text-black rounded-[28px] px-3.5 py-2 text-[12px] font-semibold cursor-pointer"
+              >
+                <House className="w-4 h-4 shrink-0" />
+                <span>Overview</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveScreen('clients')}
+                className="flex items-center gap-1 text-white hover:text-white/80 rounded-[28px] px-3 py-2 text-[12px] font-medium transition-colors cursor-pointer"
+              >
+                <UsersRound className="w-4 h-4 shrink-0" />
+                <span>Clients</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveScreen('settings')}
+                className="flex items-center gap-1 text-white hover:text-white/80 rounded-[28px] px-3 py-2 text-[12px] font-medium transition-colors cursor-pointer"
+              >
+                <Settings className="w-4 h-4 shrink-0" />
+                <span>Settings</span>
+              </button>
+            </nav>
+          </div>
+        </>
+      )}
 
       {/* =======================================================================
           PART B: DESKTOP OVERVIEW (>= 1024px / lg)
           ======================================================================= */}
-      <div className="hidden lg:block w-full max-w-[1216px] mx-auto px-4 sm:px-0 pt-4 pb-12">
-        <div className="w-full flex flex-col xl:flex-row gap-4 items-start">
-          {/* LEFT CONTAINER (70.5% width) */}
-          <div className="w-full xl:w-[70.5%] bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
-            <div className="w-full flex flex-col lg:flex-row gap-[2px] items-stretch flex-1">
-              <div className="w-full lg:w-[43.7%] flex flex-col">
-                {renderNewClientCard(false)}
+      {isDesktop && (
+        <div className="hidden lg:block w-full max-w-[1216px] mx-auto px-4 sm:px-0 pt-4 pb-12">
+          <div className="w-full flex flex-col xl:flex-row gap-4 items-start">
+            {/* LEFT CONTAINER (70.5% width) */}
+            <div className="w-full xl:w-[70.5%] bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
+              <div className="w-full flex flex-col lg:flex-row gap-[2px] items-stretch flex-1">
+                <div className="w-full lg:w-[43.7%] flex flex-col">
+                  {renderNewClientCard(false)}
+                </div>
+                <div className="w-full lg:flex-1 flex flex-col">
+                  {renderMannequinCard(false)}
+                </div>
               </div>
-              <div className="w-full lg:flex-1 flex flex-col">
-                {renderMannequinCard(false)}
+
+              {/* Desktop Save Bar */}
+              <div className="w-full px-4 py-2 flex justify-end items-center bg-[var(--surface)] rounded-[6px]">
+                <MorphingSaveButton idleText="Save" onClick={handleSaveOrder} />
               </div>
             </div>
 
-            {/* Desktop Save Bar */}
-            <div className="w-full px-4 py-2 flex justify-end items-center bg-[var(--surface)] rounded-[6px]">
-              <MorphingSaveButton idleText="Save" onClick={handleSaveOrder} />
+            {/* RIGHT COLUMN (28.2% width) */}
+            <div className="w-full xl:w-[28.2%] bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
+              {renderCalendarCard()}
+              {renderRecentOrdersCard()}
             </div>
-          </div>
-
-          {/* RIGHT COLUMN (28.2% width) */}
-          <div className="w-full xl:w-[28.2%] bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
-            {renderCalendarCard()}
-            {renderRecentOrdersCard()}
           </div>
         </div>
-      </div>
+      )}
 
       {/* =======================================================================
           GARMENT TEMPLATES DIALOG / BOTTOM SHEET
@@ -1836,6 +1963,9 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Floating System Toasts */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

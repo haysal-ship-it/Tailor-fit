@@ -18,7 +18,10 @@ import {
   Check,
   Trash2,
   Plus,
+  AlertCircle,
+  AlertTriangle,
 } from 'lucide-react';
+import { ToastContainer, type ToastMessage } from '@/components/ui/Toasts';
 import { SmallFloatingDock } from '@/components/ui/SmallFloatingDock';
 import { AnimatedNumberMorph } from '@/components/ui/AnimatedNumberMorph';
 import { RotatableMannequin } from '@/components/mannequin/RotatableMannequin';
@@ -92,6 +95,26 @@ export function ClientsScreen({
   const [newClientPhone, setNewClientPhone] = useState('');
   const [newClientEmail, setNewClientEmail] = useState('');
   const [newClientNotes, setNewClientNotes] = useState('');
+  const [clientFormErrors, setClientFormErrors] = useState<{
+    name?: string;
+    phone?: string;
+    email?: string;
+  }>({});
+  const [clientModalAlert, setClientModalAlert] = useState<string | null>(null);
+
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+
+  // Toast notifications
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const showToast = (toast: Omit<ToastMessage, 'id'>) => {
+    const id = `toast-${Date.now()}-${Math.random()}`;
+    setToasts((prev) => [...prev, { ...toast, id }]);
+  };
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
 
   // Set Point Size / Add Point Modal (Requirement C & D)
   const [pointModalData, setPointModalData] = useState<{
@@ -423,18 +446,66 @@ export function ClientsScreen({
     setPointModalError('');
   };
 
-  // Create New Client handler
+  // Create New Client handler with empty field validation and alert prompt
   const handleCreateClient = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newClientName.trim()) return;
+
+    const trimmedName = newClientName.trim();
+    const trimmedPhone = newClientPhone.trim();
+    const trimmedEmail = newClientEmail.trim();
+
+    const errors: { name?: string; phone?: string; email?: string } = {};
+    const missingFieldLabels: string[] = [];
+
+    if (!trimmedName) {
+      errors.name = 'Full Name is required';
+      missingFieldLabels.push('Full Name');
+    }
+    if (!trimmedPhone) {
+      errors.phone = 'Phone Number is required';
+      missingFieldLabels.push('Phone Number');
+    }
+    if (!trimmedEmail) {
+      errors.email = 'Email Address is required';
+      missingFieldLabels.push('Email Address');
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      errors.email = 'Enter a valid email address';
+      missingFieldLabels.push('Valid Email Address');
+    }
+
+    if (missingFieldLabels.length > 0) {
+      setClientFormErrors(errors);
+      const alertMsg = `Please complete: ${missingFieldLabels.join(', ')}`;
+      setClientModalAlert(alertMsg);
+
+      showToast({
+        type: 'warning',
+        title: 'Incomplete Client Profile',
+        message: `Please complete all required fields (${missingFieldLabels.join(', ')}) before creating the client profile.`,
+        duration: 5000,
+      });
+
+      // Auto-focus the first empty field for accessibility
+      if (errors.name) {
+        nameInputRef.current?.focus();
+      } else if (errors.phone) {
+        phoneInputRef.current?.focus();
+      } else if (errors.email) {
+        emailInputRef.current?.focus();
+      }
+      return;
+    }
+
+    setClientFormErrors({});
+    setClientModalAlert(null);
+
     const created = addClient({
-      name: newClientName.trim(),
-      phone: newClientPhone.trim() || '+234 800 000 0000',
-      email:
-        newClientEmail.trim() ||
-        `${newClientName.trim().toLowerCase().replace(/\s+/g, '.')}@couture.com`,
+      name: trimmedName,
+      phone: trimmedPhone,
+      email: trimmedEmail,
       notes: newClientNotes.trim(),
     });
+
     setNewClientName('');
     setNewClientPhone('');
     setNewClientEmail('');
@@ -443,6 +514,12 @@ export function ClientsScreen({
     setSelectedClientId(created.id);
     setMobileTab('profile');
     triggerSavedIndicator(`Client "${created.name}" added`);
+    showToast({
+      type: 'success',
+      title: 'Client Profile Created',
+      message: `"${created.name}" has been successfully added to your atelier directory.`,
+      duration: 3500,
+    });
   };
 
   // Active measurement cards filtered by zoneFilter
@@ -1517,30 +1594,84 @@ export function ClientsScreen({
                 </button>
               </div>
 
-              <form onSubmit={handleCreateClient} className="flex flex-col gap-3.5">
+              <form onSubmit={handleCreateClient} noValidate className="flex flex-col gap-3.5">
+                {clientModalAlert && (
+                  <div
+                    role="alert"
+                    aria-live="assertive"
+                    className="p-3 rounded-[12px] bg-amber-50 border border-amber-300 flex items-start gap-2.5 text-amber-900 shadow-xs"
+                  >
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-[12px] font-semibold">Incomplete Client Information</p>
+                      <p className="text-[11px] text-amber-800 leading-normal">{clientModalAlert}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setClientModalAlert(null)}
+                      className="text-amber-700 hover:text-black p-0.5 transition-colors cursor-pointer"
+                      aria-label="Dismiss alert"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
                 <Input
+                  ref={nameInputRef}
                   label="Full Name *"
-                  required
                   placeholder="e.g. Adriana Kunle"
                   value={newClientName}
-                  onChange={(e) => setNewClientName(e.target.value)}
+                  error={clientFormErrors.name}
+                  onChange={(e) => {
+                    setNewClientName(e.target.value);
+                    if (clientFormErrors.name) {
+                      setClientFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.name;
+                        return next;
+                      });
+                    }
+                  }}
                 />
                 <Input
-                  label="Phone Number"
+                  ref={phoneInputRef}
+                  label="Phone Number *"
                   type="tel"
                   placeholder="+234 800 000 0000"
                   value={newClientPhone}
-                  onChange={(e) => setNewClientPhone(e.target.value)}
+                  error={clientFormErrors.phone}
+                  onChange={(e) => {
+                    setNewClientPhone(e.target.value);
+                    if (clientFormErrors.phone) {
+                      setClientFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.phone;
+                        return next;
+                      });
+                    }
+                  }}
                 />
                 <Input
-                  label="Email Address"
+                  ref={emailInputRef}
+                  label="Email Address *"
                   type="email"
                   placeholder="name@couture.com"
                   value={newClientEmail}
-                  onChange={(e) => setNewClientEmail(e.target.value)}
+                  error={clientFormErrors.email}
+                  onChange={(e) => {
+                    setNewClientEmail(e.target.value);
+                    if (clientFormErrors.email) {
+                      setClientFormErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.email;
+                        return next;
+                      });
+                    }
+                  }}
                 />
                 <Textarea
-                  label="Bespoke Notes / Style Preferences"
+                  label="Bespoke Notes / Style Preferences (Optional)"
                   rows={2}
                   placeholder="e.g. Sloped posture, silk lining preference..."
                   value={newClientNotes}
@@ -1550,7 +1681,11 @@ export function ClientsScreen({
                 <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--hairline)]">
                   <button
                     type="button"
-                    onClick={() => setIsNewClientModalOpen(false)}
+                    onClick={() => {
+                      setIsNewClientModalOpen(false);
+                      setClientFormErrors({});
+                      setClientModalAlert(null);
+                    }}
                     className="h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[var(--text-2)] text-[14px] font-medium hover:bg-[#EAEAEA] cursor-pointer"
                   >
                     Cancel
@@ -1567,6 +1702,9 @@ export function ClientsScreen({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Floating System Toasts */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
       {/* Floating Dock on Mobile */}
       <SmallFloatingDock
