@@ -24,6 +24,8 @@ import {
   normalizeZoneId,
   resolveCanonicalKey,
   normalizeMeasurementsRecord,
+  parseDueDateToISO,
+  formatISOToDMY,
 } from '@/lib/initial-data';
 import { cn } from '@/lib/utils';
 
@@ -230,7 +232,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
     existingOrder?.price ? String(existingOrder.price) : ''
   );
   const [dueDate, setDueDate] = useState<string>(
-    existingOrder?.pickupDateTime ? existingOrder.pickupDateTime.slice(0, 10) : ''
+    existingOrder?.pickupDateTime ? formatISOToDMY(existingOrder.pickupDateTime) : ''
   );
   const [notes, setNotes] = useState<string>(existingOrder?.notes || '');
   const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>(
@@ -239,7 +241,8 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
 
   // Diagram & Measurement list state (EMPTY for new order until user picks template or adds point)
   const [fields, setFields] = useState<MeasurementFieldItem[]>(initialFieldsForOrder);
-  const [hasDiagramEdited, setHasDiagramEdited] = useState(Boolean(existingOrder));
+  const [hasDiagramEdited, setHasDiagramEdited] = useState(false);
+  const [hasFormEdited, setHasFormEdited] = useState(false);
   const [measurementValidationError, setMeasurementValidationError] = useState('');
   const [garmentTypeValidationError, setGarmentTypeValidationError] = useState('');
 
@@ -280,7 +283,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
     const map: Record<string, number> = {};
     fields.forEach((f) => {
       const num = parseFloat(f.value);
-      if (!isNaN(num) && num > 0) {
+      if (!isNaN(num) && num >= 0) {
         map[f.id] = num;
       }
     });
@@ -289,7 +292,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
 
   // Compute dirty state
   const isDirty = () => {
-    if (existingOrder) return hasDiagramEdited;
+    if (existingOrder) return hasDiagramEdited || hasFormEdited;
     return (
       garmentType.trim() !== '' ||
       price.trim() !== '' ||
@@ -420,6 +423,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
   // Choose saved template or blueprint (Requirement D: populates the mannequin points)
   const handleSelectSavedTemplate = (tmplId: string) => {
     setSelectedSavedTemplateId(tmplId);
+    setHasDiagramEdited(true);
     setMeasurementValidationError('');
     if (!tmplId) {
       setFields([]);
@@ -471,7 +475,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
             title: file.name.replace(/\.[^/.]+$/, ''),
           };
           setReferenceImages((prev) => [...prev, newImg]);
-          setHasDiagramEdited(true);
+          setHasFormEdited(true);
         }
       };
       reader.readAsDataURL(file);
@@ -482,7 +486,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
 
   const handleRemoveRefImage = (id: string) => {
     setReferenceImages((prev) => prev.filter((img) => img.id !== id));
-    setHasDiagramEdited(true);
+    setHasFormEdited(true);
   };
 
   // Requirement C: Tap on active mannequin touchpoint opens modal to update ONLY its size value
@@ -588,7 +592,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
       const measurementObj: Record<string, number> = {};
       fields.forEach((f) => {
         const val = parseFloat(f.value);
-        if (!isNaN(val) && val > 0) measurementObj[f.id] = val;
+        if (!isNaN(val) && val >= 0) measurementObj[f.id] = val;
       });
 
       let snapshotIdToUse = selectedSavedTemplateId.startsWith('blueprint:')
@@ -627,7 +631,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
           measurementSnapshotId: snapshotIdToUse || undefined,
           price: rawPrice,
           status: orderStatus,
-          pickupDateTime: dueDate || existingOrder.pickupDateTime,
+          pickupDateTime: dueDate ? parseDueDateToISO(dueDate) : existingOrder.pickupDateTime,
           notes,
           referenceImages,
         });
@@ -640,7 +644,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
           measurementSnapshotId: snapshotIdToUse || undefined,
           price: rawPrice,
           status: orderStatus,
-          pickupDateTime: dueDate || new Date().toISOString().slice(0, 10),
+          pickupDateTime: parseDueDateToISO(dueDate),
           notes,
           referenceImages,
         });
@@ -728,7 +732,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                           <div className="flex items-center gap-1.5 text-[11px] font-medium text-[#A2A2A2] mt-1 whitespace-nowrap">
                             <span>
                               {activePointKeys.length === 0
-                                ? 'Empty state'
+                                ? 'No points selected'
                                 : `${activePointKeys.length} active pts`}
                             </span>
                             <span className="w-1 h-1 rounded-full bg-[#A2A2A2] shrink-0" />
@@ -753,6 +757,8 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                             <button
                               type="button"
                               onClick={() => setPaneView('mannequin')}
+                              aria-label="Diagram View"
+                              aria-pressed={paneView === 'mannequin'}
                               className={cn(
                                 'w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer',
                                 paneView === 'mannequin'
@@ -766,6 +772,8 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                             <button
                               type="button"
                               onClick={() => setPaneView('table')}
+                              aria-label="Measurement List View"
+                              aria-pressed={paneView === 'table'}
                               className={cn(
                                 'w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer',
                                 paneView === 'table'
@@ -957,7 +965,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                           onChange={(e) => {
                             setGarmentType(e.target.value);
                             setGarmentTypeValidationError('');
-                            setHasDiagramEdited(true);
+                            setHasFormEdited(true);
                           }}
                           placeholder="Bespoke African Gown"
                           className="w-full bg-transparent text-[14px] text-black placeholder:text-[var(--muted)] focus:outline-none"
@@ -980,7 +988,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                             value={orderStatus}
                             onChange={(e) => {
                               setOrderStatus(e.target.value as OrderStatus);
-                              setHasDiagramEdited(true);
+                              setHasFormEdited(true);
                             }}
                             className="w-full bg-[var(--field-on-card)] border border-[#EDEDED] rounded-[8px] p-2 text-[13px] font-medium text-black focus:outline-none appearance-none cursor-pointer"
                           >
@@ -1062,7 +1070,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                           value={price}
                           onChange={(e) => {
                             setPrice(e.target.value);
-                            setHasDiagramEdited(true);
+                            setHasFormEdited(true);
                           }}
                           placeholder={`${currencySymbol}0.00`}
                           className="w-full bg-transparent text-[14px] text-black placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
@@ -1080,7 +1088,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                           value={dueDate}
                           onChange={(e) => {
                             setDueDate(e.target.value);
-                            setHasDiagramEdited(true);
+                            setHasFormEdited(true);
                           }}
                           placeholder="09/10/2026"
                           className="w-full bg-transparent text-[14px] text-black placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
@@ -1088,6 +1096,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                         <button
                           type="button"
                           onClick={() => setIsDatePickerOpen((prev) => !prev)}
+                          aria-label="Pick due date"
                           className="text-[var(--text-2)] hover:text-black p-0.5 cursor-pointer shrink-0 transition-colors"
                           title="Pick due date"
                         >
@@ -1111,6 +1120,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                               <button
                                 type="button"
                                 onClick={() => setIsDatePickerOpen(false)}
+                                aria-label="Close date picker"
                                 className="text-[var(--text-2)] hover:text-black p-0.5 cursor-pointer"
                               >
                                 <X className="w-3.5 h-3.5" />
@@ -1130,11 +1140,11 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                                   type="button"
                                   onClick={() => {
                                     setDueDate(d);
-                                    setHasDiagramEdited(true);
+                                    setHasFormEdited(true);
                                     setIsDatePickerOpen(false);
                                   }}
                                   className={cn(
-                                    'py-1 px-1.5 rounded-[6px] text-[11px] font-medium border text-center transition-colors cursor-pointer',
+                                    'py-1 px-1.5 rounded-[6px] text-[11px] font-medium border text-center transition-colors cursor-pointer tabular-nums',
                                     dueDate === d
                                       ? 'bg-[var(--primary)] text-white border-transparent'
                                       : 'bg-[var(--card)] text-black border-[#EDEDED] hover:bg-[#EFEFEF]'
@@ -1161,9 +1171,9 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                         value={notes}
                         onChange={(e) => {
                           setNotes(e.target.value);
-                          setHasDiagramEdited(true);
+                          setHasFormEdited(true);
                         }}
-                        placeholder="e.g hand stitched, monogram design on wrist and gold buttons"
+                        placeholder="e.g. hand-stitched, monogram design on wrist and gold buttons"
                         className="w-full h-[100px] bg-transparent text-[14px] text-black placeholder:text-[var(--muted)] focus:outline-none resize-none"
                       />
                     </div>
@@ -1255,6 +1265,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                 <button
                   type="button"
                   onClick={handleRequestClose}
+                  aria-label="Close order sheet"
                   className="w-7 h-7 rounded-full bg-[#F2F2F2] flex items-center justify-center text-[var(--muted)] hover:text-black cursor-pointer"
                 >
                   <X className="w-4 h-4" />
@@ -1277,7 +1288,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                   <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#A2A2A2] mt-0.5 whitespace-nowrap">
                     <span>
                       {activePointKeys.length === 0
-                        ? 'Empty state'
+                        ? 'No points selected'
                         : `${activePointKeys.length} active points`}
                     </span>
                     <span className="w-1 h-1 rounded-full bg-[#A2A2A2] shrink-0" />
@@ -1468,18 +1479,76 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                       <input
                         type="text"
                         value={dueDate}
-                        onChange={(e) => setDueDate(e.target.value)}
+                        onChange={(e) => {
+                          setDueDate(e.target.value);
+                          setHasFormEdited(true);
+                        }}
                         placeholder="09/10/2026"
                         className="w-full bg-transparent text-[16px] text-black placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
                       />
                       <button
                         type="button"
                         onClick={() => setIsDatePickerOpen((prev) => !prev)}
+                        aria-label="Pick due date"
                         className="text-[var(--text-2)] hover:text-black p-2 cursor-pointer shrink-0 transition-colors"
                       >
                         <CalendarIcon className="w-5 h-5" />
                       </button>
                     </div>
+
+                    <AnimatePresence>
+                      {isDatePickerOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 4, scale: 0.96 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 4, scale: 0.96 }}
+                          transition={springSmooth}
+                          className="absolute top-full right-0 mt-1.5 w-60 bg-white border border-[var(--outline)] rounded-[8px] p-3 shadow-lg z-30"
+                        >
+                          <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--outline)]">
+                            <span className="text-[12px] font-bold text-[var(--text-strong)]">
+                              October 2026
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setIsDatePickerOpen(false)}
+                              aria-label="Close date picker"
+                              className="text-[var(--text-2)] hover:text-black p-0.5 cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1.5 pt-1">
+                            {[
+                              '09/10/2026',
+                              '16/10/2026',
+                              '23/10/2026',
+                              '30/10/2026',
+                              '06/11/2026',
+                              '13/11/2026',
+                            ].map((d) => (
+                              <button
+                                key={d}
+                                type="button"
+                                onClick={() => {
+                                  setDueDate(d);
+                                  setHasFormEdited(true);
+                                  setIsDatePickerOpen(false);
+                                }}
+                                className={cn(
+                                  'py-1.5 px-1.5 rounded-[6px] text-[12px] font-medium border text-center transition-colors cursor-pointer tabular-nums',
+                                  dueDate === d
+                                    ? 'bg-[var(--primary)] text-white border-transparent'
+                                    : 'bg-[var(--card)] text-black border-[#EDEDED] hover:bg-[#EFEFEF]'
+                                )}
+                              >
+                                {d.slice(0, 5)}
+                              </button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
 
@@ -1491,8 +1560,11 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                     <textarea
                       rows={4}
                       value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="e.g hand stitched, monogram design on wrist and gold buttons"
+                      onChange={(e) => {
+                        setNotes(e.target.value);
+                        setHasFormEdited(true);
+                      }}
+                      placeholder="e.g. hand-stitched, monogram design on wrist and gold buttons"
                       className="w-full h-[120px] bg-transparent text-[16px] text-black placeholder:text-[var(--muted)] focus:outline-none resize-none"
                     />
                   </div>
@@ -1520,6 +1592,8 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                     <button
                       type="button"
                       onClick={() => setPaneView('mannequin')}
+                      aria-label="Diagram View"
+                      aria-pressed={paneView === 'mannequin'}
                       className={cn(
                         'w-11 h-11 rounded-full flex items-center justify-center transition-all cursor-pointer',
                         paneView === 'mannequin'
@@ -1532,6 +1606,8 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                     <button
                       type="button"
                       onClick={() => setPaneView('table')}
+                      aria-label="Measurement List View"
+                      aria-pressed={paneView === 'table'}
                       className={cn(
                         'w-11 h-11 rounded-full flex items-center justify-center transition-all cursor-pointer',
                         paneView === 'table'

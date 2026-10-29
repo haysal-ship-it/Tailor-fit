@@ -28,14 +28,14 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     },
     ref
   ) => {
-    const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+    const inputId = id || (label ? label.toLowerCase().replace(/[^a-z0-9]+/g, '-') : undefined);
 
     return (
-      <div className="w-full flex flex-col gap-[2px]">
+      <div className="w-full flex flex-col gap-1">
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-[11px] font-normal text-[var(--text)] select-none"
+            className="block text-[11px] font-medium leading-snug text-[var(--text)] select-none"
           >
             {label}
           </label>
@@ -52,6 +52,14 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             disabled={disabled}
+            aria-invalid={Boolean(error)}
+            aria-describedby={
+              error && inputId
+                ? `${inputId}-error`
+                : helperText && inputId
+                ? `${inputId}-helper`
+                : undefined
+            }
             className={cn(
               'w-full rounded-[8px] bg-[var(--card)] border border-[var(--card)] p-[8px] text-[12px] font-normal text-[var(--text)] placeholder:text-[var(--muted)] transition-all',
               leftAddon ? 'pl-8' : 'pl-[8px]',
@@ -74,6 +82,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         <AnimatePresence mode="wait">
           {error ? (
             <motion.p
+              id={inputId ? `${inputId}-error` : undefined}
+              role="alert"
               initial={{ opacity: 0, y: -4, height: 0 }}
               animate={{ opacity: 1, y: 0, height: 'auto' }}
               exit={{ opacity: 0, y: -4, height: 0 }}
@@ -83,7 +93,12 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
               {error}
             </motion.p>
           ) : helperText ? (
-            <p className="text-[11px] text-[var(--text-faint)]">{helperText}</p>
+            <p
+              id={inputId ? `${inputId}-helper` : undefined}
+              className="text-[11px] text-[var(--text-faint)]"
+            >
+              {helperText}
+            </p>
           ) : null}
         </AnimatePresence>
       </div>

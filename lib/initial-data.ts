@@ -18,8 +18,60 @@ export const ANATOMICAL_ZONES: AnatomicalZoneMeta[] = [
   { id: 'head_neck', label: 'Head/Neck', shortLabel: 'Head/Neck' },
   { id: 'torso', label: 'Torso', shortLabel: 'Torso' },
   { id: 'upper_limb', label: 'Upper Limb', shortLabel: 'Upper Limb' },
-  { id: 'lower_limb', label: 'Lower limb', shortLabel: 'Lower limb' },
+  { id: 'lower_limb', label: 'Lower Limb', shortLabel: 'Lower Limb' },
 ];
+
+/**
+ * Shared date helper to parse DD/MM/YYYY, DD-MM-YYYY, or YYYY-MM-DD into a valid ISO string.
+ */
+export function parseDueDateToISO(raw: string | undefined): string {
+  const fallback = new Date(Date.now() + 7 * 86400000).toISOString();
+  if (!raw || !raw.trim()) return fallback;
+  const trimmed = raw.trim();
+
+  // Check DD/MM/YYYY or DD-MM-YYYY
+  const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmyMatch) {
+    const day = parseInt(dmyMatch[1], 10);
+    const month = parseInt(dmyMatch[2], 10) - 1;
+    const year = parseInt(dmyMatch[3], 10);
+    const dt = new Date(Date.UTC(year, month, day, 15, 0, 0));
+    if (!isNaN(dt.getTime())) return dt.toISOString();
+  }
+
+  // Check YYYY-MM-DD or YYYY/MM/DD
+  const ymdMatch = trimmed.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (ymdMatch) {
+    const year = parseInt(ymdMatch[1], 10);
+    const month = parseInt(ymdMatch[2], 10) - 1;
+    const day = parseInt(ymdMatch[3], 10);
+    const dt = new Date(Date.UTC(year, month, day, 15, 0, 0));
+    if (!isNaN(dt.getTime())) return dt.toISOString();
+  }
+
+  const parsed = new Date(trimmed);
+  if (!isNaN(parsed.getTime())) return parsed.toISOString();
+
+  return fallback;
+}
+
+/**
+ * Shared date helper to format an ISO date or DD/MM/YYYY string into DD/MM/YYYY.
+ */
+export function formatISOToDMY(iso: string | undefined): string {
+  if (!iso || !iso.trim()) return '';
+  const trimmed = iso.trim();
+  const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmyMatch) {
+    return `${dmyMatch[1].padStart(2, '0')}/${dmyMatch[2].padStart(2, '0')}/${dmyMatch[3]}`;
+  }
+  const dt = new Date(trimmed);
+  if (isNaN(dt.getTime())) return trimmed;
+  const dd = String(dt.getUTCDate()).padStart(2, '0');
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const yyyy = dt.getUTCFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
 
 export function normalizeZoneId(category: AnatomicalZoneId): 'head_neck' | 'torso' | 'upper_limb' | 'lower_limb' {
   if (category === 'head_neck') return 'head_neck';
@@ -326,7 +378,7 @@ const LEGACY_KEY_ALIASES: Record<string, string> = {
   body_length: 'body_length',
   neckToAnkle: 'body_length',
   nape_to_waist: 'body_length',
-  back: 'body_length',
+  back: 'shoulder_to_neck',
   back_width: 'shoulder_width',
   front_length: 'front_length',
   front_lenght: 'front_length',
@@ -382,7 +434,7 @@ export function normalizeMeasurementsRecord(
   if (!raw) return result;
   Object.entries(raw).forEach(([k, v]) => {
     const num = typeof v === 'number' ? v : parseFloat(String(v));
-    if (!isNaN(num) && num > 0) {
+    if (!isNaN(num) && num >= 0) {
       const canonical = resolveCanonicalKey(k);
       result[canonical] = num;
     }
@@ -407,7 +459,7 @@ export const DEFAULT_TEMPLATES: GarmentTemplate[] = [
       'armhole',
       'wrist_circumference',
     ],
-    description: 'Evening wears, party gowns, wedding dress etc',
+    description: 'Evening wear, party gowns, and bridal couture dresses.',
   },
   {
     id: 'suits_blazers',
@@ -431,11 +483,11 @@ export const DEFAULT_TEMPLATES: GarmentTemplate[] = [
       'thigh_circumference',
       'rise',
     ],
-    description: 'Full bespoke fitting of two piece suits or blazers and trousers',
+    description: 'Full bespoke fitting for two-piece suits, blazers, and tailored trousers.',
   },
   {
     id: 'trousers_shorts',
-    name: 'Trousers/shorts',
+    name: 'Trousers/Shorts',
     fieldKeys: [
       'waist_circumference',
       'hip_height',
@@ -446,7 +498,7 @@ export const DEFAULT_TEMPLATES: GarmentTemplate[] = [
       'inseam',
       'outseam',
     ],
-    description: 'Fittings for tailored/pleated pants, trousers, pants and shorts.',
+    description: 'Fittings for tailored or pleated trousers, slacks, and shorts.',
   },
   {
     id: 'shirt_blouse',
@@ -464,7 +516,7 @@ export const DEFAULT_TEMPLATES: GarmentTemplate[] = [
       'armhole',
       'wrist_circumference',
     ],
-    description: 'Essential measurements for bespoke dress shirts/blouses',
+    description: 'Essential anatomical measurements for bespoke dress shirts and blouses.',
   },
 ];
 
@@ -479,8 +531,8 @@ export const SAMPLE_CLIENTS: Client[] = [
   {
     id: 'c-1',
     name: 'Chloe Dallas',
-    phone: '+234 809 489 2011',
-    email: 'chloedallas@couture.com',
+    phone: '+234 8141 432 211',
+    email: 'chloe@atelier.fit',
     notes: 'Bespoke African Gown commission with hand-stitched beaded embroidery and train.',
     createdAt: '2025-08-12T10:00:00.000Z',
   },
@@ -530,22 +582,85 @@ export const SAMPLE_SNAPSHOTS: MeasurementSnapshot[] = [
   {
     id: 'ms-1',
     clientId: 'c-1',
-    date: '09-10-2025',
+    date: '25/10/2026',
     unit: 'cm',
-    garmentType: 'Gown/Dress',
+    garmentType: 'Bespoke wedding gown',
     notes: 'Summer couture fitting for Autumn Gala. High heel allowance: 8.5cm.',
     measurements: {
-      neck_circumference: 36,
-      neckline: 40,
-      shoulder_width: 42,
-      bust_chest: 92,
-      waist_circumference: 72,
-      hip_height: 96,
-      front_length: 41.5,
-      body_length: 135,
-      sleeve_length: 60,
-      armhole: 44,
-      wrist_circumference: 16.5,
+      shoulder_width: 0,
+      neck_circumference: 0,
+      bust_chest: 0,
+      outseam: 0,
+      hip_height: 0,
+      wrist_circumference: 0,
+      sleeve_length: 0,
+      waist_circumference: 0,
+      shoulder_to_neck: 0,
+      front_length: 0,
+      body_length: 0,
+    },
+  },
+  {
+    id: 'ms-1b',
+    clientId: 'c-1',
+    date: '30/10/2026',
+    unit: 'cm',
+    garmentType: 'Shirt and trouser',
+    notes: 'Tailored two-piece shirt and trouser measurements.',
+    measurements: {
+      shoulder_width: 0,
+      neck_circumference: 0,
+      bust_chest: 0,
+      outseam: 0,
+      hip_height: 0,
+      wrist_circumference: 0,
+      sleeve_length: 0,
+      waist_circumference: 0,
+      shoulder_to_neck: 0,
+      front_length: 0,
+      body_length: 0,
+    },
+  },
+  {
+    id: 'ms-1c',
+    clientId: 'c-1',
+    date: '30/10/2026',
+    unit: 'cm',
+    garmentType: 'African wedding gown',
+    notes: 'Bespoke African bridal couture fitting.',
+    measurements: {
+      shoulder_width: 0,
+      neck_circumference: 0,
+      bust_chest: 0,
+      outseam: 0,
+      hip_height: 0,
+      wrist_circumference: 0,
+      sleeve_length: 0,
+      waist_circumference: 0,
+      shoulder_to_neck: 0,
+      front_length: 0,
+      body_length: 0,
+    },
+  },
+  {
+    id: 'ms-1d',
+    clientId: 'c-1',
+    date: '30/10/2026',
+    unit: 'cm',
+    garmentType: 'Men native wear',
+    notes: 'Traditional bespoke native attire fitting.',
+    measurements: {
+      shoulder_width: 0,
+      neck_circumference: 0,
+      bust_chest: 0,
+      outseam: 0,
+      hip_height: 0,
+      wrist_circumference: 0,
+      sleeve_length: 0,
+      waist_circumference: 0,
+      shoulder_to_neck: 0,
+      front_length: 0,
+      body_length: 0,
     },
   },
   {
@@ -619,7 +734,7 @@ export const SAMPLE_ORDERS: Order[] = [
   {
     id: 'ord-9021',
     clientId: 'c-1',
-    garmentType: 'Bespoke African Gown',
+    garmentType: 'Gown/ Dress',
     measurementSnapshotId: 'ms-1',
     referenceImages: [
       {
@@ -648,60 +763,89 @@ export const SAMPLE_ORDERS: Order[] = [
   {
     id: 'ord-101',
     clientId: 'c-1',
-    garmentType: 'Oxford Three Piece Suit',
+    garmentType: 'Gown/ Dress',
     measurementSnapshotId: 'ms-1',
     referenceImages: [
       {
         id: 'img-101-1',
-        url: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=300&q=80',
+        url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
         title: 'Couture Silhouette Sketch',
       },
       {
         id: 'img-101-2',
-        url: 'https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?auto=format&fit=crop&w=300&q=80',
+        url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=300&q=80',
         title: 'Fabric Swatch',
       },
       {
         id: 'img-101-3',
-        url: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?auto=format&fit=crop&w=300&q=80',
+        url: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=300&q=80',
         title: 'Lapel Trim',
       },
     ],
-    price: 230000,
-    paidAmount: 230000,
+    price: 130000,
+    paidAmount: 130000,
     notes: 'Hand-stitched, monogram design on wrist and gold buttons.',
-    status: 'Ready',
+    status: 'In Progress',
     pickupDateTime: '2026-09-23T16:00:00.000Z',
-    createdAt: '2025-10-02T10:00:00.000Z',
+    createdAt: '2025-10-09T09:00:00.000Z',
   },
   {
     id: 'ord-107',
     clientId: 'c-1',
-    garmentType: 'Silk Evening Jumpsuit',
+    garmentType: 'Gown/ Dress',
     measurementSnapshotId: 'ms-1',
     referenceImages: [
       {
         id: 'img-107-1',
-        url: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=300&q=80',
+        url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
         title: 'Draped Neckline',
       },
       {
         id: 'img-107-2',
-        url: 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=300&q=80',
+        url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=300&q=80',
         title: 'Wide Leg Cut',
       },
       {
         id: 'img-107-3',
-        url: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=300&q=80',
+        url: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=300&q=80',
         title: 'Back Closure',
       },
     ],
-    price: 185000,
-    paidAmount: 185000,
+    price: 130000,
+    paidAmount: 130000,
     notes: 'Completed fitting and pressed for collection.',
-    status: 'Completed',
+    status: 'In Progress',
     pickupDateTime: '2026-09-12T16:00:00.000Z',
-    createdAt: '2025-09-18T10:00:00.000Z',
+    createdAt: '2025-10-09T08:00:00.000Z',
+  },
+  {
+    id: 'ord-108',
+    clientId: 'c-1',
+    garmentType: 'Gown/ Dress',
+    measurementSnapshotId: 'ms-1',
+    referenceImages: [
+      {
+        id: 'img-108-1',
+        url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+        title: 'Beaded Bodice Detail',
+      },
+      {
+        id: 'img-108-2',
+        url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=300&q=80',
+        title: 'Silhouette Drape',
+      },
+      {
+        id: 'img-108-3',
+        url: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=300&q=80',
+        title: 'Silk Faille Swatch',
+      },
+    ],
+    price: 130000,
+    paidAmount: 130000,
+    notes: 'Couture bridal drape and hand-beaded train.',
+    status: 'In Progress',
+    pickupDateTime: '2026-10-18T16:00:00.000Z',
+    createdAt: '2025-10-09T07:00:00.000Z',
   },
   {
     id: 'ord-102',

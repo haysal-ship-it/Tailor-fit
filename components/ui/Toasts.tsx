@@ -22,7 +22,7 @@ interface ToastContainerProps {
 
 export function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0">
+    <div className="fixed bottom-20 lg:bottom-6 inset-x-0 sm:inset-x-auto sm:right-6 z-50 flex flex-col gap-2.5 max-w-sm w-full mx-auto sm:mx-0 pointer-events-none px-4 sm:px-0">
       <AnimatePresence>
         {toasts.map((toast) => (
           <ToastItem key={toast.id} toast={toast} onDismiss={onDismiss} />
@@ -136,6 +136,7 @@ function ToastItem({
         )}
         <button
           type="button"
+          aria-label="Dismiss notification"
           onClick={() => onDismiss(toast.id)}
           className="text-[var(--text-muted)] hover:text-[var(--text)] p-1 transition-colors cursor-pointer"
         >

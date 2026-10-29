@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Upload, CloudUpload, X, RefreshCw, Check } from 'lucide-react';
+import { CloudUpload, X, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { springSmooth } from '@/lib/motion-tokens';
 
@@ -10,12 +10,14 @@ interface AnimatedFileUploadProps {
   images?: string[];
   onChange?: (images: string[]) => void;
   className?: string;
+  label?: string;
 }
 
 export function AnimatedFileUpload({
   images = [],
   onChange,
   className,
+  label = 'Tap to upload image',
 }: AnimatedFileUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -24,7 +26,7 @@ export function AnimatedFileUpload({
 
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const file = files[0];
+    const fileArray = Array.from(files);
     setUploadError(false);
     setUploadProgress(15);
 
@@ -39,28 +41,37 @@ export function AnimatedFileUpload({
       });
     }, 80);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setTimeout(() => {
-        clearInterval(interval);
-        setUploadProgress(100);
+    Promise.all(
+      fileArray.map(
+        (file) =>
+          new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              if (e.target?.result) resolve(e.target.result as string);
+              else reject(new Error('Failed to read file'));
+            };
+            reader.onerror = () => reject(new Error('Failed to read file'));
+            reader.readAsDataURL(file);
+          })
+      )
+    )
+      .then((results) => {
         setTimeout(() => {
-          setUploadProgress(null);
-          const result = e.target?.result as string;
-          if (result && onChange) {
-            onChange([...images, result]);
-          }
-        }, 200);
-      }, 350);
-    };
-
-    reader.onerror = () => {
-      clearInterval(interval);
-      setUploadProgress(null);
-      setUploadError(true);
-    };
-
-    reader.readAsDataURL(file);
+          clearInterval(interval);
+          setUploadProgress(100);
+          setTimeout(() => {
+            setUploadProgress(null);
+            if (results.length > 0 && onChange) {
+              onChange([...images, ...results]);
+            }
+          }, 200);
+        }, 350);
+      })
+      .catch(() => {
+        clearInterval(interval);
+        setUploadProgress(null);
+        setUploadError(true);
+      });
   };
 
   const handleRemove = (index: number) => {
@@ -89,13 +100,17 @@ export function AnimatedFileUpload({
           backgroundColor: isDragOver ? 'rgba(29, 73, 232, 0.04)' : 'transparent',
         }}
         transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.15 }}
-        className="w-full h-[100px] border border-dashed border-[var(--dashed)] rounded-[8px] flex flex-col items-center justify-center cursor-pointer transition-colors relative overflow-hidden select-none"
+        className="w-full h-[100px] border border-dashed border-[var(--dashed)] rounded-[8px] flex flex-col items-center justify-center cursor-pointer transition-colors relative overflow-hidden select-none focus-within:border-[var(--primary)] focus-within:ring-2 focus-within:ring-[rgba(29,73,232,0.15)]"
       >
         <input
           type="file"
           accept="image/*"
-          className="hidden"
-          onChange={(e) => handleFiles(e.target.files)}
+          multiple
+          className="sr-only"
+          onChange={(e) => {
+            handleFiles(e.target.files);
+            e.target.value = '';
+          }}
         />
 
         {uploadProgress !== null ? (
@@ -108,7 +123,7 @@ export function AnimatedFileUpload({
                 transition={{ ease: 'easeOut', duration: 0.2 }}
               />
             </div>
-            <span className="text-[11px] text-[var(--text-2)] font-mono">
+            <span className="text-[11px] text-[var(--text-2)] font-mono tabular-nums">
               Uploading {uploadProgress}%
             </span>
           </div>
@@ -118,12 +133,12 @@ export function AnimatedFileUpload({
             <span className="text-[12px] font-medium">Upload failed. Tap to retry</span>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center">
+          <div className="flex flex-col items-center justify-center px-3 text-center">
             <div className="w-8 h-8 rounded-full bg-[var(--chip)] flex items-center justify-center text-[var(--text-2)]">
               <CloudUpload className="w-4 h-4" />
             </div>
-            <span className="text-[12px] font-medium text-[var(--text-2)] mt-2">
-              Tap to upload image
+            <span className="text-[11px] sm:text-[12px] font-medium text-[var(--text-2)] mt-2">
+              {label}
             </span>
           </div>
         )}
@@ -149,6 +164,7 @@ export function AnimatedFileUpload({
                 />
                 <button
                   type="button"
+                  aria-label={`Remove style reference ${idx + 1}`}
                   onClick={() => handleRemove(idx)}
                   className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black transition-colors cursor-pointer"
                   title="Remove reference"

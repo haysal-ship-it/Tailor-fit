@@ -556,6 +556,7 @@ export function RotatableMannequin({
         const btn = buttonRefs.current[v.angle];
         if (!btn) return;
         const isActive = v.angle === cardinal;
+        btn.setAttribute('aria-pressed', String(isActive));
         btn.className = cn(
           'px-2.5 h-6 rounded-full text-[11px] font-medium transition-all cursor-pointer',
           isActive
@@ -658,7 +659,7 @@ export function RotatableMannequin({
             const side = lm.sideByView[cardinal] || (projX < 318 ? 'left' : 'right');
             const isLeft = side === 'left';
             const yOff = lm.labelYOffset ?? 0;
-            const labelAnchorX = isLeft ? 88 : 548;
+            const labelAnchorX = isLeft ? 104 : 532;
             const labelAnchorY = Math.max(42, Math.min(685, projY + yOff));
 
             let pointsStr: string;
@@ -678,12 +679,15 @@ export function RotatableMannequin({
             tickEl.setAttribute('cy', String(labelAnchorY));
             tickEl.style.opacity = '1';
 
+            const hasValText = Boolean(textValEl && textValEl.textContent && textValEl.textContent.trim().length > 0);
             textNameEl.setAttribute('x', String(isLeft ? labelAnchorX - 8 : labelAnchorX + 8));
+            textNameEl.setAttribute('y', String(hasValText ? labelAnchorY - 9 : labelAnchorY));
             textNameEl.setAttribute('text-anchor', isLeft ? 'end' : 'start');
             textNameEl.style.opacity = '1';
 
             if (textValEl) {
               textValEl.setAttribute('x', String(isLeft ? labelAnchorX - 8 : labelAnchorX + 8));
+              textValEl.setAttribute('y', String(labelAnchorY + 9));
               textValEl.setAttribute('text-anchor', isLeft ? 'end' : 'start');
               textValEl.style.opacity = '1';
             }
@@ -1007,6 +1011,11 @@ export function RotatableMannequin({
                   landmarkGroupRefs.current[lm.key] = el;
                 }}
                 data-mannequin-point="true"
+                tabIndex={readOnly ? undefined : 0}
+                role={readOnly ? undefined : 'button'}
+                aria-label={`${displayLabel}${hasValue ? `: ${formattedVal}` : ' (not set)'}`}
+                onFocus={() => setHoveredKey(lm.key)}
+                onBlur={() => setHoveredKey((prev) => (prev === lm.key ? null : prev))}
                 onMouseEnter={() => setHoveredKey(lm.key)}
                 onMouseLeave={() => setHoveredKey((prev) => (prev === lm.key ? null : prev))}
                 onClick={(e) => {
@@ -1015,8 +1024,15 @@ export function RotatableMannequin({
                     onSelectPoint(lm.key, displayLabel);
                   }
                 }}
+                onKeyDown={(e) => {
+                  if (!readOnly && onSelectPoint && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onSelectPoint(lm.key, displayLabel);
+                  }
+                }}
                 className={cn(
-                  'transition-opacity duration-150',
+                  'transition-opacity duration-150 focus:outline-none',
                   readOnly ? 'pointer-events-none' : 'cursor-pointer'
                 )}
               >
@@ -1128,12 +1144,14 @@ export function RotatableMannequin({
 
       {/* Direction Toolbar at the BOTTOM of the Mannequin Container (Matching https://tailorfit-beta.vercel.app/) */}
       {showControls && (
-        <div className="mt-2 flex items-center justify-center gap-2 z-10 w-full">
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-2 z-10 w-full">
           {/* Optional M / F Gender Toggle when parent doesn't render one */}
           {showGenderToggle && onGenderChange && (
             <div className="h-8 bg-white border border-[#EDEDED] rounded-full px-1.5 py-1 flex items-center gap-1 shadow-2xs">
               <button
                 type="button"
+                aria-label="Feminine form"
+                aria-pressed={gender === 'female'}
                 onClick={() => onGenderChange('female')}
                 className={cn(
                   'px-2.5 h-6 rounded-full text-[11px] font-semibold transition-all cursor-pointer',
@@ -1146,6 +1164,8 @@ export function RotatableMannequin({
               </button>
               <button
                 type="button"
+                aria-label="Masculine form"
+                aria-pressed={gender === 'male'}
                 onClick={() => onGenderChange('male')}
                 className={cn(
                   'px-2.5 h-6 rounded-full text-[11px] font-semibold transition-all cursor-pointer',
@@ -1170,6 +1190,8 @@ export function RotatableMannequin({
                     buttonRefs.current[v.angle] = el;
                   }}
                   type="button"
+                  aria-label={v.fullLabel}
+                  aria-pressed={isActive}
                   onClick={() => animateToAngleDeg(v.angle)}
                   className={cn(
                     'px-2.5 h-6 rounded-full text-[11px] font-medium transition-all cursor-pointer',
@@ -1188,6 +1210,7 @@ export function RotatableMannequin({
 
             <button
               type="button"
+              aria-label="Rotate mannequin 90 degrees"
               onClick={handleRotate90}
               className="w-6 h-6 rounded-full flex items-center justify-center text-[var(--text-2)] hover:text-black hover:bg-[#F2F2F2] transition-colors cursor-pointer"
               title="Rotate 90°"

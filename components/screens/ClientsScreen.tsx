@@ -4,35 +4,33 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '@/lib/store';
 import {
-  Search,
-  ChevronRight,
   Phone,
-  Mail,
-  User,
-  ClipboardList,
-  Columns2,
-  X,
-  Users,
-  UserCheck,
-  ShoppingBag,
-  Check,
+  AtSign,
+  MoreVertical,
+  Pencil,
   Trash2,
+  ChevronDown,
+  CornerUpLeft,
+  PersonStanding,
+  ClipboardList,
+  Save,
+  X,
+  Check,
   Plus,
-  AlertCircle,
-  AlertTriangle,
+  Search,
+  Users,
 } from 'lucide-react';
 import { ToastContainer, type ToastMessage } from '@/components/ui/Toasts';
-import { SmallFloatingDock } from '@/components/ui/SmallFloatingDock';
 import { AnimatedNumberMorph } from '@/components/ui/AnimatedNumberMorph';
+import { AnimatedFileUpload } from '@/components/ui/AnimatedFileUpload';
 import { RotatableMannequin } from '@/components/mannequin/RotatableMannequin';
-import { Input } from '@/components/ui/Input';
-import { Textarea } from '@/components/ui/Textarea';
 import {
   ANATOMICAL_ZONES,
   getZoneLabel,
   normalizeZoneId,
   resolveCanonicalKey,
   normalizeMeasurementsRecord,
+  parseDueDateToISO,
 } from '@/lib/initial-data';
 import { springSmooth, springSnappy } from '@/lib/motion-tokens';
 import { cn } from '@/lib/utils';
@@ -40,9 +38,15 @@ import { cn } from '@/lib/utils';
 interface ClientsScreenProps {
   onOpenClient?: (clientId: string) => void;
   onNewMeasurement?: (clientId: string) => void;
-  onNewOrder: (clientId: string) => void;
+  onNewOrder?: (clientId: string) => void;
   onEditOrder?: (orderId: string) => void;
 }
+
+type ClientsViewState =
+  | 'SavedMeasurements_Default'
+  | 'SavedMeasurements_UseFlow'
+  | 'OrderHistory_Grid'
+  | 'Inline_NewOrder';
 
 const DEFAULT_FALLBACK_IMAGES = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
@@ -50,10 +54,25 @@ const DEFAULT_FALLBACK_IMAGES = [
   'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=300&q=80',
 ];
 
-export function ClientsScreen({
-  onNewOrder,
-  onEditOrder,
-}: ClientsScreenProps) {
+/**
+ * Exact Figma display labels for the 11 saved measurement cards in Frames 1, 2, M3, M4:
+ * Shoulder width, Neck, Bust/Chest, Ankle, Hip, Wrist, Sleeve, Waist, Back, Neck to Waist, Neck to Ankle
+ */
+const SAVED_CARD_DISPLAY_LABELS: Record<string, string> = {
+  shoulder_width: 'Shoulder width',
+  neck_circumference: 'Neck',
+  bust_chest: 'Bust/Chest',
+  outseam: 'Ankle',
+  hip_height: 'Hip',
+  wrist_circumference: 'Wrist',
+  sleeve_length: 'Sleeve',
+  waist_circumference: 'Waist',
+  shoulder_to_neck: 'Back',
+  front_length: 'Neck to Waist',
+  body_length: 'Neck to Ankle',
+};
+
+export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
   const {
     clients,
     orders,
@@ -62,8 +81,11 @@ export function ClientsScreen({
     selectedClientId,
     setSelectedClientId,
     addClient,
+    updateClient,
+    deleteClient,
     addSnapshot,
     updateSnapshot,
+    addOrder,
     deleteTemplate,
     getClientSnapshots,
     getClientOrders,
@@ -72,51 +94,42 @@ export function ClientsScreen({
   const unitLabel = settings?.defaultUnit || 'cm';
   const currencySymbol = settings?.currency || '₦';
 
-  const [mobileTab, setMobileTab] = useState<'directory' | 'profile' | 'orders'>('directory');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [directoryFilter, setDirectoryFilter] = useState<'all' | 'active'>('all');
+  // Primary 4-view state machine matching the 9 Figma frames
+  const [viewState, setViewState] = useState<ClientsViewState>('SavedMeasurements_Default');
 
-  // Workspace view mode on desktop: 'split' (Mannequin + Measurements side-by-side), 'mannequin', or 'table'
-  const [mannequinView, setMannequinView] = useState<'split' | 'mannequin' | 'table'>('split');
+  // Mannequin state
   const [mannequinGender, setMannequinGender] = useState<'female' | 'male'>('female');
-  const [zoneFilter, setZoneFilter] = useState<
-    'all' | 'head_neck' | 'torso' | 'upper_limb' | 'lower_limb'
-  >('all');
+  const [mannequinDisplayMode, setMannequinDisplayMode] = useState<'mannequin' | 'list'>(
+    'mannequin'
+  );
 
-  //Garment Template modal state
+  // Header overflow `⋮` menu & Snapshot dropdown states
+  const [isOverflowMenuOpen, setIsOverflowMenuOpen] = useState(false);
+  const [isSnapshotDropdownOpen, setIsSnapshotDropdownOpen] = useState(false);
+  const [isNewOrderTemplateDropdownOpen, setIsNewOrderTemplateDropdownOpen] = useState(false);
+
+  const overflowMenuRef = useRef<HTMLDivElement>(null);
+  const snapshotDropdownRef = useRef<HTMLDivElement>(null);
+  const newOrderTemplateDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Modals: Edit Profile, Delete Confirmation, Client Directory Switcher, Garment Templates, Point Size
+  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
+  const [editProfileMode, setEditProfileMode] = useState<'edit' | 'create' | 'switch'>('edit');
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [directorySearch, setDirectorySearch] = useState('');
+
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+
+  // Garment Template Modal
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [dialogSelectedTemplateId, setDialogSelectedTemplateId] = useState<string>('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [selectedTemplateName, setSelectedTemplateName] = useState<string>('');
 
-  // New Client Modal state
-  const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
-  const [newClientName, setNewClientName] = useState('');
-  const [newClientPhone, setNewClientPhone] = useState('');
-  const [newClientEmail, setNewClientEmail] = useState('');
-  const [newClientNotes, setNewClientNotes] = useState('');
-  const [clientFormErrors, setClientFormErrors] = useState<{
-    name?: string;
-    phone?: string;
-    email?: string;
-  }>({});
-  const [clientModalAlert, setClientModalAlert] = useState<string | null>(null);
-
-  const nameInputRef = useRef<HTMLInputElement>(null);
-  const phoneInputRef = useRef<HTMLInputElement>(null);
-  const emailInputRef = useRef<HTMLInputElement>(null);
-
-  // Toast notifications
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const showToast = (toast: Omit<ToastMessage, 'id'>) => {
-    const id = `toast-${Date.now()}-${Math.random()}`;
-    setToasts((prev) => [...prev, { ...toast, id }]);
-  };
-  const dismissToast = (id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  // Set Point Size / Add Point Modal (Requirement C & D)
+  // Set Point Size / Add Point Modal
   const [pointModalData, setPointModalData] = useState<{
     mode: 'edit' | 'add';
     key: string;
@@ -126,9 +139,71 @@ export function ClientsScreen({
   } | null>(null);
   const [pointModalError, setPointModalError] = useState('');
 
-  // Saved indicator toast
-  const [savedIndicator, setSavedIndicator] = useState<string | null>(null);
-  const saveIndicatorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Use Measurement Flow form state (Desktop Frame 3, Mobile Frame 1)
+  const [useFlowImages, setUseFlowImages] = useState<string[]>([]);
+  const [useFlowPrice, setUseFlowPrice] = useState('');
+  const [useFlowDueDate, setUseFlowDueDate] = useState('');
+  const [useFlowNotes, setUseFlowNotes] = useState('');
+
+  // Inline New Order form state (Desktop Frame 5, Mobile Frame 2)
+  const [newOrderClientName, setNewOrderClientName] = useState('');
+  const [newOrderGarmentType, setNewOrderGarmentType] = useState('');
+  const [newOrderPhone, setNewOrderPhone] = useState('');
+  const [newOrderEmail, setNewOrderEmail] = useState('');
+  const [newOrderSavedTemplateLabel, setNewOrderSavedTemplateLabel] = useState('');
+  const [newOrderImages, setNewOrderImages] = useState<string[]>([]);
+  const [newOrderPrice, setNewOrderPrice] = useState('');
+  const [newOrderDueDate, setNewOrderDueDate] = useState('');
+  const [newOrderNotes, setNewOrderNotes] = useState('');
+
+  // Toasts
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const showToast = (toast: Omit<ToastMessage, 'id'>) => {
+    const id = `toast-${Date.now()}-${Math.random()}`;
+    setToasts((prev) => [...prev, { ...toast, id }]);
+  };
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // Close popovers on outside click or Escape
+  useEffect(() => {
+    const handlePointerDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (overflowMenuRef.current && !overflowMenuRef.current.contains(target)) {
+        setIsOverflowMenuOpen(false);
+      }
+      if (snapshotDropdownRef.current && !snapshotDropdownRef.current.contains(target)) {
+        setIsSnapshotDropdownOpen(false);
+      }
+      if (
+        newOrderTemplateDropdownRef.current &&
+        !newOrderTemplateDropdownRef.current.contains(target)
+      ) {
+        setIsNewOrderTemplateDropdownOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOverflowMenuOpen(false);
+        setIsSnapshotDropdownOpen(false);
+        setIsNewOrderTemplateDropdownOpen(false);
+        setPointModalData(null);
+        setPointModalError('');
+        setIsTemplateModalOpen(false);
+        setIsEditProfileModalOpen(false);
+        setIsDeleteConfirmOpen(false);
+      }
+    };
+
+    window.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   // Map canonical key -> hotspot metadata
   const hotspotMap = useMemo(() => {
@@ -159,27 +234,7 @@ export function ClientsScreen({
     return settings?.templates || [];
   }, [settings?.templates]);
 
-  // Handle Escape key to close dialogs
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (pointModalData) {
-          setPointModalData(null);
-          setPointModalError('');
-        }
-        if (isTemplateModalOpen) {
-          setIsTemplateModalOpen(false);
-        }
-        if (isNewClientModalOpen) {
-          setIsNewClientModalOpen(false);
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [pointModalData, isTemplateModalOpen, isNewClientModalOpen]);
-
-  // Enrich store clients with display fields & order counts
+  // Enrich store clients
   const allClientList = useMemo(() => {
     return clients.map((c) => {
       const initials =
@@ -188,26 +243,16 @@ export function ClientsScreen({
           .map((n) => n[0])
           .join('')
           .slice(0, 2)
-          .toUpperCase() || 'CL';
+          .toUpperCase() || 'CD';
       const clientOrders = orders.filter((o) => o.clientId === c.id);
-      const activeOrdersCount = clientOrders.filter(
-        (o) => o.status !== 'Completed' && o.status !== 'Picked Up'
-      ).length;
       return {
         id: c.id,
         initials,
         name: c.name,
-        phone: c.phone || '+234 800 000 0000',
-        email: c.email || 'client@couture.com',
+        phone: c.phone || '+234 8141 432 211',
+        email: c.email || 'chloe@atelier.fit',
         notes: c.notes || '',
         totalOrdersCount: clientOrders.length,
-        activeOrdersCount,
-        since: c.createdAt
-          ? `Client since ${new Date(c.createdAt).toLocaleDateString('en-US', {
-              month: 'short',
-              year: 'numeric',
-            })}`
-          : 'Client since Aug 2025',
       };
     });
   }, [clients, orders]);
@@ -220,34 +265,13 @@ export function ClientsScreen({
         id: 'c-1',
         initials: 'CD',
         name: 'Chloe Dallas',
-        phone: '+234 809 489 2011',
-        email: 'chloedallas@couture.com',
+        phone: '+234 8141 432 211',
+        email: 'chloe@atelier.fit',
         notes: '',
-        totalOrdersCount: 0,
-        activeOrdersCount: 0,
-        since: 'Client since Aug 2025',
+        totalOrdersCount: 4,
       }
     );
   }, [allClientList, activeClientId]);
-
-  /**
-   * Directory Clients List:
-   * Never filters out the currently selected client! Keeps the list stable and highlights
-   * the selected client with `--selected` & `--selected-bg`.
-   */
-  const directoryClients = useMemo(() => {
-    return allClientList
-      .filter((c) => {
-        if (directoryFilter === 'active' && c.activeOrdersCount === 0) return false;
-        if (!searchQuery.trim()) return true;
-        const q = searchQuery.toLowerCase();
-        return (
-          c.name.toLowerCase().includes(q) ||
-          c.phone.toLowerCase().includes(q) ||
-          c.email.toLowerCase().includes(q)
-        );
-      });
-  }, [allClientList, searchQuery, directoryFilter]);
 
   // Client's saved snapshots from store
   const clientSnapshots = useMemo(() => {
@@ -266,39 +290,42 @@ export function ClientsScreen({
       const normalized = normalizeMeasurementsRecord(latest.measurements);
       const keys = Object.keys(normalized);
       setActiveSnapshotId(latest.id);
-      setSelectedTemplateName(latest.garmentType || '');
+      setSelectedTemplateName(latest.garmentType || 'Bespoke wedding gown');
       setSelectedTemplateId('');
       setActivePointKeys(keys);
       setMeasurements(normalized);
     } else {
-      // Requirement D: Clean empty state when no points/template are selected
       setActiveSnapshotId('');
       setSelectedTemplateName('');
       setSelectedTemplateId('');
       setActivePointKeys([]);
       setMeasurements({});
     }
-    setZoneFilter('all');
   }, [selectedClientProfile.id, getClientSnapshots]);
 
-  const triggerSavedIndicator = (msg = 'Saved to client profile') => {
-    setSavedIndicator(msg);
-    if (saveIndicatorTimeoutRef.current) clearTimeout(saveIndicatorTimeoutRef.current);
-    saveIndicatorTimeoutRef.current = setTimeout(() => {
-      setSavedIndicator(null);
-    }, 2400);
-  };
+  const activeSnapshot = useMemo(() => {
+    return clientSnapshots.find((s) => s.id === activeSnapshotId) || clientSnapshots[0];
+  }, [clientSnapshots, activeSnapshotId]);
 
-  // Persist measurement changes directly to store snapshot
+  const otherSnapshots = useMemo(() => {
+    const filtered = clientSnapshots.filter((s) => s.id !== activeSnapshot?.id);
+    return filtered.length > 0 ? filtered : clientSnapshots;
+  }, [clientSnapshots, activeSnapshot]);
+
+  // Persist measurement changes directly to store snapshot (unless in Inline_NewOrder)
   const persistMeasurementsToStore = (
     nextKeys: string[],
     nextMeasurements: Record<string, number>,
     garmentLabel?: string
   ) => {
+    if (viewState === 'Inline_NewOrder') return;
+
     const filteredObj: Record<string, number> = {};
     nextKeys.forEach((k) => {
       if (nextMeasurements[k] !== undefined && !isNaN(nextMeasurements[k])) {
         filteredObj[k] = nextMeasurements[k];
+      } else {
+        filteredObj[k] = 0;
       }
     });
 
@@ -310,25 +337,17 @@ export function ClientsScreen({
     } else {
       const created = addSnapshot({
         clientId: selectedClientProfile.id,
-        date: new Date()
-          .toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-          })
-          .replace(/\//g, '-'),
+        date: new Date().toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        }),
         unit: unitLabel,
-        garmentType: garmentLabel || selectedTemplateName || 'Custom Fit',
+        garmentType: garmentLabel || selectedTemplateName || 'Bespoke wedding gown',
         measurements: filteredObj,
       });
       setActiveSnapshotId(created.id);
     }
-    triggerSavedIndicator();
-  };
-
-  const handleSelectClient = (client: { id: string }) => {
-    setSelectedClientId(client.id);
-    setMobileTab('profile');
   };
 
   // Switch between client's saved snapshots
@@ -337,12 +356,13 @@ export function ClientsScreen({
     if (!found) return;
     const normalized = normalizeMeasurementsRecord(found.measurements);
     setActiveSnapshotId(found.id);
-    setSelectedTemplateName(found.garmentType || '');
+    setSelectedTemplateName(found.garmentType || 'Bespoke wedding gown');
     setActivePointKeys(Object.keys(normalized));
     setMeasurements(normalized);
+    setIsSnapshotDropdownOpen(false);
   };
 
-  // Apply a Garment Blueprint template from Settings (Requirement B & D)
+  // Apply a Garment Blueprint template from Settings
   const applyTemplateById = (tmplId: string) => {
     const tmpl = storeTemplates.find((t) => t.id === tmplId);
     if (!tmpl) return;
@@ -354,11 +374,7 @@ export function ClientsScreen({
     const nextMeasurements = { ...measurements };
     canonicalKeys.forEach((k) => {
       if (nextMeasurements[k] === undefined) {
-        const defaultCm = hotspotMap[k]?.defaultValCm ?? 40;
-        nextMeasurements[k] =
-          unitLabel === 'in'
-            ? parseFloat((defaultCm / 2.54).toFixed(1))
-            : defaultCm;
+        nextMeasurements[k] = 0;
       }
     });
 
@@ -370,15 +386,18 @@ export function ClientsScreen({
   };
 
   const handleFieldValueChange = (key: string, strVal: string) => {
-    const num = parseFloat(strVal);
     const nextMeasurements = { ...measurements };
-    if (!isNaN(num) && num > 0) {
+    if (strVal.trim() === '') {
+      nextMeasurements[key] = 0;
+      setMeasurements(nextMeasurements);
+      persistMeasurementsToStore(activePointKeys, nextMeasurements);
+      return;
+    }
+    const num = parseFloat(strVal);
+    if (!isNaN(num) && num >= 0) {
       nextMeasurements[key] = num;
       setMeasurements(nextMeasurements);
       persistMeasurementsToStore(activePointKeys, nextMeasurements);
-    } else if (strVal === '') {
-      delete nextMeasurements[key];
-      setMeasurements(nextMeasurements);
     }
   };
 
@@ -388,29 +407,29 @@ export function ClientsScreen({
     persistMeasurementsToStore(nextKeys, measurements);
   };
 
-  // Requirement C: Tap on active mannequin touchpoint opens size-only modal
+  // Tap on active mannequin touchpoint opens size-only modal
   const handleOpenPoint = (key: string, name: string) => {
     const canonical = resolveCanonicalKey(key);
     const meta = hotspotMap[canonical];
-    const currentVal =
-      measurements[canonical] !== undefined ? String(measurements[canonical]) : '';
+    const currentNum = measurements[canonical];
+    const currentVal = currentNum !== undefined && currentNum > 0 ? String(currentNum) : '';
     setPointModalData({
       mode: 'edit',
       key: canonical,
-      name: meta?.label || name,
+      name: SAVED_CARD_DISPLAY_LABELS[canonical] || meta?.label || name,
       zone: meta?.zone || 'Torso',
       value: currentVal,
     });
     setPointModalError('');
   };
 
-  // Requirement D: Click "Add Point" opens selector from the 21 standard Sizing/Measurements
+  // Click "Add Point" opens selector from the 21 standard Sizing/Measurements
   const handleOpenAddPoint = () => {
     const firstUnadded =
       allHotspots.find((h) => !activePointKeys.includes(h.key)) || allHotspots[0];
     const key = firstUnadded?.key || 'neck_circumference';
-    const existingVal =
-      measurements[key] !== undefined ? String(measurements[key]) : '';
+    const existingNum = measurements[key];
+    const existingVal = existingNum !== undefined && existingNum > 0 ? String(existingNum) : '';
     setPointModalData({
       mode: 'add',
       key,
@@ -446,118 +465,46 @@ export function ClientsScreen({
     setPointModalError('');
   };
 
-  // Create New Client handler with empty field validation and alert prompt
-  const handleCreateClient = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const trimmedName = newClientName.trim();
-    const trimmedPhone = newClientPhone.trim();
-    const trimmedEmail = newClientEmail.trim();
-
-    const errors: { name?: string; phone?: string; email?: string } = {};
-    const missingFieldLabels: string[] = [];
-
-    if (!trimmedName) {
-      errors.name = 'Full Name is required';
-      missingFieldLabels.push('Full Name');
-    }
-    if (!trimmedPhone) {
-      errors.phone = 'Phone Number is required';
-      missingFieldLabels.push('Phone Number');
-    }
-    if (!trimmedEmail) {
-      errors.email = 'Email Address is required';
-      missingFieldLabels.push('Email Address');
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      errors.email = 'Enter a valid email address';
-      missingFieldLabels.push('Valid Email Address');
-    }
-
-    if (missingFieldLabels.length > 0) {
-      setClientFormErrors(errors);
-      const alertMsg = `Please complete: ${missingFieldLabels.join(', ')}`;
-      setClientModalAlert(alertMsg);
-
-      showToast({
-        type: 'warning',
-        title: 'Incomplete Client Profile',
-        message: `Please complete all required fields (${missingFieldLabels.join(', ')}) before creating the client profile.`,
-        duration: 5000,
-      });
-
-      // Auto-focus the first empty field for accessibility
-      if (errors.name) {
-        nameInputRef.current?.focus();
-      } else if (errors.phone) {
-        phoneInputRef.current?.focus();
-      } else if (errors.email) {
-        emailInputRef.current?.focus();
-      }
-      return;
-    }
-
-    setClientFormErrors({});
-    setClientModalAlert(null);
-
-    const created = addClient({
-      name: trimmedName,
-      phone: trimmedPhone,
-      email: trimmedEmail,
-      notes: newClientNotes.trim(),
-    });
-
-    setNewClientName('');
-    setNewClientPhone('');
-    setNewClientEmail('');
-    setNewClientNotes('');
-    setIsNewClientModalOpen(false);
-    setSelectedClientId(created.id);
-    setMobileTab('profile');
-    triggerSavedIndicator(`Client "${created.name}" added`);
-    showToast({
-      type: 'success',
-      title: 'Client Profile Created',
-      message: `"${created.name}" has been successfully added to your atelier directory.`,
-      duration: 3500,
-    });
-  };
-
-  // Active measurement cards filtered by zoneFilter
+  // Measurement cards list for SavedMeasurements_Default & List toggle
   const visibleMeasurementFields = useMemo(() => {
-    return activePointKeys
-      .map((key) => {
-        const meta = hotspotMap[key];
-        return {
-          id: key,
-          name: meta?.label || key,
-          zone: meta?.zone || 'Torso',
-          zoneId: meta?.zoneId || 'torso',
-          value: measurements[key] !== undefined ? String(measurements[key]) : '',
-          unit: unitLabel,
-        };
-      })
-      .filter((f) => (zoneFilter === 'all' ? true : f.zoneId === zoneFilter));
-  }, [activePointKeys, hotspotMap, measurements, unitLabel, zoneFilter]);
+    return activePointKeys.map((key) => {
+      const meta = hotspotMap[key];
+      const rawVal = measurements[key];
+      return {
+        id: key,
+        name: SAVED_CARD_DISPLAY_LABELS[key] || meta?.label || key,
+        zone: meta?.zone || 'Torso',
+        value: rawVal !== undefined && rawVal > 0 ? String(rawVal) : '',
+        unit: unitLabel,
+      };
+    });
+  }, [activePointKeys, hotspotMap, measurements, unitLabel]);
 
-  // Live Order History cards for the selected client from store
+  // Points that have a non-zero value to highlight on the mannequin
+  const populatedMannequinPointKeys = useMemo(() => {
+    return activePointKeys.filter((k) => (measurements[k] ?? 0) > 0);
+  }, [activePointKeys, measurements]);
+
+  // Order History cards (Desktop Frame 4)
   const orderHistoryCards = useMemo(() => {
     const clientOrders = getClientOrders(selectedClientProfile.id);
     return clientOrders.map((ord) => {
-      const snap = ord.measurementSnapshotId
-        ? clientSnapshots.find((s) => s.id === ord.measurementSnapshotId)
-        : clientSnapshots[0];
-      const dateStr = snap?.date
-        ? `Size taken on ${snap.date}`
-        : `Created ${new Date(ord.createdAt).toLocaleDateString('en-GB').replace(/\//g, '-')}`;
+      const createdDateStr = ord.createdAt
+        ? new Date(ord.createdAt).toLocaleDateString('en-GB').replace(/\//g, '-')
+        : '09-10-2025';
+      const dateStr = `Size taken on ${createdDateStr}`;
 
-      let badge = ord.status || 'In Progress';
-      let badgeColor = '#F06B05';
+      let badge = 'Urgent';
+      let badgeColor = 'var(--pill-urgent)';
       if (ord.status === 'Ready' || ord.status === 'Completed' || ord.status === 'Picked Up') {
-        badgeColor = '#0E9F5C';
+        badge = ord.status;
+        badgeColor = 'var(--pill-completed)';
       } else if (ord.status === 'Paused') {
-        badgeColor = '#D93A4D';
+        badge = 'Paused';
+        badgeColor = 'var(--pill-paused)';
       } else if (ord.status === 'Pending') {
-        badgeColor = '#A0B900';
+        badge = 'Pending';
+        badgeColor = 'var(--pill-pending)';
       }
 
       const imgs =
@@ -565,7 +512,6 @@ export function ClientsScreen({
           ? ord.referenceImages.map((r) => r.url)
           : DEFAULT_FALLBACK_IMAGES;
 
-      // Ensure 3 thumbnails for the signature dark style-reference band
       const paddedImages = [
         imgs[0] || DEFAULT_FALLBACK_IMAGES[0],
         imgs[1] || imgs[0] || DEFAULT_FALLBACK_IMAGES[1],
@@ -574,558 +520,962 @@ export function ClientsScreen({
 
       return {
         id: ord.id,
-        title: ord.garmentType || 'Bespoke Order',
+        title: ord.garmentType || 'Gown/ Dress',
         badge,
         badgeColor,
         date: dateStr,
-        price: ord.price || 0,
+        price: ord.price ?? 0,
         images: paddedImages,
       };
     });
-  }, [getClientOrders, selectedClientProfile.id, clientSnapshots]);
+  }, [getClientOrders, selectedClientProfile.id]);
+
+  // Open Edit Profile modal prefilled with current client
+  const handleOpenEditProfile = (mode: 'edit' | 'create' | 'switch' = 'edit') => {
+    setIsOverflowMenuOpen(false);
+    setEditProfileMode(mode);
+    if (mode === 'create') {
+      setEditName('');
+      setEditPhone('');
+      setEditEmail('');
+      setEditNotes('');
+    } else {
+      setEditName(selectedClientProfile.name);
+      setEditPhone(selectedClientProfile.phone);
+      setEditEmail(selectedClientProfile.email);
+      setEditNotes(selectedClientProfile.notes);
+    }
+    setIsEditProfileModalOpen(true);
+  };
+
+  const handleSaveProfileModal = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedName = editName.trim();
+    if (!trimmedName) return;
+
+    if (editProfileMode === 'create') {
+      const created = addClient({
+        name: trimmedName,
+        phone: editPhone.trim() || '+234 8141 432 211',
+        email: editEmail.trim() || 'client@atelier.fit',
+        notes: editNotes.trim(),
+      });
+      setSelectedClientId(created.id);
+      showToast({
+        type: 'success',
+        title: 'Client Created',
+        message: `${created.name} added to your atelier directory.`,
+        duration: 3000,
+      });
+    } else {
+      updateClient(selectedClientProfile.id, {
+        name: trimmedName,
+        phone: editPhone.trim(),
+        email: editEmail.trim(),
+        notes: editNotes.trim(),
+      });
+      showToast({
+        type: 'success',
+        title: 'Profile Updated',
+        message: `${trimmedName}'s profile has been updated.`,
+        duration: 3000,
+      });
+    }
+    setIsEditProfileModalOpen(false);
+  };
+
+  const handleConfirmDeleteClient = () => {
+    const name = selectedClientProfile.name;
+    deleteClient(selectedClientProfile.id);
+    setIsDeleteConfirmOpen(false);
+    showToast({
+      type: 'success',
+      title: 'Client Deleted',
+      message: `${name} was removed from your client records.`,
+      duration: 3000,
+    });
+  };
+
+  // Create Order from Use Measurement Flow (Desktop Frame 3 / Mobile Frame 1)
+  const handleCreateOrderFromUseFlow = () => {
+    const raw = parseFloat(useFlowPrice.replace(/[^0-9.]/g, ''));
+    const parsedPrice = isNaN(raw) ? 0 : raw;
+    const refImgs =
+      useFlowImages.length > 0
+        ? useFlowImages.map((url, idx) => ({
+            id: `img-${Date.now()}-${idx}`,
+            url,
+            title: `Style Reference ${idx + 1}`,
+          }))
+        : DEFAULT_FALLBACK_IMAGES.map((url, idx) => ({
+            id: `img-${Date.now()}-${idx}`,
+            url,
+            title: `Style Reference ${idx + 1}`,
+          }));
+
+    addOrder({
+      clientId: selectedClientProfile.id,
+      garmentType: activeSnapshot?.garmentType || 'Gown/ Dress',
+      measurementSnapshotId: activeSnapshot?.id,
+      referenceImages: refImgs,
+      price: parsedPrice,
+      notes: useFlowNotes.trim() || 'Custom atelier order created from saved measurements.',
+      status: 'In Progress',
+      pickupDateTime: parseDueDateToISO(useFlowDueDate),
+    });
+
+    setUseFlowImages([]);
+    setUseFlowPrice('');
+    setUseFlowDueDate('');
+    setUseFlowNotes('');
+    setViewState('OrderHistory_Grid');
+    showToast({
+      type: 'success',
+      title: 'Order Created',
+      message: `New order for ${selectedClientProfile.name} has been added to Order History.`,
+      duration: 3500,
+    });
+  };
+
+  // Save Order from Inline New Order Workspace (Desktop Frame 5 / Mobile Frame 2)
+  const handleSaveInlineNewOrder = () => {
+    let targetClientId = selectedClientProfile.id;
+    const typedName = newOrderClientName.trim();
+    if (
+      typedName &&
+      typedName.toLowerCase() !== selectedClientProfile.name.toLowerCase()
+    ) {
+      const existing = clients.find(
+        (c) => c.name.toLowerCase() === typedName.toLowerCase()
+      );
+      if (existing) {
+        targetClientId = existing.id;
+      } else {
+        const created = addClient({
+          name: typedName,
+          phone: newOrderPhone.trim() || '+234 8141 432 211',
+          email: newOrderEmail.trim() || 'client@atelier.fit',
+          notes: newOrderNotes.trim(),
+        });
+        targetClientId = created.id;
+        setSelectedClientId(created.id);
+      }
+    }
+
+    const raw = parseFloat(newOrderPrice.replace(/[^0-9.]/g, ''));
+    const parsedPrice = isNaN(raw) ? 0 : raw;
+    const refImgs =
+      newOrderImages.length > 0
+        ? newOrderImages.map((url, idx) => ({
+            id: `img-${Date.now()}-${idx}`,
+            url,
+            title: `Style Reference ${idx + 1}`,
+          }))
+        : DEFAULT_FALLBACK_IMAGES.map((url, idx) => ({
+            id: `img-${Date.now()}-${idx}`,
+            url,
+            title: `Style Reference ${idx + 1}`,
+          }));
+
+    const filteredMeasurements: Record<string, number> = {};
+    activePointKeys.forEach((k) => {
+      if (measurements[k] !== undefined && !isNaN(measurements[k])) {
+        filteredMeasurements[k] = measurements[k];
+      } else {
+        filteredMeasurements[k] = 0;
+      }
+    });
+
+    const createdSnapshot = addSnapshot({
+      clientId: targetClientId,
+      date: new Date().toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }),
+      unit: unitLabel,
+      garmentType: newOrderGarmentType.trim() || selectedTemplateName || 'Gown/ Dress',
+      measurements: filteredMeasurements,
+      notes: newOrderNotes.trim(),
+    });
+    setActiveSnapshotId(createdSnapshot.id);
+
+    addOrder({
+      clientId: targetClientId,
+      garmentType: newOrderGarmentType.trim() || 'Gown/ Dress',
+      measurementSnapshotId: createdSnapshot.id,
+      referenceImages: refImgs,
+      price: parsedPrice,
+      notes: newOrderNotes.trim() || 'Bespoke order created in workspace.',
+      status: 'In Progress',
+      pickupDateTime: parseDueDateToISO(newOrderDueDate),
+    });
+
+    setNewOrderClientName('');
+    setNewOrderGarmentType('');
+    setNewOrderPhone('');
+    setNewOrderEmail('');
+    setNewOrderSavedTemplateLabel('');
+    setNewOrderImages([]);
+    setNewOrderPrice('');
+    setNewOrderDueDate('');
+    setNewOrderNotes('');
+    setViewState('OrderHistory_Grid');
+    showToast({
+      type: 'success',
+      title: 'Order Saved',
+      message: 'Your bespoke order has been saved to Order History.',
+      duration: 3500,
+    });
+  };
 
   return (
-    <div className="w-full max-w-[1216px] mx-auto mt-4 px-2 sm:px-4 lg:px-0 pb-24 select-none">
-      {/* =======================================================================
-          Master-Detail Layout (1280px design width; fluid)
-          - Left Column: Sticky Client Directory (333px on lg)
-          - Right Column: Unified Client Workspace (flex-1, ~852px on lg)
-          Both blocks are white containers (2px padding, radius 8) holding --card cards (radius 6).
-          ======================================================================= */}
-      <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
-        {/* =====================================================================
-            LEFT COLUMN: STATEFUL CLIENT DIRECTORY (333px)
-            ===================================================================== */}
-        <div
-          className={cn(
-            'w-full lg:w-[333px] lg:shrink-0 p-[2px] rounded-[8px] bg-white lg:sticky lg:top-20',
-            mobileTab !== 'directory' ? 'hidden lg:block' : 'block'
-          )}
-        >
-          <div className="w-full rounded-[6px] bg-[var(--card)] p-3 flex flex-col gap-3.5">
-            {/* Header Row: Title + "+ New Client" Pill */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
-                <h2 className="text-[16px] font-bold text-black leading-tight">
-                  Client Directory
-                </h2>
-                <span className="px-2 py-0.5 rounded-full bg-white text-[11px] font-semibold text-[var(--text-2)] border border-[#EDEDED]">
-                  {allClientList.length}
-                </span>
-              </div>
+    <div className="w-full max-w-[1216px] mx-auto mt-3 lg:mt-4 px-3 sm:px-4 xl:px-0 pb-24 lg:pb-12 select-none">
+      {allClientList.length === 0 ? (
+        <div className="w-full bg-[var(--surface)] p-8 rounded-[8px] flex flex-col items-center justify-center text-center gap-3">
+          <p className="text-[15px] font-bold text-[var(--text)]">
+            No clients in your atelier directory yet
+          </p>
+          <p className="text-[12px] text-[var(--text-2)] max-w-sm">
+            Create your first client profile to record bespoke anatomical measurements and manage order history.
+          </p>
+          <button
+            type="button"
+            onClick={() => handleOpenEditProfile('create')}
+            className="mt-1 h-9 px-5 rounded-[24px] bg-[var(--primary)] text-white text-[12px] font-medium hover:opacity-95 transition-opacity cursor-pointer flex items-center gap-1.5"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Create First Client</span>
+          </button>
+        </div>
+      ) : (
+      /* =====================================================================
+          OUTER SHELL CONTAINER (2px white frame, rounded-[8px], gap-[2px])
+          ===================================================================== */
+      <div className="w-full bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
+        {/* ===================================================================
+            TOP CLIENT HEADER BAR (Present in all 9 Figma frames)
+            =================================================================== */}
+        <div className="w-full bg-[var(--surface)] rounded-[6px] px-4 sm:px-6 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative">
+          {/* Left Identity Cluster */}
+          <div
+            id="clients-roster"
+            className="flex items-center gap-3.5 sm:gap-4 min-w-0"
+          >
+            {/* 64px Dark Charcoal Initials Circle (#595959) */}
+            <button
+              type="button"
+              onClick={() => handleOpenEditProfile('switch')}
+              title="Switch or manage client"
+              aria-label={`Switch or manage client (${selectedClientProfile.name})`}
+              className="w-[56px] h-[56px] sm:w-[64px] sm:h-[64px] rounded-full bg-[var(--text-2)] flex items-center justify-center text-white text-[15px] sm:text-[16px] font-semibold shrink-0 cursor-pointer hover:opacity-95 transition-opacity"
+            >
+              {selectedClientProfile.initials}
+            </button>
 
+            <div className="min-w-0 flex-1">
               <button
                 type="button"
-                onClick={() => setIsNewClientModalOpen(true)}
-                className="h-7 px-3 rounded-[24px] bg-white border border-[var(--outline)] text-[var(--text-strong)] text-[12px] font-semibold hover:bg-[#EAEAEA] transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                onClick={() => handleOpenEditProfile('switch')}
+                className="text-left group cursor-pointer block max-w-full"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>New Client</span>
+                <h1 className="text-[17px] sm:text-[18px] font-semibold text-[var(--text)] leading-tight truncate group-hover:text-[var(--primary)] transition-colors">
+                  {selectedClientProfile.name}
+                </h1>
               </button>
-            </div>
 
-            {/* Search field */}
-            <div className="flex items-center gap-2 bg-[var(--field-on-card)] border border-[#EDEDED] rounded-[8px] p-2">
-              <Search className="w-4 h-4 text-[var(--muted)] shrink-0" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search clients by name, phone, email..."
-                className="w-full bg-transparent text-[12px] text-black placeholder:text-[var(--muted)] focus:outline-none"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="text-[var(--muted)] hover:text-black p-0.5 cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-
-            {/* Quick Directory Filter Pills */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1 bg-white p-1 rounded-full border border-[#EDEDED]">
-                <button
-                  type="button"
-                  onClick={() => setDirectoryFilter('all')}
-                  className={cn(
-                    'px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors cursor-pointer',
-                    directoryFilter === 'all'
-                      ? 'bg-[var(--primary)] text-white'
-                      : 'text-[var(--text-2)] hover:text-black'
-                  )}
-                >
-                  All Clients ({allClientList.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDirectoryFilter('active')}
-                  className={cn(
-                    'px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors cursor-pointer',
-                    directoryFilter === 'active'
-                      ? 'bg-[var(--primary)] text-white'
-                      : 'text-[var(--text-2)] hover:text-black'
-                  )}
-                >
-                  Active Orders
-                </button>
+              {/* Contact Info Row */}
+              <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 mt-1.5 text-[11px] sm:text-[12px] font-medium text-[var(--text)]">
+                <span className="inline-flex items-center gap-1.5 tabular-nums">
+                  <Phone className="w-3.5 h-3.5 fill-current text-[var(--text)] shrink-0" />
+                  <span>{selectedClientProfile.phone}</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-3.5 h-3.5 rounded-full bg-[var(--text)] text-white inline-flex items-center justify-center shrink-0">
+                    <AtSign className="w-2.5 h-2.5 stroke-[2.5]" />
+                  </span>
+                  <span>{selectedClientProfile.email}</span>
+                </span>
               </div>
             </div>
+          </div>
 
-            {/* Client List (Keeps selected client visible and highlighted!) */}
-            <div className="bg-white rounded-[8px] p-[2px] flex flex-col gap-[2px] max-h-[520px] overflow-y-auto">
-              {directoryClients.length === 0 ? (
-                <div className="p-6 text-center text-[12px] text-[var(--muted)]">
-                  No clients match &ldquo;{searchQuery}&rdquo;
-                </div>
-              ) : (
-                directoryClients.map((client) => {
-                  const isSelected = client.id === selectedClientProfile.id;
-                  return (
-                    <button
-                      key={client.id}
-                      type="button"
-                      onClick={() => handleSelectClient(client)}
-                      className={cn(
-                        'w-full p-2.5 rounded-[8px] flex items-center justify-between text-left transition-all cursor-pointer select-none border',
-                        isSelected
-                          ? 'bg-[var(--selected-bg)] border-[var(--selected)]'
-                          : 'bg-[var(--chip)] border-transparent hover:bg-[#EAEAEA]'
-                      )}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
-                        <div
-                          className={cn(
-                            'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-colors',
-                            isSelected
-                              ? 'bg-[var(--primary)] text-white'
-                              : 'bg-white text-[var(--text-strong)]'
-                          )}
-                        >
-                          <span className="text-[13px] font-bold">
-                            {client.initials}
-                          </span>
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <h4
-                              className={cn(
-                                'text-[13px] truncate leading-tight',
-                                isSelected
-                                  ? 'font-bold text-[var(--primary)]'
-                                  : 'font-semibold text-[var(--text-strong)]'
-                              )}
-                            >
-                              {client.name}
-                            </h4>
-                            {client.activeOrdersCount > 0 && (
-                              <span className="px-1.5 py-0.2 rounded-full bg-white text-[10px] font-semibold text-[var(--text-2)] border border-[#E5E5E5] shrink-0">
-                                {client.activeOrdersCount} active
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] font-normal text-[var(--muted)] truncate leading-tight mt-0.5 tabular-nums">
-                            {client.phone}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div
-                        className={cn(
-                          'w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-colors',
-                          isSelected
-                            ? 'bg-[var(--primary)] text-white'
-                            : 'bg-white text-[var(--text-2)] shadow-2xs'
-                        )}
-                      >
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </div>
-                    </button>
-                  );
-                })
+          {/* Right Action Cluster: `New order` pill + `⋮` Overflow Menu Button */}
+          <div
+            ref={overflowMenuRef}
+            className="flex items-center gap-2.5 w-full sm:w-auto relative"
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setIsOverflowMenuOpen(false);
+                setViewState((prev) =>
+                  prev === 'Inline_NewOrder'
+                    ? 'SavedMeasurements_Default'
+                    : 'Inline_NewOrder'
+                );
+              }}
+              className={cn(
+                'flex-1 sm:flex-initial h-9 px-4 rounded-[24px] border text-[12px] font-medium transition-colors flex items-center justify-center cursor-pointer',
+                viewState === 'Inline_NewOrder'
+                  ? 'bg-[var(--selected-bg)] border-[var(--selected)] text-[var(--primary)]'
+                  : 'bg-[var(--chip)] border-[var(--outline)] text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[#E8E8E8]'
               )}
-            </div>
+            >
+              New order
+            </button>
+
+            <button
+              type="button"
+              aria-label="Client profile actions"
+              aria-haspopup="menu"
+              aria-expanded={isOverflowMenuOpen}
+              onClick={() => setIsOverflowMenuOpen((prev) => !prev)}
+              className="w-9 h-9 rounded-full bg-[var(--chip)] hover:bg-[#E8E8E8] flex items-center justify-center text-[var(--text-2)] hover:text-[var(--text)] transition-colors shrink-0 cursor-pointer"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+
+            {/* Overflow Menu Popover (Desktop Frame 2 & Mobile Frame 4) */}
+            <AnimatePresence>
+              {isOverflowMenuOpen && (
+                <motion.div
+                  role="menu"
+                  aria-label="Client profile actions"
+                  initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                  transition={springSmooth}
+                  className="absolute right-0 top-[calc(100%+6px)] z-40 w-[148px] bg-[var(--surface)] border border-[var(--outline)] rounded-[8px] p-1 shadow-[0_8px_24px_rgba(0,0,0,0.08)] flex flex-col gap-0.5"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => handleOpenEditProfile('edit')}
+                    className="w-full px-2.5 py-2 rounded-[6px] bg-[var(--card)] hover:bg-[#EFEFEF] flex items-center gap-2 text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--text)] transition-colors text-left cursor-pointer"
+                  >
+                    <Pencil className="w-3.5 h-3.5 shrink-0" />
+                    <span>Edit Profile</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setIsOverflowMenuOpen(false);
+                      setIsDeleteConfirmOpen(true);
+                    }}
+                    className="w-full px-2.5 py-2 rounded-[6px] hover:bg-[var(--card)] flex items-center gap-2 text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--paused)] transition-colors text-left cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>Delete</span>
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
-        {/* =====================================================================
-            RIGHT COLUMN: UNIFIED CLIENT WORKSPACE
-            ===================================================================== */}
-        <div
-          className={cn(
-            'flex-1 w-full min-w-0 p-[2px] rounded-[8px] bg-white flex flex-col gap-[2px]',
-            mobileTab === 'directory' ? 'hidden lg:flex' : 'flex'
-          )}
-        >
-          {/* ===================================================================
-              1. CONSOLIDATED CLIENT IDENTITY & QUICK-STATS HEADER BAR
-              Replaces the redundant double-stacked headers with a single sleek
-              horizontal bar in TailorFit's signature style.
-              =================================================================== */}
-          <div className="w-full rounded-[6px] bg-[var(--card)] p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5 min-w-0">
-              {/* 52px Black Initials Circle */}
-              <div className="w-[52px] h-[52px] rounded-full bg-black flex items-center justify-center text-[15px] font-bold text-white shadow-xs shrink-0">
-                {selectedClientProfile.initials}
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] text-[var(--muted)] tracking-[0.4px] uppercase font-bold">
-                    CLIENT PROFILE
-                  </span>
-                  <span className="w-1 h-1 rounded-full bg-[var(--muted)]" />
-                  <span className="text-[11px] text-[var(--muted)] font-medium">
-                    {selectedClientProfile.since}
-                  </span>
-                </div>
-
-                <h1 className="text-[18px] sm:text-[20px] font-bold text-black leading-tight truncate mt-0.5">
-                  {selectedClientProfile.name}
-                </h1>
-
-                {/* Contact Info Row */}
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-[var(--text-2)] mt-1">
-                  <span className="inline-flex items-center gap-1.5 text-black font-medium tabular-nums">
-                    <Phone className="w-3.5 h-3.5 text-[var(--text-2)] shrink-0" />
-                    {selectedClientProfile.phone}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-black font-medium">
-                    <Mail className="w-3.5 h-3.5 text-[var(--text-2)] shrink-0" />
-                    {selectedClientProfile.email}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Actions: Quick Stats + Choose Template + New Order */}
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              {savedIndicator && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#ECFDF5] text-[#0E9F5C] text-[11px] font-semibold">
-                  <Check className="w-3 h-3 stroke-[2.5]" />
-                  {savedIndicator}
-                </span>
-              )}
-
-              <button
-                type="button"
-                onClick={() => onNewOrder(selectedClientProfile.id)}
-                className="h-9 px-4 rounded-[24px] bg-[var(--primary)] text-white text-[13px] font-semibold hover:opacity-95 transition-opacity cursor-pointer shadow-xs"
+        {/* ===================================================================
+            MAIN WORKSPACE AREA
+            - Views 1, 2, 3 render inside the #F8F8F8 (--card) workspace with Underline Tabs
+            - View 4 (Inline_NewOrder) renders the 2-column New Order split
+            =================================================================== */}
+        {viewState !== 'Inline_NewOrder' ? (
+          <>
+            <div className="w-full bg-[var(--card)] rounded-[6px] px-4 sm:px-6 pt-4 pb-6 flex flex-col gap-4">
+              {/* Underline Tabs: `Saved Measurements` | `Order History` */}
+              <div
+                role="tablist"
+                aria-label="Client workspace sections"
+                className="w-full border-b border-[var(--outline)] flex items-center gap-6"
               >
-                New Order
-              </button>
-            </div>
-          </div>
-
-          {/* ===================================================================
-              2. BODY MEASUREMENT WORKSPACE (Side-by-Side Split on Desktop)
-              Visible on Desktop always, and on Mobile when mobileTab === 'profile'
-              =================================================================== */}
-          <div
-            className={cn(
-              'w-full rounded-[6px] bg-[var(--card)] p-4 sm:p-5 flex flex-col gap-4',
-              mobileTab === 'orders' ? 'hidden lg:flex' : 'flex'
-            )}
-          >
-            {/* Workspace Toolbar Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="text-[16px] font-bold text-black leading-tight">
-                  Body Measurements &amp; Fit
-                </h3>
-                <div className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--muted)] mt-0.5">
-                  <span>
-                    {activePointKeys.length === 0
-                      ? 'Empty state · Choose a template or add a point'
-                      : `${activePointKeys.length} active ${
-                          activePointKeys.length === 1 ? 'measurement' : 'measurements'
-                        }`}
-                  </span>
-                  <span className="w-1 h-1 rounded-full bg-[var(--muted)]" />
-                  <span>
-                    {mannequinGender === 'female' ? 'Feminine Form' : 'Masculine Form'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Right Controls: Snapshot/Template Switcher + Add Point + View Mode Toggle */}
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Saved Snapshot selector if client has multiple snapshots */}
-                {clientSnapshots.length > 0 && (
-                  <select
-                    value={activeSnapshotId}
-                    onChange={(e) => handleSelectSnapshot(e.target.value)}
-                    aria-label="Select saved measurement snapshot"
-                    className="h-9 px-3 rounded-[24px] bg-white border border-[var(--outline)] text-[12px] font-medium text-black focus:outline-none cursor-pointer"
-                  >
-                    {clientSnapshots.map((snap) => (
-                      <option key={snap.id} value={snap.id}>
-                        {snap.date} · {snap.garmentType || 'Saved Fit'}
-                      </option>
-                    ))}
-                  </select>
-                )}
-
-                {/* Choose Garment Blueprint Template */}
                 <button
                   type="button"
-                  onClick={() => {
-                    setDialogSelectedTemplateId(
-                      selectedTemplateId || storeTemplates[0]?.id || ''
-                    );
-                    setIsTemplateModalOpen(true);
-                  }}
+                  role="tab"
+                  aria-selected={
+                    viewState === 'SavedMeasurements_Default' ||
+                    viewState === 'SavedMeasurements_UseFlow'
+                  }
+                  onClick={() => setViewState('SavedMeasurements_Default')}
                   className={cn(
-                    'h-9 px-3.5 rounded-[24px] text-[13px] font-medium transition-colors cursor-pointer border',
-                    selectedTemplateName
-                      ? 'bg-[var(--selected-bg)] border-[var(--selected)] text-[var(--primary)] font-semibold'
-                      : 'bg-white border-[var(--outline)] text-[var(--text-2)] hover:bg-[#EAEAEA]'
+                    'pb-2.5 text-[12px] sm:text-[13px] transition-colors relative cursor-pointer',
+                    viewState === 'SavedMeasurements_Default' ||
+                      viewState === 'SavedMeasurements_UseFlow'
+                      ? 'font-semibold text-[var(--primary)]'
+                      : 'font-medium text-[var(--muted)] hover:text-[var(--text-2)]'
                   )}
                 >
-                  {selectedTemplateName || 'Choose Template'}
+                  Saved Measurements
+                  {(viewState === 'SavedMeasurements_Default' ||
+                    viewState === 'SavedMeasurements_UseFlow') && (
+                    <motion.div
+                      layoutId="clients-underline-tab"
+                      transition={springSnappy}
+                      className="absolute left-0 right-0 -bottom-[1px] h-[2px] bg-[var(--primary)]"
+                    />
+                  )}
                 </button>
-
-                {/* Add Point button */}
                 <button
                   type="button"
-                  onClick={handleOpenAddPoint}
-                  className="h-9 px-3.5 rounded-[24px] bg-white border border-[var(--outline)] text-black text-[13px] font-medium hover:bg-[#EAEAEA] transition-colors cursor-pointer"
+                  id="clients-order-history-tab"
+                  role="tab"
+                  aria-selected={viewState === 'OrderHistory_Grid'}
+                  onClick={() => setViewState('OrderHistory_Grid')}
+                  className={cn(
+                    'pb-2.5 text-[12px] sm:text-[13px] transition-colors relative cursor-pointer',
+                    viewState === 'OrderHistory_Grid'
+                      ? 'font-semibold text-[var(--primary)]'
+                      : 'font-medium text-[var(--muted)] hover:text-[var(--text-2)]'
+                  )}
                 >
-                  Add Point
+                  Order History
+                  {viewState === 'OrderHistory_Grid' && (
+                    <motion.div
+                      layoutId="clients-underline-tab"
+                      transition={springSnappy}
+                      className="absolute left-0 right-0 -bottom-[1px] h-[2px] bg-[var(--primary)]"
+                    />
+                  )}
                 </button>
-
-                {/* View Mode Toggle: Split (Desktop) | Mannequin | Table */}
-                <div className="flex items-center bg-[var(--track)] rounded-[24px] p-1 gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setMannequinView('split')}
-                    className={cn(
-                      'hidden lg:flex w-7 h-7 rounded-full items-center justify-center transition-all cursor-pointer',
-                      mannequinView === 'split'
-                        ? 'bg-[var(--primary)] text-white shadow-xs'
-                        : 'bg-white text-[var(--text-2)] hover:text-black'
-                    )}
-                    title="Side-by-Side Split View"
-                  >
-                    <Columns2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMannequinView('mannequin')}
-                    className={cn(
-                      'w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer',
-                      mannequinView === 'mannequin'
-                        ? 'bg-[var(--primary)] text-white shadow-xs'
-                        : 'bg-white text-[var(--text-2)] hover:text-black'
-                    )}
-                    title="Mannequin Only View"
-                  >
-                    <User className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMannequinView('table')}
-                    className={cn(
-                      'w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer',
-                      mannequinView === 'table'
-                        ? 'bg-[var(--primary)] text-white shadow-xs'
-                        : 'bg-white text-[var(--text-2)] hover:text-black'
-                    )}
-                    title="Measurement List View"
-                  >
-                    <ClipboardList className="w-3.5 h-3.5" />
-                  </button>
-                </div>
               </div>
-            </div>
 
-            {/* Main Workspace Body */}
-            <div
-              className={cn(
-                'w-full grid gap-4 items-start',
-                mannequinView === 'split'
-                  ? 'grid-cols-1 lg:grid-cols-12'
-                  : 'grid-cols-1'
-              )}
-            >
-              {/* LEFT PANE: Interactive 360° Mannequin */}
-              {(mannequinView === 'split' || mannequinView === 'mannequin') && (
-                <div
-                  className={cn(
-                    'w-full bg-white rounded-[12px] p-4 flex flex-col items-center justify-center',
-                    mannequinView === 'split' ? 'lg:col-span-5' : 'min-h-[540px]'
-                  )}
-                >
-                  <RotatableMannequin
-                    gender={mannequinGender}
-                    onGenderChange={setMannequinGender}
-                    showGenderToggle={true}
-                    compact={mannequinView === 'split'}
-                    measurements={measurements}
-                    activePointKeys={activePointKeys}
-                    selectedPointKey={pointModalData?.key || null}
-                    unit={unitLabel}
-                    onSelectPoint={handleOpenPoint}
-                  />
-                </div>
-              )}
-
-              {/* RIGHT PANE: Categorized 4-Zone Measurement Cards */}
-              {(mannequinView === 'split' || mannequinView === 'table') && (
-                <div
-                  className={cn(
-                    'w-full flex flex-col gap-3',
-                    mannequinView === 'split' ? 'lg:col-span-7' : 'w-full'
-                  )}
-                >
-                  {/* 4 Anatomical Zone Filter Pills */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 bg-white rounded-[12px] p-2.5">
-                    <div className="flex flex-wrap items-center gap-1">
+              {/* =============================================================
+                  VIEW STATE 1: `SavedMeasurements_Default`
+                  (Desktop Frames 1 & 2, Mobile Frames 3 & 4)
+                  ============================================================= */}
+              {viewState === 'SavedMeasurements_Default' && (
+                <div className="flex flex-col gap-4 pt-1">
+                  {/* Snapshot Selector Pill + Metadata Header + Use Measurement CTA */}
+                  <div
+                    ref={snapshotDropdownRef}
+                    className="flex flex-col gap-3 relative"
+                  >
+                    {/* Snapshot Selector Dropdown Pill */}
+                    <div
+                      id="client-snapshot-selector"
+                      className="relative w-[300px] max-w-full"
+                    >
                       <button
                         type="button"
-                        onClick={() => setZoneFilter('all')}
-                        className={cn(
-                          'px-3 py-1 rounded-full text-[11px] font-semibold transition-colors cursor-pointer',
-                          zoneFilter === 'all'
-                            ? 'bg-[var(--primary)] text-white'
-                            : 'bg-[var(--chip)] text-[var(--text-2)] hover:text-black'
-                        )}
+                        aria-haspopup="listbox"
+                        aria-expanded={isSnapshotDropdownOpen}
+                        onClick={() =>
+                          setIsSnapshotDropdownOpen((prev) => !prev)
+                        }
+                        className="w-full h-8 px-3.5 rounded-[24px] bg-[var(--surface)] border border-[var(--outline)] flex items-center justify-between gap-2 text-[12px] text-[var(--text-2)] hover:border-[var(--muted)] transition-colors cursor-pointer"
                       >
-                        All ({activePointKeys.length})
+                        <span className="truncate">
+                          {activeSnapshot
+                            ? `${activeSnapshot.garmentType}. ${activeSnapshot.date}`
+                            : 'Bespoke wedding gown. 25/10/2026'}
+                        </span>
+                        <ChevronDown className="w-3.5 h-3.5 text-[var(--text-2)] shrink-0" />
                       </button>
-                      {ANATOMICAL_ZONES.map((z) => {
-                        const count = activePointKeys.filter(
-                          (k) => hotspotMap[k]?.zoneId === z.id
-                        ).length;
-                        return (
-                          <button
-                            key={z.id}
-                            type="button"
-                            onClick={() => setZoneFilter(z.id)}
-                            className={cn(
-                              'px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors cursor-pointer',
-                              zoneFilter === z.id
-                                ? 'bg-[var(--primary)] text-white font-semibold'
-                                : 'bg-[var(--chip)] text-[var(--text-2)] hover:text-black'
-                            )}
+
+                      {/* Mobile Dropdown Menu (anchors directly below selector pill on mobile as in Mobile Frame 4) */}
+                      <AnimatePresence>
+                        {isSnapshotDropdownOpen && (
+                          <motion.div
+                            role="listbox"
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            transition={springSmooth}
+                            className="sm:hidden absolute left-0 top-[calc(100%+4px)] w-full bg-[var(--surface)] border border-[var(--outline)] rounded-[8px] p-1 shadow-[0_8px_24px_rgba(0,0,0,0.06)] z-30 flex flex-col gap-0.5"
                           >
-                            {z.shortLabel} ({count})
-                          </button>
-                        );
-                      })}
+                            {otherSnapshots.map((snap, idx) => (
+                              <button
+                                key={snap.id}
+                                type="button"
+                                role="option"
+                                aria-selected={snap.id === activeSnapshot?.id}
+                                onClick={() => handleSelectSnapshot(snap.id)}
+                                className={cn(
+                                  'w-full px-3 py-2 rounded-[6px] text-left text-[12px] text-[var(--text-2)] hover:bg-[var(--card)] hover:text-[var(--text)] transition-colors cursor-pointer',
+                                  idx === 0 && 'bg-[var(--card)]'
+                                )}
+                              >
+                                {snap.garmentType}. {snap.date}
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
 
-                    {activePointKeys.length > 0 && (
+                    {/* Snapshot Title + Subtitle + `Use Measurement` Pill Button */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative">
+                      <div>
+                        <h2 className="text-[14px] font-semibold text-[var(--text)] leading-snug">
+                          {activeSnapshot
+                            ? `${activeSnapshot.garmentType}.`
+                            : 'Bespoke wedding gown.'}
+                        </h2>
+                        <p className="text-[11px] text-[var(--muted)] mt-0.5">
+                          {activePointKeys.length}{' '}
+                          {activePointKeys.length === 1 ? 'point' : 'points'}{' '}
+                          &nbsp;•&nbsp;{' '}
+                          {mannequinGender === 'female' ? 'Female' : 'Male'}{' '}
+                          &nbsp;•&nbsp; Recorded on{' '}
+                          {activeSnapshot ? activeSnapshot.date : '25/10/2026'}
+                        </p>
+
+                        {/* Desktop Dropdown Menu (positioned right below the title as in Desktop Frame 2) */}
+                        <AnimatePresence>
+                          {isSnapshotDropdownOpen && (
+                            <motion.div
+                              role="listbox"
+                              initial={{ opacity: 0, y: -4 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -4 }}
+                              transition={springSmooth}
+                              className="hidden sm:flex absolute left-0 top-[26px] w-[260px] bg-[var(--surface)] border border-[var(--outline)] rounded-[8px] p-1 shadow-[0_8px_24px_rgba(0,0,0,0.06)] z-30 flex-col gap-0.5"
+                            >
+                              {otherSnapshots.map((snap, idx) => (
+                                <button
+                                  key={snap.id}
+                                  type="button"
+                                  role="option"
+                                  aria-selected={snap.id === activeSnapshot?.id}
+                                  onClick={() => handleSelectSnapshot(snap.id)}
+                                  className={cn(
+                                    'w-full px-3 py-2 rounded-[6px] text-left text-[12px] text-[var(--text-2)] hover:bg-[var(--card)] hover:text-[var(--text)] transition-colors cursor-pointer',
+                                    idx === 0 && 'bg-[var(--card)]'
+                                  )}
+                                >
+                                  {snap.garmentType}. {snap.date}
+                                </button>
+                              ))}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+
                       <button
                         type="button"
+                        id="clients-use-measurement-btn"
                         onClick={() => {
-                          setSelectedTemplateId('');
-                          setSelectedTemplateName('');
-                          setActivePointKeys([]);
-                          setMeasurements({});
-                          persistMeasurementsToStore([], {});
+                          setIsSnapshotDropdownOpen(false);
+                          setViewState('SavedMeasurements_UseFlow');
                         }}
-                        className="text-[11px] font-medium text-[var(--muted)] hover:text-[var(--paused)] cursor-pointer px-1.5"
+                        className="w-full sm:w-auto h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[#E8E8E8] transition-colors flex items-center justify-center cursor-pointer shrink-0"
                       >
-                        Clear all
+                        Use Measurement
                       </button>
-                    )}
+                    </div>
                   </div>
 
-                  {/* Measurement Cards Grid or Clean Empty State */}
-                  {activePointKeys.length === 0 ? (
-                    <div className="w-full min-h-[360px] bg-white rounded-[12px] p-6 flex flex-col items-center justify-center text-center gap-3">
-                      <p className="text-[14px] font-semibold text-black">
-                        No measurement points active for {selectedClientProfile.name}
-                      </p>
-                      <p className="text-[12px] text-[var(--text-2)] max-w-sm">
-                        Select a saved Garment Template to load its standard points onto the mannequin, or add individual points from the sizing catalog.
-                      </p>
-                      <div className="flex items-center gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDialogSelectedTemplateId(
-                              selectedTemplateId || storeTemplates[0]?.id || ''
-                            );
-                            setIsTemplateModalOpen(true);
-                          }}
-                          className="h-9 px-4 rounded-[24px] bg-[var(--primary)] text-white text-[13px] font-medium hover:opacity-95 transition-opacity cursor-pointer"
-                        >
-                          Choose Template
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleOpenAddPoint}
-                          className="h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-black text-[13px] font-medium hover:bg-[#EAEAEA] transition-colors cursor-pointer"
-                        >
-                          Add Point
-                        </button>
-                      </div>
+                  {/* 2-Column Split: Left 3D Mannequin + Right 3-Column (Desktop) / 2-Column (Mobile) Measurement Cards */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start pt-2">
+                    {/* Left Mannequin on #F8F8F8 canvas */}
+                    <div className="lg:col-span-5 flex items-center justify-center">
+                      <RotatableMannequin
+                        gender={mannequinGender}
+                        onGenderChange={setMannequinGender}
+                        showControls={false}
+                        compact={false}
+                        measurements={measurements}
+                        activePointKeys={activePointKeys}
+                        selectedPointKey={pointModalData?.key || null}
+                        unit={unitLabel}
+                        onSelectPoint={handleOpenPoint}
+                      />
                     </div>
-                  ) : visibleMeasurementFields.length === 0 ? (
-                    <div className="w-full min-h-[220px] bg-white rounded-[12px] p-6 flex flex-col items-center justify-center text-center gap-2">
-                      <p className="text-[13px] font-medium text-[var(--text-2)]">
-                        No active points in this anatomical zone.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setZoneFilter('all')}
-                        className="text-[12px] font-semibold text-[var(--primary)] hover:underline cursor-pointer"
-                      >
-                        Show all {activePointKeys.length} active points
-                      </button>
-                    </div>
-                  ) : (
-                    <div
-                      className={cn(
-                        'w-full grid gap-2 max-h-[500px] overflow-y-auto pr-0.5',
-                        mannequinView === 'split'
-                          ? 'grid-cols-1 sm:grid-cols-2'
-                          : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
-                      )}
-                    >
+
+                    {/* Right Measurement Cards Grid (2 cols on mobile, 3 cols on desktop) */}
+                    <div className="lg:col-span-7 grid grid-cols-2 lg:grid-cols-3 gap-2.5">
                       {visibleMeasurementFields.map((field) => (
                         <div
                           key={field.id}
-                          className="bg-white rounded-[14px] p-3.5 flex flex-col justify-between gap-3 border border-transparent hover:border-[#EDEDED] transition-colors"
+                          className="bg-[var(--surface)] rounded-[12px] p-3 flex flex-col justify-between gap-2.5"
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <span className="text-[13px] font-semibold text-black block truncate">
-                                {field.name}
-                              </span>
-                              <span className="text-[10px] font-medium text-[var(--muted)] block">
-                                {field.zone}
-                              </span>
-                            </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[12px] font-semibold text-[var(--text)] truncate">
+                              {field.name}
+                            </span>
                             <button
                               type="button"
                               onClick={() => handleRemovePoint(field.id)}
-                              className="w-5 h-5 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-black hover:bg-[#F2F2F2] transition-colors cursor-pointer shrink-0"
                               title={`Remove ${field.name}`}
+                              aria-label={`Remove ${field.name}`}
+                              className="w-6 h-6 -mr-1 -mt-0.5 rounded-full flex items-center justify-center text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors cursor-pointer shrink-0"
                             >
-                              <X className="w-3 h-3" />
+                              <X className="w-3.5 h-3.5" />
                             </button>
                           </div>
 
-                          <div className="w-full bg-[var(--card)] border border-[#EDEDED] focus-within:!border-[var(--primary)] rounded-[8px] p-[2px] flex items-center">
+                          <div className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 flex items-center border border-transparent focus-within:border-[var(--primary)] transition-colors">
                             <input
                               type="text"
                               inputMode="decimal"
+                              aria-label={`${field.name} (${field.unit})`}
                               value={field.value}
                               onChange={(e) =>
                                 handleFieldValueChange(field.id, e.target.value)
                               }
                               placeholder="0.0"
-                              className="w-full bg-transparent px-2.5 py-1.5 text-[13px] font-semibold text-black placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
+                              className="w-full bg-transparent text-[12px] font-medium text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
                             />
-                            <span className="pr-2.5 text-[11px] font-semibold text-[var(--text-2)] select-none shrink-0">
-                              {field.unit}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* =============================================================
+                  VIEW STATE 2: `SavedMeasurements_UseFlow`
+                  (Desktop Frame 3, Mobile Frame 1)
+                  ============================================================= */}
+              {viewState === 'SavedMeasurements_UseFlow' && (
+                <div className="flex flex-col gap-3.5 pt-0.5">
+                  {/* Back Link */}
+                  <button
+                    type="button"
+                    onClick={() => setViewState('SavedMeasurements_Default')}
+                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--text)] transition-colors w-fit cursor-pointer"
+                  >
+                    <CornerUpLeft className="w-3.5 h-3.5" />
+                    <span>Back</span>
+                  </button>
+
+                  {/* Snapshot Selector Dropdown Pill */}
+                  <div
+                    ref={snapshotDropdownRef}
+                    className="relative w-[260px] max-w-full"
+                  >
+                    <button
+                      type="button"
+                      aria-haspopup="listbox"
+                      aria-expanded={isSnapshotDropdownOpen}
+                      onClick={() => setIsSnapshotDropdownOpen((prev) => !prev)}
+                      className="w-full h-8 px-3.5 rounded-[24px] bg-[var(--surface)] border border-[var(--outline)] flex items-center justify-between gap-2 text-[12px] text-[var(--text-2)] hover:border-[var(--muted)] transition-colors cursor-pointer"
+                    >
+                      <span className="truncate">
+                        {activeSnapshot
+                          ? `${activeSnapshot.garmentType}. ${activeSnapshot.date}`
+                          : 'Bespoke wedding gown. 25/10/2026'}
+                      </span>
+                      <ChevronDown className="w-3.5 h-3.5 text-[var(--text-2)] shrink-0" />
+                    </button>
+
+                    <AnimatePresence>
+                      {isSnapshotDropdownOpen && (
+                        <motion.div
+                          role="listbox"
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          transition={springSmooth}
+                          className="absolute left-0 top-[calc(100%+4px)] w-full bg-[var(--surface)] border border-[var(--outline)] rounded-[8px] p-1 shadow-[0_8px_24px_rgba(0,0,0,0.06)] z-30 flex flex-col gap-0.5"
+                        >
+                          {otherSnapshots.map((snap, idx) => (
+                            <button
+                              key={snap.id}
+                              type="button"
+                              role="option"
+                              aria-selected={snap.id === activeSnapshot?.id}
+                              onClick={() => handleSelectSnapshot(snap.id)}
+                              className={cn(
+                                'w-full px-3 py-2 rounded-[6px] text-left text-[12px] text-[var(--text-2)] hover:bg-[var(--card)] hover:text-[var(--text)] transition-colors cursor-pointer',
+                                idx === 0 && 'bg-[var(--card)]'
+                              )}
+                            >
+                              {snap.garmentType}. {snap.date}
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* 2-Column Split wrapped in white surface frame for crisp seam separation */}
+                  <div className="bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col lg:flex-row gap-[2px] items-stretch">
+                    {/* Left White Card */}
+                    <div className="w-full lg:w-[35%] bg-[var(--surface)] rounded-[6px] p-4 flex flex-col gap-3.5 shrink-0">
+                      <h3 className="text-[15px] font-bold text-[var(--text)] leading-snug">
+                        {activeSnapshot?.garmentType || 'Bespoke wedding gown'}
+                      </h3>
+
+                      {/* Read-only Client Summary Key-Value Rows */}
+                      <div className="flex flex-col gap-2 text-[12px]">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[var(--muted)]">Client Name:</span>
+                          <span className="font-medium text-[var(--text)]">
+                            {selectedClientProfile.name}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[var(--muted)]">Phone Number</span>
+                          <span className="font-medium text-[var(--text)] tabular-nums">
+                            {selectedClientProfile.id === 'c-1'
+                              ? '+234 693828199'
+                              : selectedClientProfile.phone}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[var(--muted)]">Email Address</span>
+                          <span className="font-medium text-[var(--text)]">
+                            {selectedClientProfile.id === 'c-1'
+                              ? 'chloe@atelier.com'
+                              : selectedClientProfile.email}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Style References */}
+                      <div>
+                        <label className="text-[11px] font-medium text-[var(--text)] mb-1.5 block">
+                          Style References
+                        </label>
+                        <AnimatedFileUpload
+                          images={useFlowImages}
+                          onChange={setUseFlowImages}
+                          label="Drop fabric style, sketches or style photos here"
+                        />
+                      </div>
+
+                      {/* Price & Due Date */}
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="text-[11px] font-medium text-[var(--text)] mb-1 block">
+                            Price ({currencySymbol})
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={useFlowPrice}
+                            onChange={(e) => setUseFlowPrice(e.target.value)}
+                            placeholder={`${currencySymbol}0.00`}
+                            className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[var(--primary)] tabular-nums"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-medium text-[var(--text)] mb-1 block">
+                            Due Date
+                          </label>
+                          <input
+                            type="text"
+                            value={useFlowDueDate}
+                            onChange={(e) => setUseFlowDueDate(e.target.value)}
+                            placeholder="09/10/2026"
+                            className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[var(--primary)] tabular-nums"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Workroom notes and fabric details */}
+                      <div>
+                        <label className="text-[11px] font-medium text-[var(--text)] mb-1 block">
+                          Workroom notes and fabric details
+                        </label>
+                        <textarea
+                          value={useFlowNotes}
+                          onChange={(e) => setUseFlowNotes(e.target.value)}
+                          placeholder="e.g. hand-stitched, monogram design on wrist and gold buttons"
+                          className="w-full min-h-[100px] rounded-[8px] bg-[var(--field-on-card)] p-3 text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] resize-none focus:outline-none border border-transparent focus:border-[var(--primary)]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Right Mannequin Pane */}
+                    <div className="w-full lg:flex-1 bg-[var(--card)] rounded-[6px] p-3 sm:p-4 flex flex-col gap-3">
+                      <div>
+                        <h3 className="text-[14px] font-bold text-[var(--text)] leading-tight">
+                          Mannequin
+                        </h3>
+                        <p className="text-[11px] text-[var(--muted)] mt-0.5">
+                          All available points &nbsp;•&nbsp;{' '}
+                          {mannequinGender === 'female'
+                            ? 'Feminine Form'
+                            : 'Masculine Form'}
+                        </p>
+                      </div>
+
+                      {/* Compact White Pill Toolbar: [Mannequin | List] + [Add Point] */}
+                      <div className="w-fit rounded-[32px] bg-[var(--surface)] p-1.5 flex items-center gap-2">
+                        <div className="h-8 bg-[var(--chip)] rounded-[24px] p-1 flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setMannequinDisplayMode('mannequin')}
+                            title="Mannequin view"
+                            aria-label="Mannequin view"
+                            aria-pressed={mannequinDisplayMode === 'mannequin'}
+                            className={cn(
+                              'w-6 h-6 rounded-full flex items-center justify-center transition-colors cursor-pointer',
+                              mannequinDisplayMode === 'mannequin'
+                                ? 'bg-[var(--primary)] text-white'
+                                : 'bg-[var(--surface)] text-[var(--text-2)] hover:text-[var(--text)]'
+                            )}
+                          >
+                            <PersonStanding className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setMannequinDisplayMode('list')}
+                            title="Measurement list view"
+                            aria-label="Measurement list view"
+                            aria-pressed={mannequinDisplayMode === 'list'}
+                            className={cn(
+                              'w-6 h-6 rounded-full flex items-center justify-center transition-colors cursor-pointer',
+                              mannequinDisplayMode === 'list'
+                                ? 'bg-[var(--primary)] text-white'
+                                : 'bg-[var(--surface)] text-[var(--text-2)] hover:text-[var(--text)]'
+                            )}
+                          >
+                            <ClipboardList className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleOpenAddPoint}
+                          className="h-8 px-3.5 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--text)] transition-colors cursor-pointer"
+                        >
+                          Add Point
+                        </button>
+                      </div>
+
+                      {/* Mannequin or List View */}
+                      {mannequinDisplayMode === 'mannequin' ? (
+                        <div className="flex-1 flex items-center justify-center py-2">
+                          <RotatableMannequin
+                            gender={mannequinGender}
+                            onGenderChange={setMannequinGender}
+                            showControls={false}
+                            compact={false}
+                            measurements={measurements}
+                            activePointKeys={activePointKeys}
+                            selectedPointKey={pointModalData?.key || null}
+                            unit={unitLabel}
+                            onSelectPoint={handleOpenPoint}
+                          />
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-2">
+                          {visibleMeasurementFields.map((field) => (
+                            <div
+                              key={field.id}
+                              className="bg-[var(--surface)] rounded-[12px] p-3 flex flex-col justify-between gap-2.5"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[12px] font-semibold text-[var(--text)] truncate">
+                                  {field.name}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemovePoint(field.id)}
+                                  title={`Remove ${field.name}`}
+                                  aria-label={`Remove ${field.name}`}
+                                  className="w-6 h-6 -mr-1 -mt-0.5 rounded-full flex items-center justify-center text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[var(--chip)] cursor-pointer shrink-0"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                              <div className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 flex items-center">
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  aria-label={`${field.name} (${field.unit})`}
+                                  value={field.value}
+                                  onChange={(e) =>
+                                    handleFieldValueChange(
+                                      field.id,
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="0.0"
+                                  className="w-full bg-transparent text-[12px] font-medium text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* =============================================================
+                  VIEW STATE 3: `OrderHistory_Grid`
+                  (Desktop Frame 4: 4-Column Order Card Grid)
+                  ============================================================= */}
+              {viewState === 'OrderHistory_Grid' && (
+                <div className="pt-1">
+                  {orderHistoryCards.length === 0 ? (
+                    <div className="w-full bg-[var(--surface)] rounded-[8px] p-8 text-center flex flex-col items-center justify-center gap-2">
+                      <p className="text-[14px] font-semibold text-[var(--text)]">
+                        No orders recorded for {selectedClientProfile.name} yet
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setViewState('Inline_NewOrder')}
+                        className="mt-1 h-9 px-4 rounded-[24px] bg-[var(--primary)] text-white text-[12px] font-medium hover:opacity-95 transition-opacity cursor-pointer"
+                      >
+                        Create First Order
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      {orderHistoryCards.map((card) => (
+                        <div
+                          key={card.id}
+                          onClick={() => {
+                            if (onEditOrder) onEditOrder(card.id);
+                          }}
+                          className={cn(
+                            'bg-[var(--surface)] rounded-[8px] p-[2px] flex flex-col gap-[2px] border border-transparent hover:border-[var(--selected)] transition-all',
+                            onEditOrder && 'cursor-pointer'
+                          )}
+                        >
+                          {/* Card Header */}
+                          <div className="bg-[var(--surface)] rounded-t-[6px] px-2.5 pt-2.5 pb-2 flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <h4 className="text-[13px] font-semibold text-[var(--text)] truncate leading-tight">
+                                {card.title}
+                              </h4>
+                              <p className="text-[11px] font-normal text-[var(--sub)] mt-1 leading-tight">
+                                {card.date}
+                              </p>
+                            </div>
+
+                            <span
+                              style={{ backgroundColor: card.badgeColor }}
+                              className="px-2.5 py-0.5 rounded-[24px] text-[10px] font-medium text-white shrink-0 leading-tight"
+                            >
+                              {card.badge}
+                            </span>
+                          </div>
+
+                          {/* Dark Style References Band (#222222) */}
+                          <div className="bg-[var(--band)] rounded-[6px] p-2 flex flex-col gap-1.5">
+                            <span className="text-[10px] font-medium text-white leading-tight">
+                              Style references
+                            </span>
+                            <div className="grid grid-cols-3 gap-1">
+                              {card.images.map((img, idx) => (
+                                <img
+                                  key={idx}
+                                  src={img}
+                                  alt="Style reference"
+                                  className="w-full h-[64px] rounded-[4px] object-cover"
+                                />
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Bottom Price Row */}
+                          <div className="bg-[var(--surface)] rounded-b-[6px] px-2.5 py-2 flex items-center justify-between">
+                            <span className="text-[11px] text-[var(--price-label)]">
+                              Price
+                            </span>
+                            <span className="text-[14px] font-bold text-[var(--text)] tabular-nums">
+                              <AnimatedNumberMorph
+                                value={card.price}
+                                prefix={currencySymbol}
+                              />
                             </span>
                           </div>
                         </div>
@@ -1135,125 +1485,697 @@ export function ClientsScreen({
                 </div>
               )}
             </div>
-          </div>
 
-          {/* ===================================================================
-              3. LIVE ORDER HISTORY SECTION (Connected to store.orders)
-              Visible on Desktop always, and on Mobile when mobileTab === 'orders'
-              =================================================================== */}
-          <div
-            className={cn(
-              'w-full rounded-[6px] bg-[var(--card)] p-4 sm:p-5 flex flex-col gap-3',
-              mobileTab === 'profile' ? 'hidden lg:flex' : 'flex'
-            )}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h3 className="text-[16px] font-bold text-black leading-tight">
-                  Order History
-                </h3>
-                <span className="px-2 py-0.5 rounded-full bg-white text-[11px] font-semibold text-[var(--text-2)] border border-[#EDEDED]">
-                  {orderHistoryCards.length}
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onNewOrder(selectedClientProfile.id)}
-                className="text-[12px] font-semibold text-[var(--primary)] hover:underline cursor-pointer"
-              >
-                + Add Order
-              </button>
-            </div>
-
-            {orderHistoryCards.length === 0 ? (
-              <div className="w-full bg-white rounded-[8px] p-8 text-center flex flex-col items-center justify-center gap-2">
-                <p className="text-[14px] font-semibold text-black">
-                  No orders recorded for {selectedClientProfile.name} yet
-                </p>
-                <p className="text-[12px] text-[var(--muted)] max-w-xs">
-                  Create a bespoke order for this client using their saved measurements or a garment template.
-                </p>
-                <button
+            {/* Bottom White Action Bar for `SavedMeasurements_UseFlow` (Desktop Frame 3 & Mobile Frame 1) */}
+            {viewState === 'SavedMeasurements_UseFlow' && (
+              <div className="w-full bg-[var(--surface)] rounded-[6px] px-4 sm:px-6 py-3 flex items-center justify-end">
+                <motion.button
                   type="button"
-                  onClick={() => onNewOrder(selectedClientProfile.id)}
-                  className="mt-1 h-9 px-4 rounded-[24px] bg-[var(--primary)] text-white text-[13px] font-medium hover:opacity-95 transition-opacity cursor-pointer"
+                  whileTap={{ scale: 0.97 }}
+                  transition={springSnappy}
+                  onClick={handleCreateOrderFromUseFlow}
+                  className="h-9 px-5 rounded-[24px] bg-[var(--primary)] text-white text-[12px] font-medium hover:opacity-95 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
-                  Create First Order
-                </button>
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Create Order</span>
+                </motion.button>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                {orderHistoryCards.map((card) => (
-                  <div
-                    key={card.id}
-                    onClick={() => {
-                      if (onEditOrder) onEditOrder(card.id);
-                    }}
-                    className={cn(
-                      'bg-white rounded-[8px] p-[2px] flex flex-col gap-[2px] border border-transparent hover:border-[var(--selected)] transition-all',
-                      onEditOrder && 'cursor-pointer'
-                    )}
+            )}
+          </>
+        ) : (
+          /* =================================================================
+             VIEW STATE 4: `Inline_NewOrder`
+             (Desktop Frame 5, Mobile Frame 2)
+             ================================================================= */
+          <>
+            <div className="flex flex-col lg:flex-row gap-[2px] w-full">
+              {/* Left Column: New Order Form */}
+              <div className="w-full lg:w-[34%] bg-[var(--card)] rounded-[6px] p-3 flex flex-col gap-2.5 shrink-0">
+                <div className="flex items-center justify-between px-0.5">
+                  <h2 className="text-[14px] sm:text-[15px] font-bold text-[var(--text)]">
+                    New Order
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setViewState('SavedMeasurements_Default')}
+                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--text)] transition-colors cursor-pointer"
                   >
-                    {/* Part 1: Header */}
-                    <div className="bg-white rounded-[8px] px-2.5 py-3 flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <h4 className="text-[14px] font-semibold text-black truncate leading-tight">
-                          {card.title}
-                        </h4>
-                        <p className="text-[12px] font-medium text-[var(--sub)] mt-1 leading-tight">
-                          {card.date}
-                        </p>
-                      </div>
+                    <CornerUpLeft className="w-3.5 h-3.5" />
+                    <span>Back</span>
+                  </button>
+                </div>
 
-                      <span
-                        style={{ backgroundColor: card.badgeColor }}
-                        className="px-2.5 py-0.5 rounded-[24px] text-[11px] font-semibold text-white shrink-0 leading-tight"
-                      >
-                        {card.badge}
-                      </span>
-                    </div>
+                <div className="bg-[var(--surface)] rounded-[8px] p-3.5 flex flex-col gap-3.5">
+                  {/* Basic Information */}
+                  <div>
+                    <h3 className="text-[13px] sm:text-[14px] font-semibold text-[var(--text)]">
+                      Basic Information
+                    </h3>
 
-                    {/* Part 2: Style references band (#222222) */}
-                    <div className="bg-[var(--band)] rounded-[6px] p-2 flex flex-col gap-1.5">
-                      <span className="text-[11px] font-semibold text-white leading-tight">
-                        Style references
-                      </span>
-                      <div className="grid grid-cols-3 gap-1">
-                        {card.images.map((img, idx) => (
-                          <img
-                            key={idx}
-                            src={img}
-                            alt="Style reference"
-                            className="w-full h-[66px] rounded-[6px] object-cover"
-                          />
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Part 3: Price row */}
-                    <div className="bg-white rounded-[8px] p-2.5 flex items-center justify-between">
-                      <span className="text-[12px] text-[var(--price-label)]">
-                        Price
-                      </span>
-                      <span className="text-[16px] font-semibold text-black tabular-nums">
-                        <AnimatedNumberMorph
-                          value={card.price}
-                          prefix={currencySymbol}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-2">
+                      <div>
+                        <label className="text-[11px] font-medium text-[var(--text)] mb-1 block">
+                          Client
+                        </label>
+                        <input
+                          type="text"
+                          value={newOrderClientName}
+                          onChange={(e) => setNewOrderClientName(e.target.value)}
+                          placeholder="e.g. Adriana Kunle"
+                          className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-2.5 text-[11px] sm:text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[var(--primary)]"
                         />
-                      </span>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-medium text-[var(--text)] mb-1 block">
+                          Garment Type
+                        </label>
+                        <input
+                          type="text"
+                          value={newOrderGarmentType}
+                          onChange={(e) =>
+                            setNewOrderGarmentType(e.target.value)
+                          }
+                          placeholder="Bespoke African Gown"
+                          className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-2.5 text-[11px] sm:text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[var(--primary)]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-medium text-[var(--text)] mb-1 block">
+                          Phone Number
+                        </label>
+                        <input
+                          type="tel"
+                          value={newOrderPhone}
+                          onChange={(e) => setNewOrderPhone(e.target.value)}
+                          placeholder="+234 -"
+                          className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-2.5 text-[11px] sm:text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[var(--primary)] tabular-nums"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-medium text-[var(--text)] mb-1 block">
+                          Email Address
+                        </label>
+                        <input
+                          type="email"
+                          value={newOrderEmail}
+                          onChange={(e) => setNewOrderEmail(e.target.value)}
+                          placeholder="name@example.com"
+                          className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-2.5 text-[11px] sm:text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[var(--primary)]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Saved Measurements Selector */}
+                    <div
+                      ref={newOrderTemplateDropdownRef}
+                      className="mt-2.5 relative"
+                    >
+                      <label className="text-[11px] font-medium text-[var(--muted)] mb-1 block">
+                        Saved Measurements
+                      </label>
+                      <button
+                        type="button"
+                        aria-haspopup="listbox"
+                        aria-expanded={isNewOrderTemplateDropdownOpen}
+                        onClick={() =>
+                          setIsNewOrderTemplateDropdownOpen((prev) => !prev)
+                        }
+                        className="w-full h-9 px-3.5 rounded-[24px] bg-[var(--surface)] border border-[var(--outline)] flex items-center justify-between gap-2 text-[12px] text-[var(--text-2)] hover:border-[var(--muted)] transition-colors cursor-pointer"
+                      >
+                        <span className="truncate">
+                          {newOrderSavedTemplateLabel ||
+                            'Choose Saved Template'}
+                        </span>
+                        <ChevronDown className="w-3.5 h-3.5 text-[var(--text-2)] shrink-0" />
+                      </button>
+
+                      <AnimatePresence>
+                        {isNewOrderTemplateDropdownOpen && (
+                          <motion.div
+                            role="listbox"
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            transition={springSmooth}
+                            className="absolute left-0 top-[calc(100%+4px)] w-full bg-[var(--surface)] border border-[var(--outline)] rounded-[8px] p-1 shadow-[0_8px_24px_rgba(0,0,0,0.06)] z-30 flex flex-col gap-0.5"
+                          >
+                            {clientSnapshots.map((snap, idx) => (
+                              <button
+                                key={snap.id}
+                                type="button"
+                                role="option"
+                                aria-selected={snap.id === activeSnapshot?.id}
+                                onClick={() => {
+                                  handleSelectSnapshot(snap.id);
+                                  setNewOrderSavedTemplateLabel(
+                                    `${snap.garmentType}. ${snap.date}`
+                                  );
+                                  if (!newOrderGarmentType) {
+                                    setNewOrderGarmentType(snap.garmentType);
+                                  }
+                                  setIsNewOrderTemplateDropdownOpen(false);
+                                }}
+                                className={cn(
+                                  'w-full px-3 py-2 rounded-[6px] text-left text-[12px] text-[var(--text-2)] hover:bg-[var(--card)] hover:text-[var(--text)] transition-colors cursor-pointer',
+                                  idx === 0 && 'bg-[var(--card)]'
+                                )}
+                              >
+                                {snap.garmentType}. {snap.date}
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
 
-      {/* =======================================================================
-          GARMENT TEMPLATES MODAL (Requirement B & D)
-          ======================================================================= */}
+                  {/* Style References */}
+                  <div>
+                    <h3 className="text-[13px] sm:text-[14px] font-semibold text-[var(--text)] mb-1.5">
+                      Style References
+                    </h3>
+                    <AnimatedFileUpload
+                      images={newOrderImages}
+                      onChange={setNewOrderImages}
+                      label="Tap to upload image"
+                    />
+                  </div>
+
+                  {/* Price/Due date */}
+                  <div>
+                    <h3 className="text-[13px] sm:text-[14px] font-semibold text-[var(--text)] mb-1.5">
+                      Price/Due date
+                    </h3>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="text-[11px] font-medium text-[var(--text)] mb-1 block">
+                          Price ({currencySymbol})
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={newOrderPrice}
+                          onChange={(e) => setNewOrderPrice(e.target.value)}
+                          placeholder={`${currencySymbol}0.00`}
+                          className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-2.5 text-[11px] sm:text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[var(--primary)] tabular-nums"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-medium text-[var(--text)] mb-1 block">
+                          Due Date
+                        </label>
+                        <input
+                          type="text"
+                          value={newOrderDueDate}
+                          onChange={(e) => setNewOrderDueDate(e.target.value)}
+                          placeholder="09/10/2026"
+                          className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-2.5 text-[11px] sm:text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[var(--primary)] tabular-nums"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <h3 className="text-[13px] sm:text-[14px] font-semibold text-[var(--text)] leading-tight">
+                      Notes
+                    </h3>
+                    <span className="text-[11px] font-medium text-[var(--text)] mt-0.5 mb-1.5 block">
+                      Workroom notes and fabric details
+                    </span>
+                    <textarea
+                      value={newOrderNotes}
+                      onChange={(e) => setNewOrderNotes(e.target.value)}
+                      placeholder="e.g. hand-stitched, monogram design on wrist and gold buttons"
+                      className="w-full min-h-[96px] rounded-[8px] bg-[var(--field-on-card)] p-2.5 text-[11px] sm:text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] resize-none focus:outline-none border border-transparent focus:border-[var(--primary)]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Mannequin Workspace */}
+              <div className="w-full lg:flex-1 bg-[var(--card)] rounded-[6px] p-4 flex flex-col gap-3">
+                <div>
+                  <h3 className="text-[14px] font-bold text-[var(--text)] leading-tight">
+                    Mannequin
+                  </h3>
+                  <p className="text-[11px] text-[var(--muted)] mt-0.5">
+                    All available points &nbsp;•&nbsp;{' '}
+                    {mannequinGender === 'female'
+                      ? 'Feminine Form'
+                      : 'Masculine Form'}
+                  </p>
+                </div>
+
+                {/* White Pill Toolbar (Desktop Frame 5 & Mobile Frame 2) */}
+                <div className="w-fit max-w-full rounded-[32px] bg-[var(--surface)] p-1.5 flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  {/* 1. Template Button (`Template` on mobile, `Choose Template` on desktop) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDialogSelectedTemplateId(
+                        selectedTemplateId || storeTemplates[0]?.id || ''
+                      );
+                      setIsTemplateModalOpen(true);
+                    }}
+                    className="h-8 sm:h-9 px-3.5 sm:px-5 rounded-[24px] bg-[var(--chip)] text-[12px] sm:text-[13px] font-medium text-[var(--text-2)] hover:text-[var(--text)] transition-colors cursor-pointer"
+                  >
+                    <span className="sm:hidden">Template</span>
+                    <span className="hidden sm:inline">Choose Template</span>
+                  </button>
+
+                  {/* 2. M / F Gender Toggle Pill */}
+                  <div className="h-8 sm:h-9 bg-[var(--chip)] rounded-[24px] p-1 flex items-center gap-1">
+                    <button
+                      type="button"
+                      aria-label="Masculine form"
+                      aria-pressed={mannequinGender === 'male'}
+                      onClick={() => setMannequinGender('male')}
+                      className={cn(
+                        'w-6 h-6 sm:w-7 sm:h-7 rounded-full text-[11px] font-semibold flex items-center justify-center transition-colors cursor-pointer',
+                        mannequinGender === 'male'
+                          ? 'bg-[var(--primary)] text-white'
+                          : 'bg-[var(--surface)] text-[var(--text-2)] hover:text-[var(--text)]'
+                      )}
+                    >
+                      M
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Feminine form"
+                      aria-pressed={mannequinGender === 'female'}
+                      onClick={() => setMannequinGender('female')}
+                      className={cn(
+                        'w-6 h-6 sm:w-7 sm:h-7 rounded-full text-[11px] font-semibold flex items-center justify-center transition-colors cursor-pointer',
+                        mannequinGender === 'female'
+                          ? 'bg-[var(--primary)] text-white'
+                          : 'bg-[var(--surface)] text-[var(--text-2)] hover:text-[var(--text)]'
+                      )}
+                    >
+                      F
+                    </button>
+                  </div>
+
+                  {/* 3. Mannequin / List View Toggle Pill */}
+                  <div className="h-8 sm:h-9 bg-[var(--chip)] rounded-[24px] p-1 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setMannequinDisplayMode('mannequin')}
+                      title="Mannequin view"
+                      aria-label="Mannequin view"
+                      aria-pressed={mannequinDisplayMode === 'mannequin'}
+                      className={cn(
+                        'w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer',
+                        mannequinDisplayMode === 'mannequin'
+                          ? 'bg-[var(--primary)] text-white'
+                          : 'bg-[var(--surface)] text-[var(--text-2)] hover:text-[var(--text)]'
+                      )}
+                    >
+                      <PersonStanding className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMannequinDisplayMode('list')}
+                      title="Measurement list view"
+                      aria-label="Measurement list view"
+                      aria-pressed={mannequinDisplayMode === 'list'}
+                      className={cn(
+                        'w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer',
+                        mannequinDisplayMode === 'list'
+                          ? 'bg-[var(--primary)] text-white'
+                          : 'bg-[var(--surface)] text-[var(--text-2)] hover:text-[var(--text)]'
+                      )}
+                    >
+                      <ClipboardList className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* 4. Add Point Button */}
+                  <button
+                    type="button"
+                    onClick={handleOpenAddPoint}
+                    className="h-8 sm:h-9 px-3.5 sm:px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[12px] sm:text-[13px] font-medium text-[var(--text-2)] hover:text-[var(--text)] transition-colors cursor-pointer"
+                  >
+                    Add Point
+                  </button>
+                </div>
+
+                {/* Mannequin Stage or List View */}
+                {mannequinDisplayMode === 'mannequin' ? (
+                  <div className="flex-1 flex items-center justify-center py-2">
+                    <RotatableMannequin
+                      gender={mannequinGender}
+                      onGenderChange={setMannequinGender}
+                      showControls={false}
+                      compact={false}
+                      measurements={measurements}
+                      activePointKeys={activePointKeys}
+                      selectedPointKey={pointModalData?.key || null}
+                      unit={unitLabel}
+                      onSelectPoint={handleOpenPoint}
+                    />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-2">
+                    {visibleMeasurementFields.map((field) => (
+                      <div
+                        key={field.id}
+                        className="bg-[var(--surface)] rounded-[12px] p-3 flex flex-col justify-between gap-2.5"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[12px] font-semibold text-[var(--text)] truncate">
+                            {field.name}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePoint(field.id)}
+                            title={`Remove ${field.name}`}
+                            aria-label={`Remove ${field.name}`}
+                            className="w-6 h-6 -mr-1 -mt-0.5 rounded-full flex items-center justify-center text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[var(--chip)] cursor-pointer shrink-0"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 flex items-center">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            aria-label={`${field.name} (${field.unit})`}
+                            value={field.value}
+                            onChange={(e) =>
+                              handleFieldValueChange(field.id, e.target.value)
+                            }
+                            placeholder="0.0"
+                            className="w-full bg-transparent text-[12px] font-medium text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Bottom White Action Bar (`Save`) */}
+            <div className="w-full bg-[var(--surface)] rounded-[6px] px-4 sm:px-6 py-3 flex items-center justify-end">
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.97 }}
+                transition={springSnappy}
+                onClick={handleSaveInlineNewOrder}
+                className="h-9 px-5 rounded-[24px] bg-[var(--primary)] text-white text-[12px] font-medium hover:opacity-95 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Save</span>
+              </motion.button>
+            </div>
+          </>
+        )}
+      </div>
+      )}
+
+      {/* =====================================================================
+          EDIT PROFILE / SWITCH CLIENT MODAL
+          ===================================================================== */}
+      <AnimatePresence>
+        {isEditProfileModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-60 bg-black/50 backdrop-blur-[6px] flex items-center justify-center p-4"
+          >
+            <div
+              className="absolute inset-0"
+              onClick={() => setIsEditProfileModalOpen(false)}
+            />
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Edit or switch client profile"
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              transition={springSmooth}
+              className="relative w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-[16px] bg-[var(--surface)] p-4 sm:p-6 shadow-2xl z-10 flex flex-col gap-4"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[var(--hairline)]">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditProfileMode('edit')}
+                    className={cn(
+                      'px-3 py-1 rounded-full text-[12px] font-semibold transition-colors cursor-pointer',
+                      editProfileMode === 'edit'
+                        ? 'bg-[var(--primary)] text-white'
+                        : 'bg-[var(--chip)] text-[var(--text-2)]'
+                    )}
+                  >
+                    Edit Profile
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditProfileMode('switch')}
+                    className={cn(
+                      'px-3 py-1 rounded-full text-[12px] font-semibold transition-colors cursor-pointer flex items-center gap-1',
+                      editProfileMode === 'switch'
+                        ? 'bg-[var(--primary)] text-white'
+                        : 'bg-[var(--chip)] text-[var(--text-2)]'
+                    )}
+                  >
+                    <Users className="w-3 h-3" />
+                    <span>Clients ({allClientList.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditProfileMode('create');
+                      setEditName('');
+                      setEditPhone('');
+                      setEditEmail('');
+                      setEditNotes('');
+                    }}
+                    className={cn(
+                      'px-3 py-1 rounded-full text-[12px] font-semibold transition-colors cursor-pointer flex items-center gap-1',
+                      editProfileMode === 'create'
+                        ? 'bg-[var(--primary)] text-white'
+                        : 'bg-[var(--chip)] text-[var(--text-2)]'
+                    )}
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>New</span>
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Close modal"
+                  onClick={() => setIsEditProfileModalOpen(false)}
+                  className="w-7 h-7 rounded-full bg-[var(--chip)] text-[var(--muted)] hover:text-[var(--text)] flex items-center justify-center cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {editProfileMode === 'switch' ? (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2 bg-[var(--field-on-card)] rounded-[8px] px-3 py-2">
+                    <Search className="w-4 h-4 text-[var(--muted)] shrink-0" />
+                    <input
+                      type="text"
+                      value={directorySearch}
+                      onChange={(e) => setDirectorySearch(e.target.value)}
+                      placeholder="Search clients..."
+                      className="w-full bg-transparent text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5 max-h-[280px] overflow-y-auto">
+                    {allClientList
+                      .filter(
+                        (c) =>
+                          !directorySearch.trim() ||
+                          c.name
+                            .toLowerCase()
+                            .includes(directorySearch.toLowerCase()) ||
+                          c.phone
+                            .toLowerCase()
+                            .includes(directorySearch.toLowerCase())
+                      )
+                      .map((client) => {
+                        const isSelected =
+                          client.id === selectedClientProfile.id;
+                        return (
+                          <button
+                            key={client.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedClientId(client.id);
+                              setIsEditProfileModalOpen(false);
+                            }}
+                            className={cn(
+                              'w-full p-2.5 rounded-[10px] flex items-center justify-between text-left transition-colors cursor-pointer border',
+                              isSelected
+                                ? 'bg-[var(--selected-bg)] border-[var(--selected)]'
+                                : 'bg-[var(--card)] border-transparent hover:bg-[var(--chip)]'
+                            )}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-8 h-8 rounded-full bg-[var(--text-2)] text-white flex items-center justify-center text-[12px] font-semibold shrink-0">
+                                {client.initials}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-[13px] font-semibold text-[var(--text)] truncate">
+                                  {client.name}
+                                </p>
+                                <p className="text-[11px] text-[var(--muted)] truncate">
+                                  {client.phone} • {client.email}
+                                </p>
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <Check className="w-4 h-4 text-[var(--primary)] shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+              ) : (
+                <form
+                  onSubmit={handleSaveProfileModal}
+                  className="flex flex-col gap-3.5"
+                >
+                  <div>
+                    <label className="text-[11px] font-semibold text-[var(--text)] mb-1 block">
+                      Full Name
+                    </label>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="e.g. Chloe Dallas"
+                      required
+                      className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 text-[12px] text-[var(--text)] focus:outline-none border border-transparent focus:border-[var(--primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-[var(--text)] mb-1 block">
+                      Phone Number
+                    </label>
+                    <input
+                      type="tel"
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      placeholder="+234 8141 432 211"
+                      className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 text-[12px] text-[var(--text)] focus:outline-none border border-transparent focus:border-[var(--primary)] tabular-nums"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-[var(--text)] mb-1 block">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      value={editEmail}
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      placeholder="chloe@atelier.fit"
+                      className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 text-[12px] text-[var(--text)] focus:outline-none border border-transparent focus:border-[var(--primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-[var(--text)] mb-1 block">
+                      Client Notes
+                    </label>
+                    <textarea
+                      value={editNotes}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      placeholder="Fit preferences, fabric notes..."
+                      className="w-full min-h-[80px] rounded-[8px] bg-[var(--field-on-card)] p-3 text-[12px] text-[var(--text)] resize-none focus:outline-none border border-transparent focus:border-[var(--primary)]"
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditProfileModalOpen(false)}
+                      className="h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[12px] font-medium text-[var(--text-2)] cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="h-9 px-5 rounded-[24px] bg-[var(--primary)] text-white text-[12px] font-medium hover:opacity-95 cursor-pointer"
+                    >
+                      {editProfileMode === 'create'
+                        ? 'Create Client'
+                        : 'Save Changes'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* =====================================================================
+          DELETE CLIENT CONFIRMATION DIALOG
+          ===================================================================== */}
+      <AnimatePresence>
+        {isDeleteConfirmOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-60 bg-black/50 backdrop-blur-[6px] flex items-center justify-center p-4"
+          >
+            <div
+              className="absolute inset-0"
+              onClick={() => setIsDeleteConfirmOpen(false)}
+            />
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Delete ${selectedClientProfile.name}`}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={springSnappy}
+              className="relative w-full max-w-sm rounded-[16px] bg-[var(--surface)] p-6 shadow-2xl z-10 flex flex-col gap-4"
+            >
+              <h3 className="text-[16px] font-bold text-[var(--text)]">
+                Delete {selectedClientProfile.name}?
+              </h3>
+              <p className="text-[12px] text-[var(--text-2)] leading-relaxed">
+                This will remove {selectedClientProfile.name}&apos;s profile,
+                saved measurements, and order history from your workspace.
+              </p>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteConfirmOpen(false)}
+                  className="h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[12px] font-medium text-[var(--text-2)] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteClient}
+                  className="h-9 px-5 rounded-[24px] bg-[var(--paused)] text-white text-[12px] font-medium hover:opacity-95 cursor-pointer"
+                >
+                  Delete
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* =====================================================================
+          GARMENT TEMPLATES MODAL
+          ===================================================================== */}
       <AnimatePresence>
         {isTemplateModalOpen && (
           <motion.div
@@ -1270,20 +2192,22 @@ export function ClientsScreen({
             <motion.div
               role="dialog"
               aria-modal="true"
+              aria-label="Garment Templates"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               transition={springSnappy}
-              className="relative w-[435px] max-w-[calc(100vw-32px)] rounded-[16px] bg-white p-6 z-10 flex flex-col gap-5 shadow-2xl"
+              className="relative w-[435px] max-w-[calc(100vw-32px)] max-h-[90dvh] overflow-y-auto rounded-[16px] bg-[var(--surface)] p-4 sm:p-6 z-10 flex flex-col gap-5 shadow-2xl"
             >
               <div className="flex items-center justify-between">
-                <h3 className="text-[16px] font-bold text-black">
+                <h3 className="text-[16px] font-bold text-[var(--text)]">
                   Garment Templates
                 </h3>
                 <button
                   type="button"
+                  aria-label="Close templates modal"
                   onClick={() => setIsTemplateModalOpen(false)}
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-black cursor-pointer"
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-[var(--text)] cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1300,15 +2224,15 @@ export function ClientsScreen({
                         'w-full p-3.5 rounded-[12px] text-left transition-all flex items-center justify-between cursor-pointer border',
                         isSelected
                           ? 'border-[var(--selected)] bg-[var(--selected-bg)]'
-                          : 'border-[var(--outline)] bg-[var(--card)] hover:bg-[#F3F3F3]'
+                          : 'border-[var(--outline)] bg-[var(--card)] hover:bg-[var(--chip)]'
                       )}
                     >
                       <div className="flex-1 pr-3 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-[14px] font-semibold text-black truncate">
+                          <span className="text-[14px] font-semibold text-[var(--text)] truncate">
                             {tmpl.name}
                           </span>
-                          <span className="px-2 py-0.5 rounded-full bg-white text-[10px] font-medium text-[var(--text-2)] border border-[#EDEDED] shrink-0">
+                          <span className="px-2 py-0.5 rounded-full bg-[var(--surface)] text-[10px] font-medium text-[var(--text-2)] border border-[var(--hairline)] shrink-0">
                             {tmpl.fieldKeys.length} pts
                           </span>
                         </div>
@@ -1324,12 +2248,15 @@ export function ClientsScreen({
                             e.stopPropagation();
                             deleteTemplate(tmpl.id);
                             if (dialogSelectedTemplateId === tmpl.id) {
-                              const rem = storeTemplates.filter((t) => t.id !== tmpl.id);
+                              const rem = storeTemplates.filter(
+                                (t) => t.id !== tmpl.id
+                              );
                               setDialogSelectedTemplateId(rem[0]?.id || '');
                             }
                           }}
                           title={`Delete ${tmpl.name}`}
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-[var(--paused)] hover:bg-white transition-colors cursor-pointer"
+                          aria-label={`Delete ${tmpl.name}`}
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-[var(--paused)] hover:bg-[var(--surface)] transition-colors cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -1338,10 +2265,12 @@ export function ClientsScreen({
                             'w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors',
                             isSelected
                               ? 'bg-[var(--selected)] text-white'
-                              : 'border border-[var(--outline)] bg-white'
+                              : 'border border-[var(--outline)] bg-[var(--surface)]'
                           )}
                         >
-                          {isSelected && <Check className="w-3 h-3 stroke-[2.5]" />}
+                          {isSelected && (
+                            <Check className="w-3 h-3 stroke-[2.5]" />
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1353,7 +2282,7 @@ export function ClientsScreen({
                 <button
                   type="button"
                   onClick={() => setIsTemplateModalOpen(false)}
-                  className="h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[var(--text-2)] text-[14px] font-medium hover:bg-[#eaeaea] cursor-pointer"
+                  className="h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[var(--text-2)] text-[14px] font-medium hover:opacity-90 cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1374,9 +2303,9 @@ export function ClientsScreen({
         )}
       </AnimatePresence>
 
-      {/* =======================================================================
-          SET POINT SIZE / ADD POINT DIALOG (Requirement C & D)
-          ======================================================================= */}
+      {/* =====================================================================
+          SET POINT SIZE / ADD POINT DIALOG
+          ===================================================================== */}
       <AnimatePresence>
         {pointModalData && (
           <motion.div
@@ -1401,12 +2330,12 @@ export function ClientsScreen({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.96 }}
               transition={springSnappy}
-              className="relative w-[430px] max-w-[calc(100vw-32px)] rounded-[16px] bg-white p-6 z-10 flex flex-col gap-5 shadow-2xl"
+              className="relative w-[430px] max-w-[calc(100vw-32px)] max-h-[90dvh] overflow-y-auto rounded-[16px] bg-[var(--surface)] p-4 sm:p-6 z-10 flex flex-col gap-5 shadow-2xl"
             >
               <div className="flex items-center justify-between">
                 <h3
                   id="client-point-dialog-title"
-                  className="text-[16px] font-bold text-black"
+                  className="text-[16px] font-bold text-[var(--text)]"
                 >
                   {pointModalData.mode === 'edit'
                     ? `Update ${pointModalData.name}`
@@ -1414,11 +2343,12 @@ export function ClientsScreen({
                 </h3>
                 <button
                   type="button"
+                  aria-label="Close point dialog"
                   onClick={() => {
                     setPointModalData(null);
                     setPointModalError('');
                   }}
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-black transition-colors cursor-pointer"
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-[var(--text)] transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1432,27 +2362,25 @@ export function ClientsScreen({
                 className="flex flex-col gap-4"
               >
                 {pointModalData.mode === 'edit' ? (
-                  /* Requirement C: Read-Only Measurement Info — user can update ONLY the size */
-                  <div className="rounded-[10px] bg-[var(--card)] p-3 border border-[#EDEDED] flex items-center justify-between">
+                  <div className="rounded-[10px] bg-[var(--card)] p-3 border border-[var(--hairline)] flex items-center justify-between">
                     <div>
                       <span className="text-[10px] font-semibold uppercase tracking-[0.3px] text-[var(--muted)] block">
                         {pointModalData.zone}
                       </span>
-                      <span className="text-[14px] font-semibold text-black">
+                      <span className="text-[14px] font-semibold text-[var(--text)]">
                         {pointModalData.name}
                       </span>
                     </div>
-                    <span className="px-2.5 py-1 rounded-full bg-white text-[11px] font-medium text-[var(--text-2)] border border-[#EDEDED]">
+                    <span className="px-2.5 py-1 rounded-full bg-[var(--surface)] text-[11px] font-medium text-[var(--text-2)] border border-[var(--hairline)]">
                       Size Only
                     </span>
                   </div>
                 ) : (
-                  /* Requirement B & D: Add Point chooses from the 21 standard Sizing/Measurements */
                   <div className="flex flex-col gap-2">
-                    <label className="block text-[11px] font-semibold text-black">
+                    <label className="block text-[11px] font-semibold text-[var(--text)]">
                       Select Sizing Measurement
                     </label>
-                    <div className="flex flex-col gap-2.5 max-h-[210px] overflow-y-auto rounded-[10px] bg-[var(--card)] p-2.5 border border-[#EDEDED]">
+                    <div className="flex flex-col gap-2.5 max-h-[210px] overflow-y-auto rounded-[10px] bg-[var(--card)] p-2.5 border border-[var(--hairline)]">
                       {hotspotsByZone.map((zone) => (
                         <div key={zone.id} className="flex flex-col gap-1">
                           <span className="text-[10px] font-bold uppercase tracking-[0.3px] text-[var(--muted)]">
@@ -1461,16 +2389,20 @@ export function ClientsScreen({
                           <div className="flex flex-wrap gap-1.5">
                             {zone.items.map((item) => {
                               const isSelected = pointModalData.key === item.key;
-                              const isAlreadyActive = activePointKeys.includes(item.key);
+                              const isAlreadyActive = activePointKeys.includes(
+                                item.key
+                              );
                               return (
                                 <button
                                   key={item.key}
                                   type="button"
                                   onClick={() => {
                                     setPointModalError('');
+                                    const existingNum = measurements[item.key];
                                     const existing =
-                                      measurements[item.key] !== undefined
-                                        ? String(measurements[item.key])
+                                      existingNum !== undefined &&
+                                      existingNum > 0
+                                        ? String(existingNum)
                                         : pointModalData.value;
                                     setPointModalData({
                                       ...pointModalData,
@@ -1485,12 +2417,14 @@ export function ClientsScreen({
                                     isSelected
                                       ? 'bg-[var(--selected-bg)] border-[var(--selected)] text-[var(--primary)] font-semibold'
                                       : isAlreadyActive
-                                      ? 'bg-[#F2F2F2] border-[#E0E0E0] text-black'
-                                      : 'bg-white border-[#E5E5E5] text-[var(--text-2)] hover:text-black'
+                                      ? 'bg-[var(--chip)] border-[var(--outline)] text-[var(--text)]'
+                                      : 'bg-[var(--surface)] border-[var(--hairline)] text-[var(--text-2)] hover:text-[var(--text)]'
                                   )}
                                 >
                                   <span>{item.label}</span>
-                                  {isSelected && <Check className="w-3 h-3 stroke-[2.5]" />}
+                                  {isSelected && (
+                                    <Check className="w-3 h-3 stroke-[2.5]" />
+                                  )}
                                 </button>
                               );
                             })}
@@ -1502,10 +2436,10 @@ export function ClientsScreen({
                 )}
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-black mb-1">
+                  <label className="block text-[11px] font-semibold text-[var(--text)] mb-1">
                     Measurement Size ({unitLabel.toUpperCase()})
                   </label>
-                  <div className="w-full bg-[var(--card)] border border-[#EDEDED] rounded-[8px] p-2 flex items-center">
+                  <div className="w-full bg-[var(--card)] border border-[var(--hairline)] rounded-[8px] p-2 flex items-center">
                     <input
                       type="text"
                       inputMode="decimal"
@@ -1513,10 +2447,13 @@ export function ClientsScreen({
                       placeholder="0.0"
                       onChange={(e) => {
                         setPointModalError('');
-                        setPointModalData({ ...pointModalData, value: e.target.value });
+                        setPointModalData({
+                          ...pointModalData,
+                          value: e.target.value,
+                        });
                       }}
                       autoFocus
-                      className="w-full bg-transparent text-[14px] font-semibold text-black placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
+                      className="w-full bg-transparent text-[14px] font-semibold text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
                     />
                     <span className="pr-1 text-[12px] font-semibold text-[var(--text-2)] select-none shrink-0">
                       {unitLabel}
@@ -1537,7 +2474,7 @@ export function ClientsScreen({
                       setPointModalData(null);
                       setPointModalError('');
                     }}
-                    className="h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[var(--text-2)] text-[14px] font-medium hover:bg-[#eaeaea] transition-colors cursor-pointer"
+                    className="h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[var(--text-2)] text-[14px] font-medium hover:opacity-90 transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -1545,7 +2482,9 @@ export function ClientsScreen({
                     type="submit"
                     className="h-9 px-6 rounded-[24px] bg-[var(--primary)] text-white text-[14px] font-medium hover:opacity-95 transition-opacity cursor-pointer shadow-xs"
                   >
-                    {pointModalData.mode === 'edit' ? 'Update Size' : 'Add Point'}
+                    {pointModalData.mode === 'edit'
+                      ? 'Update Size'
+                      : 'Add Point'}
                   </button>
                 </div>
               </form>
@@ -1554,168 +2493,8 @@ export function ClientsScreen({
         )}
       </AnimatePresence>
 
-      {/* =======================================================================
-          NEW CLIENT MODAL
-          ======================================================================= */}
-      <AnimatePresence>
-        {isNewClientModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-60 bg-black/50 backdrop-blur-[6px] flex items-center justify-center p-4"
-          >
-            <div
-              className="absolute inset-0"
-              onClick={() => setIsNewClientModalOpen(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              transition={springSmooth}
-              className="relative w-full max-w-md rounded-[16px] bg-white p-6 shadow-2xl z-10 flex flex-col gap-4"
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-[var(--hairline)]">
-                <div>
-                  <h3 className="text-[16px] font-bold text-black">
-                    New Client Profile
-                  </h3>
-                  <p className="text-[12px] text-[var(--muted)]">
-                    Add a client to your atelier directory
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsNewClientModalOpen(false)}
-                  className="w-7 h-7 rounded-full bg-[#F2F2F2] text-[var(--muted)] hover:text-black flex items-center justify-center cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleCreateClient} noValidate className="flex flex-col gap-3.5">
-                {clientModalAlert && (
-                  <div
-                    role="alert"
-                    aria-live="assertive"
-                    className="p-3 rounded-[12px] bg-amber-50 border border-amber-300 flex items-start gap-2.5 text-amber-900 shadow-xs"
-                  >
-                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-[12px] font-semibold">Incomplete Client Information</p>
-                      <p className="text-[11px] text-amber-800 leading-normal">{clientModalAlert}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setClientModalAlert(null)}
-                      className="text-amber-700 hover:text-black p-0.5 transition-colors cursor-pointer"
-                      aria-label="Dismiss alert"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-
-                <Input
-                  ref={nameInputRef}
-                  label="Full Name *"
-                  placeholder="e.g. Adriana Kunle"
-                  value={newClientName}
-                  error={clientFormErrors.name}
-                  onChange={(e) => {
-                    setNewClientName(e.target.value);
-                    if (clientFormErrors.name) {
-                      setClientFormErrors((prev) => {
-                        const next = { ...prev };
-                        delete next.name;
-                        return next;
-                      });
-                    }
-                  }}
-                />
-                <Input
-                  ref={phoneInputRef}
-                  label="Phone Number *"
-                  type="tel"
-                  placeholder="+234 800 000 0000"
-                  value={newClientPhone}
-                  error={clientFormErrors.phone}
-                  onChange={(e) => {
-                    setNewClientPhone(e.target.value);
-                    if (clientFormErrors.phone) {
-                      setClientFormErrors((prev) => {
-                        const next = { ...prev };
-                        delete next.phone;
-                        return next;
-                      });
-                    }
-                  }}
-                />
-                <Input
-                  ref={emailInputRef}
-                  label="Email Address *"
-                  type="email"
-                  placeholder="name@couture.com"
-                  value={newClientEmail}
-                  error={clientFormErrors.email}
-                  onChange={(e) => {
-                    setNewClientEmail(e.target.value);
-                    if (clientFormErrors.email) {
-                      setClientFormErrors((prev) => {
-                        const next = { ...prev };
-                        delete next.email;
-                        return next;
-                      });
-                    }
-                  }}
-                />
-                <Textarea
-                  label="Bespoke Notes / Style Preferences (Optional)"
-                  rows={2}
-                  placeholder="e.g. Sloped posture, silk lining preference..."
-                  value={newClientNotes}
-                  onChange={(e) => setNewClientNotes(e.target.value)}
-                />
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--hairline)]">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsNewClientModalOpen(false);
-                      setClientFormErrors({});
-                      setClientModalAlert(null);
-                    }}
-                    className="h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[var(--text-2)] text-[14px] font-medium hover:bg-[#EAEAEA] cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="h-9 px-5 rounded-[24px] bg-[var(--primary)] text-white text-[14px] font-medium hover:opacity-95 cursor-pointer shadow-xs"
-                  >
-                    Create Client
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Floating System Toasts */}
+      {/* Global Toast Container */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-
-      {/* Floating Dock on Mobile */}
-      <SmallFloatingDock
-        activeTab={mobileTab}
-        onChange={setMobileTab}
-        tabs={[
-          { id: 'directory', label: 'Directory', icon: <Users className="w-4 h-4" /> },
-          { id: 'profile', label: 'Measurements', icon: <UserCheck className="w-4 h-4" /> },
-          { id: 'orders', label: 'Orders', icon: <ShoppingBag className="w-4 h-4" /> },
-        ]}
-      />
     </div>
   );
 }

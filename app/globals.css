@@ -100,7 +100,11 @@ body {
 
 /* Tabular numbers on prices, dates, calendar numbers */
 .tabular-nums,
-[data-tabular-nums] {
+.font-mono,
+[data-tabular-nums],
+input[type="tel"],
+input[type="number"],
+input[inputmode="decimal"] {
   font-variant-numeric: tabular-nums;
 }
 

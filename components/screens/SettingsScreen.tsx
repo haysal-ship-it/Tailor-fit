@@ -118,8 +118,8 @@ export function SettingsScreen() {
   // Scroll observer to update activeNav on scroll
   useEffect(() => {
     const handleScroll = () => {
-      const standardsEl = document.getElementById('section-standards');
-      const blueprintsEl = document.getElementById('section-blueprints');
+      const standardsEl = document.getElementById('settings-standards') || document.getElementById('section-standards');
+      const blueprintsEl = document.getElementById('settings-blueprints') || document.getElementById('section-blueprints');
       const sizingEl = document.getElementById('section-sizing');
 
       const scrollPos = window.scrollY + 180;
@@ -139,7 +139,7 @@ export function SettingsScreen() {
 
   const scrollToSection = (sectionId: 'standards' | 'blueprints' | 'sizing') => {
     setActiveNav(sectionId);
-    const el = document.getElementById(`section-${sectionId}`);
+    const el = document.getElementById(`settings-${sectionId}`) || document.getElementById(`section-${sectionId}`);
     if (el) {
       const offset = el.getBoundingClientRect().top + window.scrollY - 80;
       window.scrollTo({ top: offset, behavior: 'smooth' });
@@ -341,7 +341,7 @@ export function SettingsScreen() {
                 SECTION 1: Measurement & Billing Standards
                 =============================================================== */}
             <section
-              id="section-standards"
+              id="settings-standards"
               className="w-full bg-[#F8F8F8] rounded-[6px] p-4 lg:p-6 flex flex-col"
             >
               <div className="mb-6">
@@ -424,7 +424,7 @@ export function SettingsScreen() {
                 - Delete saved templates with Undo toast
                 =============================================================== */}
             <section
-              id="section-blueprints"
+              id="settings-blueprints"
               className="w-full bg-[#F8F8F8] rounded-[6px] p-4 lg:p-6 flex flex-col"
             >
               <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-3 mb-6">

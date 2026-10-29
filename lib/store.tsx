@@ -79,10 +79,10 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | null>(null);
 
 const STORAGE_KEYS = {
-  CLIENTS: 'tailorfit_clients_v2',
-  SNAPSHOTS: 'tailorfit_snapshots_v2',
-  ORDERS: 'tailorfit_orders_v2',
-  SETTINGS: 'tailorfit_settings_v2',
+  CLIENTS: 'tailorfit_clients_v3',
+  SNAPSHOTS: 'tailorfit_snapshots_v3',
+  ORDERS: 'tailorfit_orders_v3',
+  SETTINGS: 'tailorfit_settings_v3',
 };
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {

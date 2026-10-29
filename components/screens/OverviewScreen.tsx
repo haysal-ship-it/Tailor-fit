@@ -11,11 +11,7 @@ import {
   X,
   Check,
   Calendar as CalendarIcon,
-  House,
-  UsersRound,
-  Settings,
   Trash2,
-  AlertCircle,
 } from 'lucide-react';
 import { ToastContainer, type ToastMessage } from '@/components/ui/Toasts';
 import { springSmooth, springSnappy } from '@/lib/motion-tokens';
@@ -23,18 +19,19 @@ import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { MorphingSaveButton } from '@/components/ui/MorphingSaveButton';
 import { AnimatedFileUpload } from '@/components/ui/AnimatedFileUpload';
-import { OrigamiTailorFitLogo } from '@/components/Navbar';
-import { NotificationDropdown } from '@/components/ui/NotificationDropdown';
 import { RotatableMannequin } from '@/components/mannequin/RotatableMannequin';
 import {
   ANATOMICAL_ZONES,
   getZoneLabel,
   normalizeZoneId,
   resolveCanonicalKey,
+  parseDueDateToISO,
 } from '@/lib/initial-data';
 import { cn } from '@/lib/utils';
 
 interface CalendarOrderItem {
+  id: string;
+  clientId: string;
   client: string;
   garment: string;
   time: string;
@@ -46,9 +43,10 @@ interface OverviewScreenProps {
   onOpenOrder?: (orderId: string, clientId?: string) => void;
 }
 
-export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProps) {
+export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
   const {
     addClient,
+    updateClient,
     addOrder,
     addSnapshot,
     orders,
@@ -56,7 +54,6 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
     settings,
     allHotspots,
     deleteTemplate,
-    setActiveScreen,
   } = useStore();
   const shouldReduceMotion = useReducedMotion();
   const unitLabel = settings?.defaultUnit || 'cm';
@@ -201,40 +198,16 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
     year: 'numeric',
   }).format(viewDate);
 
-  // Status dots on calendar
+  // Status dots on calendar synced strictly with store orders
   const getOrdersForDay = (day: number) => {
     const dayOrders: CalendarOrderItem[] = [];
-
-    if (calendarYear === 2026 && calendarMonth === 9) {
-      if (day === 10) {
-        dayOrders.push({
-          client: 'Chloe Dallas',
-          garment: 'Bespoke African Gown',
-          time: '10:00 AM',
-          status: 'pending',
-        });
-      } else if (day === 17) {
-        dayOrders.push({
-          client: 'Taylor Razaq',
-          garment: 'Bespoke African Gown',
-          time: '02:30 PM',
-          status: 'completed',
-        });
-      } else if (day === 22) {
-        dayOrders.push({
-          client: 'Bryan Muhammed',
-          garment: 'Bespoke African Gown',
-          time: '04:15 PM',
-          status: 'paused',
-        });
-      }
-    }
 
     if (orders && orders.length > 0) {
       for (const ord of orders) {
         if (!ord.pickupDateTime) continue;
         const d = new Date(ord.pickupDateTime);
         if (
+          !isNaN(d.getTime()) &&
           d.getFullYear() === calendarYear &&
           d.getMonth() === calendarMonth &&
           d.getDate() === day
@@ -255,6 +228,8 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
           const timeStr = `${String(displayHours).padStart(2, '0')}:${displayMinutes} ${ampm}`;
 
           dayOrders.push({
+            id: ord.id,
+            clientId: ord.clientId,
             client: cName,
             garment: ord.garmentType || 'Garment',
             time: timeStr,
@@ -267,9 +242,22 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
     return dayOrders;
   };
 
-  // Due Date popover state
+  // Due Date popover state with dynamic month/year navigation
   const [isDueDatePickerOpen, setIsDueDatePickerOpen] = useState(false);
+  const [duePickerDate, setDuePickerDate] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
   const dueDatePickerRef = useRef<HTMLDivElement>(null);
+
+  const duePickerYear = duePickerDate.getFullYear();
+  const duePickerMonth = duePickerDate.getMonth();
+  const duePickerFirstDayOffset = new Date(duePickerYear, duePickerMonth, 1).getDay();
+  const duePickerDaysCount = new Date(duePickerYear, duePickerMonth + 1, 0).getDate();
+  const duePickerMonthLabel = new Intl.DateTimeFormat('en-GB', {
+    month: 'long',
+    year: 'numeric',
+  }).format(duePickerDate);
 
   // Handle Escape key to close modals and popovers
   useEffect(() => {
@@ -388,7 +376,6 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
   // Requirement D: Clicking "Add Point" opens modal to select from the 21 standard measurements
   const handleOpenAddPoint = () => {
     triggerRef.current = document.activeElement as HTMLButtonElement;
-    // Default to first unadded measurement, or first overall
     const firstUnadded =
       allHotspots.find((h) => !activePointKeys.includes(h.key)) || allHotspots[0];
     const key = firstUnadded?.key || 'neck_circumference';
@@ -499,7 +486,8 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
     const trimmedPhone = clientPhone.trim();
     const trimmedEmail = clientEmail.trim();
     const trimmedGarment = clientGarment.trim() || selectedTemplateName;
-    const priceNum = parseFloat(clientPrice.replace(/[^0-9.]/g, '')) || 0;
+    const rawPrice = parseFloat(clientPrice.replace(/[^0-9.]/g, ''));
+    const priceNum = isNaN(rawPrice) ? 0 : rawPrice;
 
     const errors: { name?: string; phone?: string; email?: string; garment?: string } = {};
     const missing: string[] = [];
@@ -547,12 +535,31 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
 
     setClientFormErrors({});
 
-    const newCl = addClient({
-      name: trimmedName,
-      phone: trimmedPhone,
-      email: trimmedEmail,
-      notes: clientNotes.trim(),
-    });
+    // Reuse existing client if matching name or email (case-insensitive)
+    const existingClient = clients.find(
+      (c) =>
+        c.name.trim().toLowerCase() === trimmedName.toLowerCase() ||
+        (c.email && c.email.trim().toLowerCase() === trimmedEmail.toLowerCase())
+    );
+
+    let targetClientId: string;
+    if (existingClient) {
+      updateClient(existingClient.id, {
+        name: trimmedName,
+        phone: trimmedPhone,
+        email: trimmedEmail,
+        notes: clientNotes.trim() || existingClient.notes,
+      });
+      targetClientId = existingClient.id;
+    } else {
+      const newCl = addClient({
+        name: trimmedName,
+        phone: trimmedPhone,
+        email: trimmedEmail,
+        notes: clientNotes.trim(),
+      });
+      targetClientId = newCl.id;
+    }
 
     const activeMeasurementsOnly: Record<string, number> = {};
     activePointKeys.forEach((k) => {
@@ -562,7 +569,7 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
     });
 
     const snapshot = addSnapshot({
-      clientId: newCl.id,
+      clientId: targetClientId,
       date: new Date()
         .toLocaleDateString('en-GB', {
           day: '2-digit',
@@ -577,11 +584,11 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
     });
 
     addOrder({
-      clientId: newCl.id,
+      clientId: targetClientId,
       garmentType: trimmedGarment,
       measurementSnapshotId: snapshot.id,
       status: 'In Progress',
-      pickupDateTime: clientDueDate ? `${clientDueDate}T12:00:00` : '2026-10-31T12:00:00',
+      pickupDateTime: parseDueDateToISO(clientDueDate),
       price: priceNum,
       referenceImages: styleImages.map((url, i) => ({
         id: `ref-${Date.now()}-${i}`,
@@ -591,64 +598,60 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
       notes: clientNotes,
     });
 
+    // Reset intake form fields cleanly after save
+    setClientName('');
+    setClientGarment('');
+    setClientPhone('');
+    setClientEmail('');
+    setClientPrice('');
+    setClientDueDate('');
+    setClientNotes('');
+    setStyleImages([]);
+    setActivePointKeys([]);
+    setMeasurements({});
+    setSelectedTemplateId('');
+    setSelectedTemplateName('');
+
     showToast({
       type: 'success',
       title: 'Client & Order Saved',
-      message: `Created profile for "${trimmedName}" and booked order for "${trimmedGarment}".`,
+      message: `${existingClient ? 'Updated' : 'Created'} profile for "${trimmedName}" and booked order for "${trimmedGarment}".`,
       duration: 4000,
     });
   };
 
-  // Live Recent Orders list connected to global store
+  // Live Recent Orders list connected to global store, sorted by createdAt descending
   const recentOrdersList = useMemo(() => {
-    if (orders && orders.length > 0) {
-      return orders.slice(0, 4).map((ord) => {
-        const cl = clients.find((c) => c.id === ord.clientId);
-        const clientFullName = cl?.name || 'Chloe Dallas';
-        const initials =
-          clientFullName
-            .split(' ')
-            .map((p) => p[0])
-            .join('')
-            .slice(0, 2)
-            .toUpperCase() || 'CL';
-        return {
-          id: ord.id,
-          client: clientFullName,
-          initials,
-          garment: ord.garmentType || 'Bespoke Order',
-          clientId: cl?.id || ord.clientId || 'c-1',
-        };
-      });
-    }
-    return [
-      {
-        id: 'ord-9021',
-        client: 'Chloe Dallas',
-        initials: 'CD',
-        garment: 'Bespoke African Gown',
-        clientId: 'c-1',
-      },
-      {
-        id: 'ord-102',
-        client: 'Taylor Razaq',
-        initials: 'TR',
-        garment: 'Bespoke African Gown',
-        clientId: 'c-2',
-      },
-      {
-        id: 'ord-103',
-        client: 'Bryan Muhammed',
-        initials: 'BM',
-        garment: 'Bespoke African Gown',
-        clientId: 'c-3',
-      },
-    ];
+    if (!orders || orders.length === 0) return [];
+    const sorted = [...orders].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    return sorted.slice(0, 4).map((ord) => {
+      const cl = clients.find((c) => c.id === ord.clientId);
+      const clientFullName = cl?.name || 'Client';
+      const initials =
+        clientFullName
+          .split(' ')
+          .map((p) => p[0])
+          .join('')
+          .slice(0, 2)
+          .toUpperCase() || 'CL';
+      return {
+        id: ord.id,
+        client: clientFullName,
+        initials,
+        garment: ord.garmentType || 'Bespoke Order',
+        clientId: cl?.id || ord.clientId || 'c-1',
+      };
+    });
   }, [orders, clients]);
 
   // Shared Subcomponents for Desktop & Mobile
   const renderNewClientCard = (isMobile = false) => (
-    <div className="w-full bg-[var(--card)] rounded-[6px] p-3 flex flex-col gap-2">
+    <div
+      id="overview-client-intake"
+      className="w-full bg-[var(--card)] rounded-[6px] p-3 flex flex-col gap-2"
+    >
       <div>
         <h2 className="text-[16px] font-bold text-[var(--text)] leading-tight">
           New Client
@@ -658,7 +661,7 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
         </p>
       </div>
 
-      <div className="bg-[var(--surface)] rounded-[8px] flex flex-col gap-[2px] p-[2px]">
+      <div className="bg-[var(--card)] rounded-[8px] flex flex-col gap-[2px] p-[2px]">
         {/* Section 1: Basic Information */}
         <div className="bg-[var(--surface)] p-2.5 flex flex-col gap-1 rounded-[6px]">
           <h3 className="text-[14px] font-semibold text-[var(--text)]">
@@ -668,7 +671,7 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
             <Input
               ref={clientNameInputRef}
               label="Client *"
-              placeholder="e.g Adriana Kunle"
+              placeholder="e.g. Adriana Kunle"
               value={clientName}
               error={clientFormErrors.name}
               onChange={(e) => {
@@ -702,6 +705,7 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
             <Input
               ref={clientPhoneInputRef}
               label="Phone Number *"
+              type="tel"
               placeholder="+234 -"
               value={clientPhone}
               error={clientFormErrors.phone}
@@ -755,25 +759,29 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
             <Input
               label={`Price (${currencySymbol})`}
+              inputMode="decimal"
               placeholder={`${currencySymbol}0.00`}
               value={clientPrice}
               onChange={(e) => setClientPrice(e.target.value)}
+              className="tabular-nums"
             />
             <div className="relative" ref={dueDatePickerRef}>
               <Input
                 label="Due Date"
                 type="text"
-                placeholder="09/10/2026"
+                placeholder="DD/MM/YYYY"
                 value={clientDueDate}
                 onChange={(e) => setClientDueDate(e.target.value)}
                 className={cn(
+                  'tabular-nums',
                   clientDueDate
-                    ? 'text-[var(--text-strong)] font-semibold tabular-nums'
+                    ? 'text-[var(--text-strong)] font-semibold'
                     : ''
                 )}
                 rightAddon={
                   <button
                     type="button"
+                    aria-label="Open calendar to pick due date"
                     onClick={() => setIsDueDatePickerOpen((prev) => !prev)}
                     className="p-1 text-[var(--text-2)] hover:text-black cursor-pointer transition-colors"
                     title="Open calendar to pick due date"
@@ -783,7 +791,7 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
                 }
               />
 
-              {/* Date Picker Popover */}
+              {/* Dynamic Date Picker Popover */}
               <AnimatePresence>
                 {isDueDatePickerOpen && (
                   <motion.div
@@ -795,23 +803,38 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
                   >
                     <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--outline)]">
                       <span className="text-[12px] font-bold text-[var(--text-strong)]">
-                        October 2026
+                        {duePickerMonthLabel}
                       </span>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => {
-                            setClientDueDate('09/10/2026');
-                            setIsDueDatePickerOpen(false);
-                          }}
-                          className="text-[10px] font-medium text-[var(--primary)] hover:underline cursor-pointer"
+                          aria-label="Previous month"
+                          onClick={() =>
+                            setDuePickerDate(
+                              (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1)
+                            )
+                          }
+                          className="p-0.5 rounded hover:bg-[var(--chip)] text-[var(--text-2)] hover:text-black cursor-pointer"
                         >
-                          09/10/2026
+                          <ChevronLeft className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
+                          aria-label="Next month"
+                          onClick={() =>
+                            setDuePickerDate(
+                              (prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1)
+                            )
+                          }
+                          className="p-0.5 rounded hover:bg-[var(--chip)] text-[var(--text-2)] hover:text-black cursor-pointer"
+                        >
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Close calendar"
                           onClick={() => setIsDueDatePickerOpen(false)}
-                          className="text-[var(--text-2)] hover:text-black p-0.5 cursor-pointer"
+                          className="text-[var(--text-2)] hover:text-black p-0.5 cursor-pointer ml-1"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -829,12 +852,13 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
                     </div>
 
                     <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-medium">
-                      <span />
-                      <span />
-                      <span />
-                      <span />
-                      {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
-                        const formatted = `${String(day).padStart(2, '0')}/10/2026`;
+                      {Array.from({ length: duePickerFirstDayOffset }, (_, idx) => (
+                        <span key={`empty-${idx}`} />
+                      ))}
+                      {Array.from({ length: duePickerDaysCount }, (_, i) => i + 1).map((day) => {
+                        const formatted = `${String(day).padStart(2, '0')}/${String(
+                          duePickerMonth + 1
+                        ).padStart(2, '0')}/${duePickerYear}`;
                         const isSelected = clientDueDate === formatted;
                         return (
                           <button
@@ -867,11 +891,9 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
         <div className="bg-[var(--surface)] p-2.5 flex flex-col gap-1 rounded-[6px]">
           <h3 className="text-[14px] font-semibold text-[var(--text)]">Notes</h3>
           <div className="pt-0.5">
-            <label className="block text-[11px] font-normal text-[var(--text)] mb-[2px]">
-              Workroom notes and fabric details
-            </label>
             <Textarea
-              placeholder="e.g hand stitched, monogram design on wrist and gold buttons"
+              label="Workroom notes and fabric details"
+              placeholder="e.g. hand-stitched, monogram design on wrist and gold buttons"
               value={clientNotes}
               onChange={(e) => setClientNotes(e.target.value)}
               className={isMobile ? 'h-[90px]' : 'h-[133px]'}
@@ -895,9 +917,9 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
           <div className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--muted)] mt-0.5">
             {centerView === 'mannequin' ? (
               <>
-                <span>
+                <span className="tabular-nums">
                   {activePointKeys.length === 0
-                    ? 'Empty state · Choose a template or add a point'
+                    ? 'No points selected · Choose a template or add a point'
                     : `${activePointKeys.length} active ${
                         activePointKeys.length === 1 ? 'point' : 'points'
                       }`}
@@ -918,6 +940,7 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
               setSelectedTemplateId('');
               setSelectedTemplateName('');
               setActivePointKeys([]);
+              setMeasurements({});
             }}
             className="text-[11px] font-medium text-[var(--muted)] hover:text-black cursor-pointer shrink-0 pt-0.5"
           >
@@ -929,29 +952,36 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
       {/* Toolbar: white pill container */}
       <div className="w-full rounded-[32px] bg-white p-2 flex flex-wrap items-center gap-2">
         {/* 1. Choose Template */}
-        <button
-          ref={triggerRef}
-          type="button"
-          onClick={() => {
-            setDialogSelectedTemplateId(
-              selectedTemplateId || storeTemplates[0]?.id || ''
-            );
-            setIsTemplateModalOpen(true);
-          }}
-          className={cn(
-            'flex-1 min-w-[120px] h-9 rounded-[24px] text-[14px] font-medium flex items-center justify-center transition-colors cursor-pointer px-3 truncate',
-            selectedTemplateName
-              ? 'bg-[var(--selected-bg)] border border-[var(--selected)] text-[var(--primary)] font-semibold'
-              : 'bg-[var(--chip)] text-[var(--text-2)] hover:bg-[#eaeaea]'
-          )}
+        <div
+          id="overview-blueprints"
+          className="flex-1 min-w-[120px] flex items-center gap-1"
         >
-          {selectedTemplateName || 'Choose Template'}
-        </button>
+          <button
+            ref={triggerRef}
+            type="button"
+            onClick={() => {
+              setDialogSelectedTemplateId(
+                selectedTemplateId || storeTemplates[0]?.id || ''
+              );
+              setIsTemplateModalOpen(true);
+            }}
+            className={cn(
+              'w-full h-9 rounded-[24px] text-[14px] font-medium flex items-center justify-center transition-colors cursor-pointer px-3 truncate',
+              selectedTemplateName
+                ? 'bg-[var(--selected-bg)] border border-[var(--selected)] text-[var(--primary)] font-semibold'
+                : 'bg-[var(--chip)] text-[var(--text-2)] hover:bg-[#eaeaea]'
+            )}
+          >
+            {selectedTemplateName || 'Choose Template'}
+          </button>
+        </div>
 
         {/* 2. M / F toggle group */}
         <div className="h-9 bg-[var(--chip)] rounded-[24px] px-2 py-1.5 flex items-center gap-1 shrink-0">
           <button
             type="button"
+            aria-label="Masculine form"
+            aria-pressed={gender === 'male'}
             onClick={() => setGender('male')}
             className={cn(
               'w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold transition-all cursor-pointer',
@@ -964,6 +994,8 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
           </button>
           <button
             type="button"
+            aria-label="Feminine form"
+            aria-pressed={gender === 'female'}
             onClick={() => setGender('female')}
             className={cn(
               'w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold transition-all cursor-pointer',
@@ -980,6 +1012,8 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
         <div className="h-9 bg-[var(--chip)] rounded-[24px] px-2 py-1.5 flex items-center gap-1 shrink-0">
           <button
             type="button"
+            aria-label="Diagram view"
+            aria-pressed={centerView === 'mannequin'}
             onClick={() => setCenterView('mannequin')}
             className={cn(
               'w-6 h-6 rounded-full flex items-center justify-center transition-all cursor-pointer',
@@ -993,6 +1027,8 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
           </button>
           <button
             type="button"
+            aria-label="List view"
+            aria-pressed={centerView === 'table'}
             onClick={() => setCenterView('table')}
             className={cn(
               'w-6 h-6 rounded-full flex items-center justify-center transition-all cursor-pointer',
@@ -1007,18 +1043,26 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
         </div>
 
         {/* 4. Add Point */}
-        <button
-          type="button"
-          onClick={handleOpenAddPoint}
-          className="h-9 px-3.5 bg-[var(--chip)] border border-[var(--outline)] text-[var(--text-2)] text-[14px] font-medium rounded-[24px] hover:bg-[#eaeaea] transition-colors cursor-pointer shrink-0"
+        <div
+          id="overview-touchpoints"
+          className="flex items-center gap-1 shrink-0"
         >
-          Add Point
-        </button>
+          <button
+            type="button"
+            onClick={handleOpenAddPoint}
+            className="h-9 px-3.5 bg-[var(--chip)] border border-[var(--outline)] text-[var(--text-2)] text-[14px] font-medium rounded-[24px] hover:bg-[#eaeaea] transition-colors cursor-pointer shrink-0"
+          >
+            Add Point
+          </button>
+        </div>
       </div>
 
       {/* Main Content: Mannequin Diagram OR List View */}
       {centerView === 'mannequin' ? (
-        <div className="w-full flex flex-col items-center justify-center py-2 select-none flex-1">
+        <div
+          id="overview-mannequin"
+          className="w-full flex flex-col items-center justify-center py-2 select-none flex-1 relative"
+        >
           <RotatableMannequin
             gender={gender}
             onGenderChange={setGender}
@@ -1083,8 +1127,9 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
                   </div>
                   <button
                     type="button"
+                    aria-label={`Remove ${field.label}`}
                     onClick={() => handleRemoveField(field.id, field.label)}
-                    className="w-5 h-5 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-black hover:bg-neutral-100 transition-colors cursor-pointer shrink-0"
+                    className="w-6 h-6 -mr-1 -mt-0.5 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-black hover:bg-neutral-100 transition-colors cursor-pointer shrink-0"
                     title={`Remove ${field.label}`}
                   >
                     <X className="w-3.5 h-3.5" />
@@ -1098,6 +1143,7 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
                     }}
                     type="text"
                     inputMode="decimal"
+                    aria-label={`${field.label} in ${unitLabel}`}
                     placeholder="0.0"
                     value={strVal}
                     onChange={(e) => handleFieldChange(field.id, e.target.value)}
@@ -1126,7 +1172,10 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
   );
 
   const renderCalendarCard = () => (
-    <div className="w-full bg-[var(--card)] rounded-[6px] p-3 flex flex-col gap-3 relative">
+    <div
+      id="overview-calendar"
+      className="w-full bg-[var(--card)] rounded-[6px] p-3 flex flex-col gap-3 relative"
+    >
       <div className="flex items-center justify-between">
         <h3 className="text-[14px] font-semibold text-[var(--text-strong)] leading-none">
           Garment&apos;s Calendar
@@ -1136,6 +1185,7 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
           <div className="flex items-center gap-0.5 text-[var(--text-2)]">
             <button
               type="button"
+              aria-label="Previous Month"
               className="p-1 rounded hover:bg-neutral-200 transition-colors cursor-pointer"
               title="Previous Month"
               onClick={() => {
@@ -1149,6 +1199,7 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
             </button>
             <button
               type="button"
+              aria-label="Next Month"
               className="p-1 rounded hover:bg-neutral-200 transition-colors cursor-pointer"
               title="Next Month"
               onClick={() => {
@@ -1242,11 +1293,12 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
               className="absolute left-3 right-3 top-[170px] z-30 bg-white border border-[var(--outline)] rounded-[8px] p-3 shadow-xl"
             >
               <div className="flex items-center justify-between pb-2 border-b border-[var(--outline)] mb-2">
-                <span className="text-[12px] font-bold text-[var(--text-strong)]">
+                <span className="text-[12px] font-bold text-[var(--text-strong)] tabular-nums">
                   {activeDatePopover} {calendarMonthLabel} — Pickups
                 </span>
                 <button
                   type="button"
+                  aria-label="Close pickups popover"
                   onClick={() => setActiveDatePopover(null)}
                   className="text-[var(--text-2)] hover:text-black p-0.5 cursor-pointer"
                 >
@@ -1255,9 +1307,14 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
               </div>
               <div className="flex flex-col gap-1.5">
                 {getOrdersForDay(activeDatePopover).map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between text-[11px] bg-[var(--chip)] p-2 rounded-[6px]"
+                  <button
+                    key={item.id || idx}
+                    type="button"
+                    onClick={() => {
+                      setActiveDatePopover(null);
+                      onOpenClient(item.clientId);
+                    }}
+                    className="w-full text-left flex items-center justify-between text-[11px] bg-[var(--chip)] hover:bg-[#EAEAEA] p-2 rounded-[6px] transition-colors cursor-pointer"
                   >
                     <div>
                       <div className="font-medium text-[var(--text-strong)]">
@@ -1270,7 +1327,7 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
                     <span className="font-semibold text-[var(--text-date)] tabular-nums">
                       {item.time}
                     </span>
-                  </div>
+                  </button>
                 ))}
               </div>
             </motion.div>
@@ -1296,46 +1353,64 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
   );
 
   const renderRecentOrdersCard = () => (
-    <div className="w-full bg-[var(--card)] rounded-[6px] p-3 flex flex-col gap-2">
+    <div
+      id="overview-client-intake"
+      className="w-full bg-[var(--card)] rounded-[6px] p-3 flex flex-col gap-2"
+    >
       <h3 className="text-[14px] font-semibold text-[var(--text-strong)]">
         Recent Orders
       </h3>
 
-      <div className="bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
-        {recentOrdersList.map((order) => (
-          <div
-            key={order.id}
-            onClick={() => onOpenClient(order.clientId)}
-            className="bg-[var(--chip)] hover:bg-[#EAEAEA] rounded-[8px] p-2 flex items-center gap-2 justify-between cursor-pointer transition-colors"
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-[12px] font-bold text-[var(--text-strong)] shrink-0">
-                {order.initials}
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-[12px] font-medium text-[var(--text-strong)] leading-tight truncate">
-                  {order.client}
-                </span>
-                <span className="text-[11px] font-normal text-[var(--muted)] leading-tight truncate">
-                  {order.garment}
-                </span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenClient(order.clientId);
+      {recentOrdersList.length === 0 ? (
+        <div className="bg-[var(--surface)] rounded-[8px] p-4 text-center text-[12px] text-[var(--muted)]">
+          No recent orders yet. Create a client and order to see it here.
+        </div>
+      ) : (
+        <div className="bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
+          {recentOrdersList.map((order) => (
+            <div
+              key={order.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => onOpenClient(order.clientId)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onOpenClient(order.clientId);
+                }
               }}
-              className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-[var(--text-strong)] hover:bg-neutral-100 transition-colors cursor-pointer shrink-0"
-              title={`Open client profile for ${order.client}`}
+              className="bg-[var(--chip)] hover:bg-[#EAEAEA] rounded-[6px] p-2 flex items-center gap-2 justify-between cursor-pointer transition-colors"
             >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        ))}
-      </div>
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-[12px] font-bold text-[var(--text-strong)] shrink-0">
+                  {order.initials}
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[12px] font-medium text-[var(--text-strong)] leading-tight truncate">
+                    {order.client}
+                  </span>
+                  <span className="text-[11px] font-normal text-[var(--muted)] leading-tight truncate">
+                    {order.garment}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                aria-label={`Open client profile for ${order.client}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenClient(order.clientId);
+                }}
+                className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-[var(--text-strong)] hover:bg-neutral-100 transition-colors cursor-pointer shrink-0"
+                title={`Open client profile for ${order.client}`}
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 
@@ -1365,7 +1440,7 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
                   <span className="text-[14px] font-semibold text-black truncate">
                     {tmpl.name}
                   </span>
-                  <span className="px-2 py-0.5 rounded-full bg-white text-[10px] font-medium text-[var(--text-2)] border border-[#EDEDED] shrink-0">
+                  <span className="px-2 py-0.5 rounded-full bg-white text-[10px] font-medium text-[var(--text-2)] border border-[#EDEDED] shrink-0 tabular-nums">
                     {tmpl.fieldKeys.length} pts
                   </span>
                 </div>
@@ -1377,6 +1452,7 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
+                  aria-label={`Delete ${tmpl.name}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     deleteTemplate(tmpl.id);
@@ -1543,78 +1619,26 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
   };
 
   return (
-    <div className="w-full min-h-screen bg-[var(--page)] select-none text-[var(--text)]">
+    <div className="w-full max-w-[1216px] mx-auto px-3 sm:px-4 xl:px-0 mt-3 lg:mt-4 pb-24 lg:pb-12 select-none text-[var(--text)]">
       {/* =======================================================================
           PART A: MOBILE OVERVIEW (< 1024px)
           ======================================================================= */}
       {!isDesktop && (
-        <>
-          <div className="w-full px-2 sm:px-4 max-w-[720px] mx-auto pt-2 pb-[88px] lg:hidden flex flex-col gap-2">
-            <div className="w-full bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
-              <div className="w-full bg-[var(--surface)] p-[2px] rounded-[8px]">
-                <div className="w-full rounded-[6px] bg-[var(--card)] px-6 py-1 flex items-center justify-between min-h-[45px]">
-                  <div
-                    onClick={() => setActiveScreen('overview')}
-                    className="flex items-center gap-2 cursor-pointer text-black"
-                  >
-                    <OrigamiTailorFitLogo className="w-[44px] h-[31px] text-black" />
-                    <span className="text-[24px] font-bold text-black tracking-[-0.02em]">
-                      TailorFit
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <NotificationDropdown />
-                  </div>
-                </div>
-              </div>
-
-              {renderNewClientCard(true)}
-              {renderMannequinCard(true)}
-              {renderCalendarCard()}
-              {renderRecentOrdersCard()}
-            </div>
+        <div className="w-full lg:hidden flex flex-col gap-2">
+          <div className="w-full bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
+            {renderNewClientCard(true)}
+            {renderMannequinCard(true)}
+            {renderCalendarCard()}
+            {renderRecentOrdersCard()}
           </div>
-
-          {/* Floating Navigation on Mobile (< 1024px) */}
-          <div className="lg:hidden fixed bottom-4 inset-x-0 z-40 flex justify-center px-4 pointer-events-none">
-            <nav
-              className="pointer-events-auto bg-black rounded-[32px] p-1 flex items-center gap-1 shadow-2xl select-none"
-              aria-label="Mobile Navigation"
-            >
-              <button
-                type="button"
-                onClick={() => setActiveScreen('overview')}
-                className="flex items-center gap-1 bg-white text-black rounded-[28px] px-3.5 py-2 text-[12px] font-semibold cursor-pointer"
-              >
-                <House className="w-4 h-4 shrink-0" />
-                <span>Overview</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveScreen('clients')}
-                className="flex items-center gap-1 text-white hover:text-white/80 rounded-[28px] px-3 py-2 text-[12px] font-medium transition-colors cursor-pointer"
-              >
-                <UsersRound className="w-4 h-4 shrink-0" />
-                <span>Clients</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveScreen('settings')}
-                className="flex items-center gap-1 text-white hover:text-white/80 rounded-[28px] px-3 py-2 text-[12px] font-medium transition-colors cursor-pointer"
-              >
-                <Settings className="w-4 h-4 shrink-0" />
-                <span>Settings</span>
-              </button>
-            </nav>
-          </div>
-        </>
+        </div>
       )}
 
       {/* =======================================================================
           PART B: DESKTOP OVERVIEW (>= 1024px / lg)
           ======================================================================= */}
       {isDesktop && (
-        <div className="hidden lg:block w-full max-w-[1216px] mx-auto px-4 sm:px-0 pt-4 pb-12">
+        <div className="hidden lg:block w-full">
           <div className="w-full flex flex-col xl:flex-row gap-4 items-start">
             {/* LEFT CONTAINER (70.5% width) */}
             <div className="w-full xl:w-[70.5%] bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
@@ -1633,8 +1657,8 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
               </div>
             </div>
 
-            {/* RIGHT COLUMN (28.2% width) */}
-            <div className="w-full xl:w-[28.2%] bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
+            {/* RIGHT COLUMN (aligned 1:1 with Navbar right edge) */}
+            <div className="w-full xl:flex-1 bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
               {renderCalendarCard()}
               {renderRecentOrdersCard()}
             </div>
@@ -1937,7 +1961,7 @@ export function OverviewScreen({ onOpenClient, onOpenOrder }: OverviewScreenProp
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.95 }}
             transition={springSmooth}
-            className="fixed bottom-6 right-6 z-50 bg-white rounded-[16px] px-4 py-3 shadow-xl border border-[var(--outline)] flex items-center gap-3 select-none"
+            className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-50 bg-white rounded-[16px] px-4 py-3 shadow-xl border border-[var(--outline)] flex items-center gap-3 select-none"
           >
             <span className="text-[12px] font-medium text-[var(--text-strong)]">
               Removed &ldquo;{undoToast.label}&rdquo;

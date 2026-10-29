@@ -61,8 +61,8 @@ export function MorphingSaveButton({
       whileTap={disabled || status === 'loading' || shouldReduceMotion ? undefined : { scale: 0.97 }}
       transition={springSnappy}
       className={cn(
-        'relative inline-flex items-center justify-center rounded-[24px] font-medium text-[14px] cursor-pointer select-none overflow-hidden transition-colors',
-        'h-10 px-5',
+        'relative inline-flex items-center justify-center rounded-[24px] font-medium text-[13px] cursor-pointer select-none overflow-hidden transition-colors',
+        'h-10 min-w-[110px] px-5',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]',
         status === 'error'
           ? 'bg-[var(--status-danger)] text-white hover:opacity-90'
@@ -72,7 +72,7 @@ export function MorphingSaveButton({
         disabled && 'opacity-30 cursor-not-allowed',
         className
       )}
-      style={{ width: '110px', ...style }}
+      style={style}
     >
       <AnimatePresence mode="wait" initial={false}>
         {status === 'idle' && (
@@ -82,7 +82,7 @@ export function MorphingSaveButton({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={springMorph}
-            className="inline-flex items-center gap-1 text-[14px] font-medium"
+            className="inline-flex items-center gap-1.5 text-[13px] font-medium"
           >
             <Save className="w-4 h-4 shrink-0" />
             <span>{idleText}</span>
@@ -96,10 +96,10 @@ export function MorphingSaveButton({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
             transition={springMorph}
-            className="inline-flex items-center gap-2"
+            className="inline-flex items-center gap-2 text-[13px] font-medium"
           >
             <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="text-xs">Saving...</span>
+            <span>Saving...</span>
           </motion.span>
         )}
 
@@ -110,7 +110,7 @@ export function MorphingSaveButton({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
             transition={springMorph}
-            className="inline-flex items-center gap-1.5"
+            className="inline-flex items-center gap-1.5 text-[13px] font-medium"
           >
             <svg
               className="w-4 h-4"
@@ -131,7 +131,7 @@ export function MorphingSaveButton({
                 }}
               />
             </svg>
-            <span className="text-xs font-semibold">Saved</span>
+            <span>Saved</span>
           </motion.span>
         )}
 
@@ -142,10 +142,10 @@ export function MorphingSaveButton({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
             transition={springMorph}
-            className="inline-flex items-center gap-1.5"
+            className="inline-flex items-center gap-1.5 text-[13px] font-medium"
           >
             <AlertCircle className="w-4 h-4" />
-            <span className="text-xs">Retry</span>
+            <span>Retry</span>
           </motion.span>
         )}
       </AnimatePresence>
