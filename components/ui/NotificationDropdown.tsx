@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Bell } from 'lucide-react';
+import { Bell, CheckCircle2 } from 'lucide-react';
+import { useStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { springSmooth, springSnappy } from '@/lib/motion-tokens';
 
@@ -16,34 +17,62 @@ interface NotificationItem {
 
 export function NotificationDropdown() {
   const [isOpen, setIsOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const { clients, getOrdersDueToday, getOrdersOverdue, getOrdersReady } = useStore();
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [shake, setShake] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const shouldReduceMotion = useReducedMotion();
 
-  const [notifications, setNotifications] = useState<NotificationItem[]>([
-    {
-      id: 'notif-1',
-      title: 'Chloe Dallas fitting due today',
-      time: '10:00 AM',
-      description: 'Bespoke African Gown ready for final fitting in main studio.',
-      isNew: false,
-    },
-    {
-      id: 'notif-2',
-      title: 'Urgent order: Bryan Muhammed',
-      time: '04:15 PM',
-      description: 'Silk Evening Gown requested priority completion.',
-      isNew: false,
-    },
-    {
-      id: 'notif-3',
-      title: 'Taylor Razaq pickup completed',
-      time: 'Yesterday',
-      description: 'Oxford Three Piece Suit marked picked up.',
-      isNew: false,
-    },
-  ]);
+  const notifications = useMemo(() => {
+    const list: NotificationItem[] = [];
+    const clientMap = new Map(clients.map((c) => [c.id, c.name]));
+
+    const overdue = getOrdersOverdue();
+    overdue.forEach((o) => {
+      const id = `notif-overdue-${o.id}`;
+      list.push({
+        id,
+        title: `Overdue pickup: ${clientMap.get(o.clientId) || 'Client'}`,
+        time: 'Urgent',
+        description: `${o.garmentType || 'Bespoke Order'} is past its scheduled delivery date.`,
+        isNew: !readIds.has(id),
+      });
+    });
+
+    const dueToday = getOrdersDueToday();
+    dueToday.forEach((o) => {
+      const id = `notif-today-${o.id}`;
+      list.push({
+        id,
+        title: `${clientMap.get(o.clientId) || 'Client'} fitting due today`,
+        time: 'Today',
+        description: `${o.garmentType || 'Bespoke Order'} is scheduled for collection.`,
+        isNew: !readIds.has(id),
+      });
+    });
+
+    const ready = getOrdersReady();
+    ready.slice(0, 3).forEach((o) => {
+      const id = `notif-ready-${o.id}`;
+      list.push({
+        id,
+        title: `${clientMap.get(o.clientId) || 'Client'} order ready`,
+        time: 'Ready',
+        description: `${o.garmentType || 'Bespoke Order'} marked finished and ready.`,
+        isNew: !readIds.has(id),
+      });
+    });
+
+    return list;
+  }, [clients, getOrdersDueToday, getOrdersOverdue, getOrdersReady, readIds]);
+
+  const unreadCount = useMemo(() => {
+    return notifications.filter((n) => n.isNew).length;
+  }, [notifications]);
+
+  const handleMarkAllRead = () => {
+    setReadIds(new Set(notifications.map((n) => n.id)));
+  };
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -65,11 +94,6 @@ export function NotificationDropdown() {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen]);
-
-  const handleMarkAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isNew: false })));
-    setUnreadCount(0);
-  };
 
   return (
     <div ref={containerRef} className="relative">
@@ -136,8 +160,16 @@ export function NotificationDropdown() {
 
             <div className="py-2 space-y-2 max-h-72 overflow-y-auto">
               {notifications.length === 0 ? (
-                <div className="py-6 text-center text-xs text-[var(--text-muted)]">
-                  No studio alerts right now.
+                <div className="py-8 text-center flex flex-col items-center justify-center gap-2">
+                  <div className="w-10 h-10 rounded-full bg-[var(--surface-2)] flex items-center justify-center text-[var(--text-muted)] mb-0.5">
+                    <CheckCircle2 className="w-5 h-5 text-[var(--completed)]" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-[var(--text)]">All Caught Up</p>
+                    <p className="text-[11px] text-[var(--text-muted)] mt-1 max-w-[200px] leading-snug">
+                      No pending fittings, overdue collections, or studio alerts at this time.
+                    </p>
+                  </div>
                 </div>
               ) : (
                 notifications.map((n) => (

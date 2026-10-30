@@ -641,7 +641,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
         client: clientFullName,
         initials,
         garment: ord.garmentType || 'Bespoke Order',
-        clientId: cl?.id || ord.clientId || 'c-1',
+        clientId: cl?.id || ord.clientId || '',
       };
     });
   }, [orders, clients]);
@@ -1283,28 +1283,28 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
 
       {/* Peek Card Popover */}
       <AnimatePresence>
-        {activeDatePopover !== null &&
-          getOrdersForDay(activeDatePopover).length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: -4, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -4, scale: 0.98 }}
-              transition={springSnappy}
-              className="absolute left-3 right-3 top-[170px] z-30 bg-white border border-[var(--outline)] rounded-[8px] p-3 shadow-xl"
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-[var(--outline)] mb-2">
-                <span className="text-[12px] font-bold text-[var(--text-strong)] tabular-nums">
-                  {activeDatePopover} {calendarMonthLabel} — Pickups
-                </span>
-                <button
-                  type="button"
-                  aria-label="Close pickups popover"
-                  onClick={() => setActiveDatePopover(null)}
-                  className="text-[var(--text-2)] hover:text-black p-0.5 cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
+        {activeDatePopover !== null && (
+          <motion.div
+            initial={{ opacity: 0, y: -4, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={springSnappy}
+            className="absolute left-3 right-3 top-[170px] z-30 bg-white border border-[var(--outline)] rounded-[8px] p-3 shadow-xl"
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--outline)] mb-2">
+              <span className="text-[12px] font-bold text-[var(--text-strong)] tabular-nums">
+                {activeDatePopover} {calendarMonthLabel} — Pickups
+              </span>
+              <button
+                type="button"
+                aria-label="Close pickups popover"
+                onClick={() => setActiveDatePopover(null)}
+                className="text-[var(--text-2)] hover:text-black p-0.5 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            {getOrdersForDay(activeDatePopover).length > 0 ? (
               <div className="flex flex-col gap-1.5">
                 {getOrdersForDay(activeDatePopover).map((item, idx) => (
                   <button
@@ -1330,8 +1330,28 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
                   </button>
                 ))}
               </div>
-            </motion.div>
-          )}
+            ) : (
+              <div className="py-3 text-center flex flex-col items-center justify-center gap-1.5">
+                <p className="text-[12px] text-[var(--muted)]">
+                  No pickups or fittings scheduled for this date.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const padDay = String(activeDatePopover).padStart(2, '0');
+                    const padMonth = String(calendarMonth + 1).padStart(2, '0');
+                    const dmy = `${padDay}/${padMonth}/${calendarYear}`;
+                    setActiveDatePopover(null);
+                    setClientDueDate(dmy);
+                  }}
+                  className="text-[11px] font-semibold text-[var(--primary)] hover:underline cursor-pointer"
+                >
+                  Set as due date for intake form
+                </button>
+              </div>
+            )}
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* Legend row */}
@@ -1362,8 +1382,16 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
       </h3>
 
       {recentOrdersList.length === 0 ? (
-        <div className="bg-[var(--surface)] rounded-[8px] p-4 text-center text-[12px] text-[var(--muted)]">
-          No recent orders yet. Create a client and order to see it here.
+        <div className="bg-[var(--surface)] rounded-[8px] p-6 text-center flex flex-col items-center justify-center gap-2 border border-[var(--outline)]">
+          <div className="w-10 h-10 rounded-full bg-[var(--chip)] flex items-center justify-center text-[var(--muted)] mb-0.5">
+            <ClipboardList className="w-5 h-5 text-[var(--text-2)]" />
+          </div>
+          <span className="text-[13px] font-semibold text-[var(--text-strong)]">
+            No Recent Orders
+          </span>
+          <p className="text-[11px] text-[var(--muted)] max-w-xs leading-relaxed">
+            Active fittings and garment orders will appear here automatically as you create client orders.
+          </p>
         </div>
       ) : (
         <div className="bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">

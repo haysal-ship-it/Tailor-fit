@@ -19,6 +19,8 @@ import {
   Plus,
   Search,
   Users,
+  Ruler,
+  Package,
 } from 'lucide-react';
 import { ToastContainer, type ToastMessage } from '@/components/ui/Toasts';
 import { AnimatedNumberMorph } from '@/components/ui/AnimatedNumberMorph';
@@ -72,7 +74,12 @@ const SAVED_CARD_DISPLAY_LABELS: Record<string, string> = {
   body_length: 'Neck to Ankle',
 };
 
-export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
+export function ClientsScreen({
+  onOpenClient,
+  onNewMeasurement,
+  onNewOrder,
+  onEditOrder,
+}: ClientsScreenProps) {
   const {
     clients,
     orders,
@@ -89,6 +96,7 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
     deleteTemplate,
     getClientSnapshots,
     getClientOrders,
+    resetToDemoData,
   } = useStore();
 
   const unitLabel = settings?.defaultUnit || 'cm';
@@ -240,43 +248,39 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
       const initials =
         c.name
           .split(' ')
+          .filter(Boolean)
           .map((n) => n[0])
           .join('')
           .slice(0, 2)
-          .toUpperCase() || 'CD';
+          .toUpperCase() || 'CL';
       const clientOrders = orders.filter((o) => o.clientId === c.id);
       return {
         id: c.id,
         initials,
         name: c.name,
-        phone: c.phone || '+234 8141 432 211',
-        email: c.email || 'chloe@atelier.fit',
+        phone: c.phone || '',
+        email: c.email || '',
         notes: c.notes || '',
         totalOrdersCount: clientOrders.length,
       };
     });
   }, [clients, orders]);
 
-  const activeClientId = selectedClientId || allClientList[0]?.id || 'c-1';
+  const activeClientId = selectedClientId || allClientList[0]?.id || null;
   const selectedClientProfile = useMemo(() => {
+    if (allClientList.length === 0) return null;
     return (
       allClientList.find((c) => c.id === activeClientId) ||
-      allClientList[0] || {
-        id: 'c-1',
-        initials: 'CD',
-        name: 'Chloe Dallas',
-        phone: '+234 8141 432 211',
-        email: 'chloe@atelier.fit',
-        notes: '',
-        totalOrdersCount: 4,
-      }
+      allClientList[0] ||
+      null
     );
   }, [allClientList, activeClientId]);
 
   // Client's saved snapshots from store
   const clientSnapshots = useMemo(() => {
+    if (!selectedClientProfile) return [];
     return getClientSnapshots(selectedClientProfile.id);
-  }, [getClientSnapshots, selectedClientProfile.id]);
+  }, [getClientSnapshots, selectedClientProfile]);
 
   const [activeSnapshotId, setActiveSnapshotId] = useState<string>('');
   const [activePointKeys, setActivePointKeys] = useState<string[]>([]);
@@ -284,13 +288,21 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
 
   // Sync active snapshot & measurements when selected client changes
   useEffect(() => {
+    if (!selectedClientProfile) {
+      setActiveSnapshotId('');
+      setSelectedTemplateName('');
+      setSelectedTemplateId('');
+      setActivePointKeys([]);
+      setMeasurements({});
+      return;
+    }
     const snaps = getClientSnapshots(selectedClientProfile.id);
     if (snaps.length > 0) {
       const latest = snaps[0];
       const normalized = normalizeMeasurementsRecord(latest.measurements);
       const keys = Object.keys(normalized);
       setActiveSnapshotId(latest.id);
-      setSelectedTemplateName(latest.garmentType || 'Bespoke wedding gown');
+      setSelectedTemplateName(latest.garmentType || 'Bespoke fitting');
       setSelectedTemplateId('');
       setActivePointKeys(keys);
       setMeasurements(normalized);
@@ -301,7 +313,7 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
       setActivePointKeys([]);
       setMeasurements({});
     }
-  }, [selectedClientProfile.id, getClientSnapshots]);
+  }, [selectedClientProfile?.id, getClientSnapshots]);
 
   const activeSnapshot = useMemo(() => {
     return clientSnapshots.find((s) => s.id === activeSnapshotId) || clientSnapshots[0];
@@ -318,7 +330,7 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
     nextMeasurements: Record<string, number>,
     garmentLabel?: string
   ) => {
-    if (viewState === 'Inline_NewOrder') return;
+    if (viewState === 'Inline_NewOrder' || !selectedClientProfile) return;
 
     const filteredObj: Record<string, number> = {};
     nextKeys.forEach((k) => {
@@ -487,6 +499,7 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
 
   // Order History cards (Desktop Frame 4)
   const orderHistoryCards = useMemo(() => {
+    if (!selectedClientProfile) return [];
     const clientOrders = getClientOrders(selectedClientProfile.id);
     return clientOrders.map((ord) => {
       const createdDateStr = ord.createdAt
@@ -510,13 +523,7 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
       const imgs =
         ord.referenceImages && ord.referenceImages.length > 0
           ? ord.referenceImages.map((r) => r.url)
-          : DEFAULT_FALLBACK_IMAGES;
-
-      const paddedImages = [
-        imgs[0] || DEFAULT_FALLBACK_IMAGES[0],
-        imgs[1] || imgs[0] || DEFAULT_FALLBACK_IMAGES[1],
-        imgs[2] || imgs[0] || DEFAULT_FALLBACK_IMAGES[2],
-      ];
+          : [];
 
       return {
         id: ord.id,
@@ -525,25 +532,26 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
         badgeColor,
         date: dateStr,
         price: ord.price ?? 0,
-        images: paddedImages,
+        images: imgs,
       };
     });
-  }, [getClientOrders, selectedClientProfile.id]);
+  }, [getClientOrders, selectedClientProfile?.id]);
 
   // Open Edit Profile modal prefilled with current client
   const handleOpenEditProfile = (mode: 'edit' | 'create' | 'switch' = 'edit') => {
     setIsOverflowMenuOpen(false);
-    setEditProfileMode(mode);
-    if (mode === 'create') {
+    if (mode === 'create' || !selectedClientProfile) {
       setEditName('');
       setEditPhone('');
       setEditEmail('');
       setEditNotes('');
+      setEditProfileMode(mode === 'switch' ? 'switch' : 'create');
     } else {
       setEditName(selectedClientProfile.name);
       setEditPhone(selectedClientProfile.phone);
       setEditEmail(selectedClientProfile.email);
       setEditNotes(selectedClientProfile.notes);
+      setEditProfileMode(mode);
     }
     setIsEditProfileModalOpen(true);
   };
@@ -553,11 +561,11 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
     const trimmedName = editName.trim();
     if (!trimmedName) return;
 
-    if (editProfileMode === 'create') {
+    if (editProfileMode === 'create' || !selectedClientProfile) {
       const created = addClient({
         name: trimmedName,
-        phone: editPhone.trim() || '+234 8141 432 211',
-        email: editEmail.trim() || 'client@atelier.fit',
+        phone: editPhone.trim(),
+        email: editEmail.trim(),
         notes: editNotes.trim(),
       });
       setSelectedClientId(created.id);
@@ -585,6 +593,7 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
   };
 
   const handleConfirmDeleteClient = () => {
+    if (!selectedClientProfile) return;
     const name = selectedClientProfile.name;
     deleteClient(selectedClientProfile.id);
     setIsDeleteConfirmOpen(false);
@@ -598,6 +607,7 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
 
   // Create Order from Use Measurement Flow (Desktop Frame 3 / Mobile Frame 1)
   const handleCreateOrderFromUseFlow = () => {
+    if (!selectedClientProfile) return;
     const raw = parseFloat(useFlowPrice.replace(/[^0-9.]/g, ''));
     const parsedPrice = isNaN(raw) ? 0 : raw;
     const refImgs =
@@ -607,11 +617,7 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
             url,
             title: `Style Reference ${idx + 1}`,
           }))
-        : DEFAULT_FALLBACK_IMAGES.map((url, idx) => ({
-            id: `img-${Date.now()}-${idx}`,
-            url,
-            title: `Style Reference ${idx + 1}`,
-          }));
+        : [];
 
     addOrder({
       clientId: selectedClientProfile.id,
@@ -639,11 +645,12 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
 
   // Save Order from Inline New Order Workspace (Desktop Frame 5 / Mobile Frame 2)
   const handleSaveInlineNewOrder = () => {
-    let targetClientId = selectedClientProfile.id;
+    let targetClientId = selectedClientProfile?.id;
     const typedName = newOrderClientName.trim();
     if (
       typedName &&
-      typedName.toLowerCase() !== selectedClientProfile.name.toLowerCase()
+      (!selectedClientProfile ||
+        typedName.toLowerCase() !== selectedClientProfile.name.toLowerCase())
     ) {
       const existing = clients.find(
         (c) => c.name.toLowerCase() === typedName.toLowerCase()
@@ -653,13 +660,24 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
       } else {
         const created = addClient({
           name: typedName,
-          phone: newOrderPhone.trim() || '+234 8141 432 211',
-          email: newOrderEmail.trim() || 'client@atelier.fit',
+          phone: newOrderPhone.trim(),
+          email: newOrderEmail.trim(),
           notes: newOrderNotes.trim(),
         });
         targetClientId = created.id;
         setSelectedClientId(created.id);
       }
+    }
+
+    if (!targetClientId) {
+      const created = addClient({
+        name: typedName || 'New Client',
+        phone: newOrderPhone.trim(),
+        email: newOrderEmail.trim(),
+        notes: newOrderNotes.trim(),
+      });
+      targetClientId = created.id;
+      setSelectedClientId(created.id);
     }
 
     const raw = parseFloat(newOrderPrice.replace(/[^0-9.]/g, ''));
@@ -671,11 +689,7 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
             url,
             title: `Style Reference ${idx + 1}`,
           }))
-        : DEFAULT_FALLBACK_IMAGES.map((url, idx) => ({
-            id: `img-${Date.now()}-${idx}`,
-            url,
-            title: `Style Reference ${idx + 1}`,
-          }));
+        : [];
 
     const filteredMeasurements: Record<string, number> = {};
     activePointKeys.forEach((k) => {
@@ -731,22 +745,45 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
 
   return (
     <div className="w-full max-w-[1216px] mx-auto mt-3 lg:mt-4 px-3 sm:px-4 xl:px-0 pb-24 lg:pb-12 select-none">
-      {allClientList.length === 0 ? (
-        <div className="w-full bg-[var(--surface)] p-8 rounded-[8px] flex flex-col items-center justify-center text-center gap-3">
-          <p className="text-[15px] font-bold text-[var(--text)]">
-            No clients in your atelier directory yet
-          </p>
-          <p className="text-[12px] text-[var(--text-2)] max-w-sm">
-            Create your first client profile to record bespoke anatomical measurements and manage order history.
-          </p>
-          <button
-            type="button"
-            onClick={() => handleOpenEditProfile('create')}
-            className="mt-1 h-9 px-5 rounded-[24px] bg-[var(--primary)] text-white text-[12px] font-medium hover:opacity-95 transition-opacity cursor-pointer flex items-center gap-1.5"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Create First Client</span>
-          </button>
+      {!selectedClientProfile ? (
+        <div className="w-full bg-[var(--surface)] p-8 sm:p-14 rounded-[12px] border border-[var(--outline)] flex flex-col items-center justify-center text-center gap-4 shadow-xs">
+          <div className="w-16 h-16 rounded-full bg-[var(--chip)] border border-[var(--outline)] flex items-center justify-center text-[var(--text-2)]">
+            <Users className="w-8 h-8 text-[var(--text-strong)]" />
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[var(--muted)] mb-1 block">
+              Atelier Client Registry
+            </span>
+            <h2 className="text-[22px] sm:text-[26px] font-bold text-[var(--text)] tracking-tight">
+              No Clients in Atelier
+            </h2>
+            <p className="text-[14px] text-[var(--text-2)] max-w-md mt-2 leading-relaxed">
+              Your client registry is currently empty. Add your first bespoke client to record anatomical measurements, manage fitting schedules, and track couture garment orders.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-3 mt-3">
+            <button
+              type="button"
+              onClick={() => handleOpenEditProfile('create')}
+              className="h-10 px-6 rounded-[24px] bg-[var(--primary)] text-white text-[13px] font-semibold hover:bg-[var(--primary)]/90 transition-colors shadow-xs cursor-pointer flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add First Client</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                resetToDemoData();
+                showToast({
+                  type: 'velocity',
+                  message: 'Sample demo atelier data loaded successfully.',
+                });
+              }}
+              className="h-10 px-5 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[var(--text-2)] text-[13px] font-medium hover:text-[var(--text)] hover:bg-[#EAEAEA] transition-colors cursor-pointer"
+            >
+              Explore with Demo Data
+            </button>
+          </div>
         </div>
       ) : (
       /* =====================================================================
@@ -957,24 +994,32 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
                     >
                       <button
                         type="button"
+                        disabled={clientSnapshots.length === 0}
                         aria-haspopup="listbox"
                         aria-expanded={isSnapshotDropdownOpen}
-                        onClick={() =>
-                          setIsSnapshotDropdownOpen((prev) => !prev)
-                        }
-                        className="w-full h-8 px-3.5 rounded-[24px] bg-[var(--surface)] border border-[var(--outline)] flex items-center justify-between gap-2 text-[12px] text-[var(--text-2)] hover:border-[var(--muted)] transition-colors cursor-pointer"
+                        onClick={() => {
+                          if (clientSnapshots.length > 0) {
+                            setIsSnapshotDropdownOpen((prev) => !prev);
+                          }
+                        }}
+                        className={cn(
+                          'w-full h-8 px-3.5 rounded-[24px] bg-[var(--surface)] border border-[var(--outline)] flex items-center justify-between gap-2 text-[12px] text-[var(--text-2)] transition-colors',
+                          clientSnapshots.length > 0
+                            ? 'hover:border-[var(--muted)] cursor-pointer'
+                            : 'opacity-60 cursor-default'
+                        )}
                       >
                         <span className="truncate">
-                          {activeSnapshot
+                          {clientSnapshots.length > 0 && activeSnapshot
                             ? `${activeSnapshot.garmentType}. ${activeSnapshot.date}`
-                            : 'Bespoke wedding gown. 25/10/2026'}
+                            : 'No saved measurements'}
                         </span>
                         <ChevronDown className="w-3.5 h-3.5 text-[var(--text-2)] shrink-0" />
                       </button>
 
                       {/* Mobile Dropdown Menu (anchors directly below selector pill on mobile as in Mobile Frame 4) */}
                       <AnimatePresence>
-                        {isSnapshotDropdownOpen && (
+                        {isSnapshotDropdownOpen && clientSnapshots.length > 0 && (
                           <motion.div
                             role="listbox"
                             initial={{ opacity: 0, y: -4 }}
@@ -1003,26 +1048,27 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
                       </AnimatePresence>
                     </div>
 
-                    {/* Snapshot Title + Subtitle + `Use Measurement` Pill Button */}
+                    {/* Snapshot Title + Subtitle + CTA Pill Button */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative">
                       <div>
                         <h2 className="text-[14px] font-semibold text-[var(--text)] leading-snug">
-                          {activeSnapshot
+                          {clientSnapshots.length > 0 && activeSnapshot
                             ? `${activeSnapshot.garmentType}.`
-                            : 'Bespoke wedding gown.'}
+                            : 'No Saved Measurements'}
                         </h2>
                         <p className="text-[11px] text-[var(--muted)] mt-0.5">
-                          {activePointKeys.length}{' '}
-                          {activePointKeys.length === 1 ? 'point' : 'points'}{' '}
-                          &nbsp;•&nbsp;{' '}
-                          {mannequinGender === 'female' ? 'Female' : 'Male'}{' '}
-                          &nbsp;•&nbsp; Recorded on{' '}
-                          {activeSnapshot ? activeSnapshot.date : '25/10/2026'}
+                          {clientSnapshots.length > 0
+                            ? `${activePointKeys.length} ${
+                                activePointKeys.length === 1 ? 'point' : 'points'
+                              } • ${
+                                mannequinGender === 'female' ? 'Female' : 'Male'
+                              } • Recorded on ${activeSnapshot?.date || ''}`
+                            : `No measurement snapshots recorded for ${selectedClientProfile.name} yet.`}
                         </p>
 
                         {/* Desktop Dropdown Menu (positioned right below the title as in Desktop Frame 2) */}
                         <AnimatePresence>
-                          {isSnapshotDropdownOpen && (
+                          {isSnapshotDropdownOpen && clientSnapshots.length > 0 && (
                             <motion.div
                               role="listbox"
                               initial={{ opacity: 0, y: -4 }}
@@ -1051,17 +1097,33 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
                         </AnimatePresence>
                       </div>
 
-                      <button
-                        type="button"
-                        id="clients-use-measurement-btn"
-                        onClick={() => {
-                          setIsSnapshotDropdownOpen(false);
-                          setViewState('SavedMeasurements_UseFlow');
-                        }}
-                        className="w-full sm:w-auto h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[#E8E8E8] transition-colors flex items-center justify-center cursor-pointer shrink-0"
-                      >
-                        Use Measurement
-                      </button>
+                      {clientSnapshots.length > 0 ? (
+                        <button
+                          type="button"
+                          id="clients-use-measurement-btn"
+                          onClick={() => {
+                            setIsSnapshotDropdownOpen(false);
+                            setViewState('SavedMeasurements_UseFlow');
+                          }}
+                          className="w-full sm:w-auto h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[#E8E8E8] transition-colors flex items-center justify-center cursor-pointer shrink-0"
+                        >
+                          Use Measurement
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          id="clients-use-measurement-btn"
+                          onClick={() => {
+                            if (onNewMeasurement) {
+                              onNewMeasurement(selectedClientProfile.id);
+                            }
+                          }}
+                          className="w-full sm:w-auto h-9 px-4 rounded-[24px] bg-[var(--primary)] text-white text-[12px] font-semibold hover:bg-[var(--primary)]/90 transition-colors flex items-center gap-1.5 justify-center cursor-pointer shrink-0"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Take Measurements</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1082,43 +1144,73 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
                       />
                     </div>
 
-                    {/* Right Measurement Cards Grid (2 cols on mobile, 3 cols on desktop) */}
-                    <div className="lg:col-span-7 grid grid-cols-2 lg:grid-cols-3 gap-2.5">
-                      {visibleMeasurementFields.map((field) => (
-                        <div
-                          key={field.id}
-                          className="bg-[var(--surface)] rounded-[12px] p-3 flex flex-col justify-between gap-2.5"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[12px] font-semibold text-[var(--text)] truncate">
-                              {field.name}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleRemovePoint(field.id)}
-                              title={`Remove ${field.name}`}
-                              aria-label={`Remove ${field.name}`}
-                              className="w-6 h-6 -mr-1 -mt-0.5 rounded-full flex items-center justify-center text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors cursor-pointer shrink-0"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
+                    {/* Right Measurement Cards Grid OR Empty State */}
+                    <div className="lg:col-span-7">
+                      {clientSnapshots.length === 0 ? (
+                        <div className="w-full bg-[var(--surface)] rounded-[12px] p-8 sm:p-12 border border-[var(--outline)] flex flex-col items-center justify-center text-center gap-3">
+                          <div className="w-12 h-12 rounded-full bg-[var(--chip)] flex items-center justify-center text-[var(--text-2)]">
+                            <Ruler className="w-6 h-6 text-[var(--text-strong)]" />
                           </div>
-
-                          <div className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 flex items-center border border-transparent focus-within:border-[var(--primary)] transition-colors">
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              aria-label={`${field.name} (${field.unit})`}
-                              value={field.value}
-                              onChange={(e) =>
-                                handleFieldValueChange(field.id, e.target.value)
+                          <div>
+                            <h3 className="text-[15px] font-semibold text-[var(--text)]">
+                              No Saved Measurements
+                            </h3>
+                            <p className="text-[12px] text-[var(--muted)] max-w-sm mt-1.5 leading-relaxed">
+                              No anatomical measurements have been recorded for {selectedClientProfile.name} yet. Capture measurements using the 3D studio mannequin on Overview or record their first bespoke fitting.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (onNewMeasurement) {
+                                onNewMeasurement(selectedClientProfile.id);
                               }
-                              placeholder="0.0"
-                              className="w-full bg-transparent text-[12px] font-medium text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
-                            />
-                          </div>
+                            }}
+                            className="mt-2 h-9 px-5 rounded-[24px] bg-[var(--primary)] text-white text-[12px] font-medium hover:bg-[var(--primary)]/90 transition-colors cursor-pointer flex items-center gap-1.5"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Capture Measurements</span>
+                          </button>
                         </div>
-                      ))}
+                      ) : (
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5">
+                          {visibleMeasurementFields.map((field) => (
+                            <div
+                              key={field.id}
+                              className="bg-[var(--surface)] rounded-[12px] p-3 flex flex-col justify-between gap-2.5"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[12px] font-semibold text-[var(--text)] truncate">
+                                  {field.name}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemovePoint(field.id)}
+                                  title={`Remove ${field.name}`}
+                                  aria-label={`Remove ${field.name}`}
+                                  className="w-6 h-6 -mr-1 -mt-0.5 rounded-full flex items-center justify-center text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors cursor-pointer shrink-0"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+
+                              <div className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 flex items-center border border-transparent focus-within:border-[var(--primary)] transition-colors">
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  aria-label={`${field.name} (${field.unit})`}
+                                  value={field.value}
+                                  onChange={(e) =>
+                                    handleFieldValueChange(field.id, e.target.value)
+                                  }
+                                  placeholder="0.0"
+                                  className="w-full bg-transparent text-[12px] font-medium text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1209,17 +1301,13 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[var(--muted)]">Phone Number</span>
                           <span className="font-medium text-[var(--text)] tabular-nums">
-                            {selectedClientProfile.id === 'c-1'
-                              ? '+234 693828199'
-                              : selectedClientProfile.phone}
+                            {selectedClientProfile.phone || '—'}
                           </span>
                         </div>
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[var(--muted)]">Email Address</span>
                           <span className="font-medium text-[var(--text)]">
-                            {selectedClientProfile.id === 'c-1'
-                              ? 'chloe@atelier.com'
-                              : selectedClientProfile.email}
+                            {selectedClientProfile.email || '—'}
                           </span>
                         </div>
                       </div>
@@ -1405,16 +1493,31 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
               {viewState === 'OrderHistory_Grid' && (
                 <div className="pt-1">
                   {orderHistoryCards.length === 0 ? (
-                    <div className="w-full bg-[var(--surface)] rounded-[8px] p-8 text-center flex flex-col items-center justify-center gap-2">
-                      <p className="text-[14px] font-semibold text-[var(--text)]">
-                        No orders recorded for {selectedClientProfile.name} yet
-                      </p>
+                    <div className="w-full bg-[var(--surface)] rounded-[12px] p-10 sm:p-14 border border-[var(--outline)] flex flex-col items-center justify-center text-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-[var(--chip)] flex items-center justify-center text-[var(--text-2)]">
+                        <Package className="w-6 h-6 text-[var(--text-strong)]" />
+                      </div>
+                      <div>
+                        <h3 className="text-[15px] font-semibold text-[var(--text)]">
+                          No Garment Orders Yet
+                        </h3>
+                        <p className="text-[12px] text-[var(--muted)] max-w-sm mt-1.5 leading-relaxed">
+                          There are no orders recorded for {selectedClientProfile.name}. Create an order to track garment specifications, pricing, fabric swatches, and pickup schedules.
+                        </p>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => setViewState('Inline_NewOrder')}
-                        className="mt-1 h-9 px-4 rounded-[24px] bg-[var(--primary)] text-white text-[12px] font-medium hover:opacity-95 transition-opacity cursor-pointer"
+                        onClick={() => {
+                          if (onNewOrder) {
+                            onNewOrder(selectedClientProfile.id);
+                          } else {
+                            setViewState('Inline_NewOrder');
+                          }
+                        }}
+                        className="mt-2 h-9 px-5 rounded-[24px] bg-[var(--primary)] text-white text-[12px] font-medium hover:bg-[var(--primary)]/90 transition-colors cursor-pointer flex items-center gap-1.5"
                       >
-                        Create First Order
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Create First Order</span>
                       </button>
                     </div>
                   ) : (
@@ -1454,16 +1557,22 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
                             <span className="text-[10px] font-medium text-white leading-tight">
                               Style references
                             </span>
-                            <div className="grid grid-cols-3 gap-1">
-                              {card.images.map((img, idx) => (
-                                <img
-                                  key={idx}
-                                  src={img}
-                                  alt="Style reference"
-                                  className="w-full h-[64px] rounded-[4px] object-cover"
-                                />
-                              ))}
-                            </div>
+                            {card.images.length > 0 ? (
+                              <div className="grid grid-cols-3 gap-1">
+                                {card.images.map((img, idx) => (
+                                  <img
+                                    key={idx}
+                                    src={img}
+                                    alt="Style reference"
+                                    className="w-full h-[64px] rounded-[4px] object-cover bg-neutral-800"
+                                  />
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="h-[64px] rounded-[4px] bg-white/5 border border-white/10 flex items-center justify-center text-[11px] text-white/50">
+                                No reference photos
+                              </div>
+                            )}
                           </div>
 
                           {/* Bottom Price Row */}
@@ -1993,8 +2102,8 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
                     />
                   </div>
                   <div className="flex flex-col gap-1.5 max-h-[280px] overflow-y-auto">
-                    {allClientList
-                      .filter(
+                    {(() => {
+                      const filtered = allClientList.filter(
                         (c) =>
                           !directorySearch.trim() ||
                           c.name
@@ -2003,9 +2112,45 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
                           c.phone
                             .toLowerCase()
                             .includes(directorySearch.toLowerCase())
-                      )
-                      .map((client) => {
+                      );
+
+                      if (allClientList.length === 0) {
+                        return (
+                          <div className="py-8 text-center flex flex-col items-center justify-center gap-2">
+                            <p className="text-[13px] font-medium text-[var(--text)]">
+                              No clients in directory yet
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setEditProfileMode('create')}
+                              className="mt-1 h-8 px-4 rounded-[24px] bg-[var(--primary)] text-white text-[12px] font-medium cursor-pointer"
+                            >
+                              + Create New Client
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      if (filtered.length === 0) {
+                        return (
+                          <div className="py-8 text-center flex flex-col items-center justify-center gap-2">
+                            <p className="text-[13px] text-[var(--muted)]">
+                              No clients match &ldquo;{directorySearch}&rdquo;
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setDirectorySearch('')}
+                              className="text-[12px] text-[var(--primary)] font-medium hover:underline cursor-pointer"
+                            >
+                              Clear search
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      return filtered.map((client) => {
                         const isSelected =
+                          selectedClientProfile &&
                           client.id === selectedClientProfile.id;
                         return (
                           <button
@@ -2031,7 +2176,7 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
                                   {client.name}
                                 </p>
                                 <p className="text-[11px] text-[var(--muted)] truncate">
-                                  {client.phone} • {client.email}
+                                  {client.phone ? `${client.phone} • ` : ''}{client.email || 'No email'}
                                 </p>
                               </div>
                             </div>
@@ -2040,7 +2185,8 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
                             )}
                           </button>
                         );
-                      })}
+                      });
+                    })()}
                   </div>
                 </div>
               ) : (
@@ -2056,7 +2202,7 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
                       type="text"
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      placeholder="e.g. Chloe Dallas"
+                      placeholder="Client full name"
                       required
                       className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 text-[12px] text-[var(--text)] focus:outline-none border border-transparent focus:border-[var(--primary)]"
                     />
@@ -2069,7 +2215,7 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
                       type="tel"
                       value={editPhone}
                       onChange={(e) => setEditPhone(e.target.value)}
-                      placeholder="+234 8141 432 211"
+                      placeholder="+234 800 000 0000"
                       className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 text-[12px] text-[var(--text)] focus:outline-none border border-transparent focus:border-[var(--primary)] tabular-nums"
                     />
                   </div>
@@ -2081,7 +2227,7 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
                       type="email"
                       value={editEmail}
                       onChange={(e) => setEditEmail(e.target.value)}
-                      placeholder="chloe@atelier.fit"
+                      placeholder="client@example.com"
                       className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 text-[12px] text-[var(--text)] focus:outline-none border border-transparent focus:border-[var(--primary)]"
                     />
                   </div>
@@ -2138,7 +2284,7 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
             <motion.div
               role="dialog"
               aria-modal="true"
-              aria-label={`Delete ${selectedClientProfile.name}`}
+              aria-label={`Delete ${selectedClientProfile?.name || 'Client'}`}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
@@ -2146,10 +2292,10 @@ export function ClientsScreen({ onEditOrder }: ClientsScreenProps) {
               className="relative w-full max-w-sm rounded-[16px] bg-[var(--surface)] p-6 shadow-2xl z-10 flex flex-col gap-4"
             >
               <h3 className="text-[16px] font-bold text-[var(--text)]">
-                Delete {selectedClientProfile.name}?
+                Delete {selectedClientProfile?.name || 'Client'}?
               </h3>
               <p className="text-[12px] text-[var(--text-2)] leading-relaxed">
-                This will remove {selectedClientProfile.name}&apos;s profile,
+                This will remove {selectedClientProfile?.name || 'this client'}&apos;s profile,
                 saved measurements, and order history from your workspace.
               </p>
               <div className="flex items-center justify-end gap-2 pt-2">

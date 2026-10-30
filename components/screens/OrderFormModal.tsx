@@ -51,6 +51,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
     orders,
     settings,
     allHotspots,
+    addClient,
     addOrder,
     updateOrder,
     addSnapshot,
@@ -121,24 +122,41 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
   }, []);
 
   // Client resolution
-  const clientId = initialClientId || existingOrder?.clientId || clients[0]?.id || 'c-1';
+  const clientId = initialClientId || existingOrder?.clientId || clients[0]?.id || null;
   const activeClient = useMemo(() => {
+    if (!clientId) {
+      if (clients.length > 0) {
+        return {
+          id: clients[0].id,
+          name: clients[0].name,
+          phone: clients[0].phone || '—',
+          email: clients[0].email || '—',
+        };
+      }
+      return null;
+    }
     const found = clients.find((c) => c.id === clientId);
     if (found) {
       return {
         id: found.id,
         name: found.name,
-        phone: found.phone || '+234 809 489 2011',
-        email: found.email || 'client@couture.com',
+        phone: found.phone || '—',
+        email: found.email || '—',
       };
     }
-    return {
-      id: 'c-1',
-      name: 'Chloe Dallas',
-      phone: '+234 809 489 2011',
-      email: 'chloedallas@couture.com',
-    };
+    return clients[0]
+      ? {
+          id: clients[0].id,
+          name: clients[0].name,
+          phone: clients[0].phone || '—',
+          email: clients[0].email || '—',
+        }
+      : null;
   }, [clients, clientId]);
+
+  const [newClientName, setNewClientName] = useState('');
+  const [newClientPhone, setNewClientPhone] = useState('');
+  const [newClientEmail, setNewClientEmail] = useState('');
 
   // Combined saved measurement snapshots for this client + Garment Blueprints from Settings
   const savedTemplates = useMemo(() => {
@@ -151,21 +169,23 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
     }> = [];
 
     // 1. Client's saved measurement snapshots
-    const fromStore = getClientSnapshots(activeClient.id);
-    if (fromStore && fromStore.length > 0) {
-      fromStore.forEach((s) => {
-        const normalized = normalizeMeasurementsRecord(s.measurements);
-        const keys = Object.keys(normalized);
-        if (keys.length > 0) {
-          list.push({
-            id: s.id,
-            label: `Saved (${s.date || '09-10-2025'}) · ${s.garmentType || 'Gown/Dress'}`,
-            garmentType: s.garmentType || 'Bespoke African Gown',
-            measurements: normalized,
-            fieldKeys: keys,
-          });
-        }
-      });
+    if (activeClient) {
+      const fromStore = getClientSnapshots(activeClient.id);
+      if (fromStore && fromStore.length > 0) {
+        fromStore.forEach((s) => {
+          const normalized = normalizeMeasurementsRecord(s.measurements);
+          const keys = Object.keys(normalized);
+          if (keys.length > 0) {
+            list.push({
+              id: s.id,
+              label: `Saved (${s.date || ''}) · ${s.garmentType || 'Gown/Dress'}`,
+              garmentType: s.garmentType || 'Bespoke Order',
+              measurements: normalized,
+              fieldKeys: keys,
+            });
+          }
+        });
+      }
     }
 
     // 2. Garment Blueprint Templates from Settings
@@ -190,7 +210,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
     });
 
     return list;
-  }, [getClientSnapshots, activeClient.id, settings?.templates, hotspotMap, unitLabel]);
+  }, [getClientSnapshots, activeClient?.id, settings?.templates, hotspotMap, unitLabel]);
 
   // Initial state if editing an existing order vs creating a new order (Requirement D: new order starts EMPTY)
   const initialFieldsForOrder = useMemo<MeasurementFieldItem[]>(() => {
@@ -599,6 +619,18 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
         ? ''
         : selectedSavedTemplateId;
 
+      let resolvedClientId = activeClient?.id;
+      if (!resolvedClientId) {
+        const nameToUse = newClientName.trim() || 'New Client';
+        const created = addClient({
+          name: nameToUse,
+          phone: newClientPhone.trim(),
+          email: newClientEmail.trim(),
+          notes: 'Created via Order Sheet',
+        });
+        resolvedClientId = created.id;
+      }
+
       if (hasDiagramEdited || !snapshotIdToUse) {
         if (existingOrder?.measurementSnapshotId && snapshotIdToUse) {
           updateSnapshot(existingOrder.measurementSnapshotId, {
@@ -608,7 +640,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
           snapshotIdToUse = existingOrder.measurementSnapshotId;
         } else {
           const createdSnapshot = addSnapshot({
-            clientId: activeClient.id,
+            clientId: resolvedClientId,
             date: new Date()
               .toLocaleDateString('en-GB', {
                 day: '2-digit',
@@ -639,7 +671,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
         setCreatedToastMessage('Order updated');
       } else {
         addOrder({
-          clientId: activeClient.id,
+          clientId: resolvedClientId,
           garmentType: garmentType.trim() || 'Bespoke Order',
           measurementSnapshotId: snapshotIdToUse || undefined,
           price: rawPrice,
@@ -875,33 +907,65 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
               </div>
 
               <div className="flex flex-col gap-4">
-                {/* Client summary */}
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[14px] font-medium text-[var(--muted)]">
-                      Client Name:
-                    </span>
-                    <span className="text-[16px] font-semibold text-black">
-                      {activeClient.name}
-                    </span>
+                {/* Client summary OR New Client Input */}
+                {activeClient ? (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[14px] font-medium text-[var(--muted)]">
+                        Client Name:
+                      </span>
+                      <span className="text-[16px] font-semibold text-black">
+                        {activeClient.name}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[14px] font-medium text-[var(--muted)]">
+                        Phone Number
+                      </span>
+                      <span className="text-[16px] font-semibold text-black">
+                        {activeClient.phone}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[14px] font-medium text-[var(--muted)]">
+                        Email Address
+                      </span>
+                      <span className="text-[16px] font-semibold text-black">
+                        {activeClient.email}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[14px] font-medium text-[var(--muted)]">
-                      Phone Number
+                ) : (
+                  <div className="bg-[var(--card)] rounded-[8px] p-3 flex flex-col gap-2.5 border border-[var(--outline)]">
+                    <span className="text-[12px] font-semibold text-black">
+                      Client Information
                     </span>
-                    <span className="text-[16px] font-semibold text-black">
-                      {activeClient.phone}
-                    </span>
+                    <input
+                      type="text"
+                      placeholder="Client full name *"
+                      value={newClientName}
+                      onChange={(e) => setNewClientName(e.target.value)}
+                      className="w-full h-8 rounded-[6px] bg-white border border-[var(--outline)] px-2.5 text-[12px] text-black focus:outline-none focus:border-[var(--primary)]"
+                      required
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="tel"
+                        placeholder="Phone number"
+                        value={newClientPhone}
+                        onChange={(e) => setNewClientPhone(e.target.value)}
+                        className="w-full h-8 rounded-[6px] bg-white border border-[var(--outline)] px-2.5 text-[12px] text-black focus:outline-none focus:border-[var(--primary)]"
+                      />
+                      <input
+                        type="email"
+                        placeholder="Email address"
+                        value={newClientEmail}
+                        onChange={(e) => setNewClientEmail(e.target.value)}
+                        className="w-full h-8 rounded-[6px] bg-white border border-[var(--outline)] px-2.5 text-[12px] text-black focus:outline-none focus:border-[var(--primary)]"
+                      />
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[14px] font-medium text-[var(--muted)]">
-                      Email Address
-                    </span>
-                    <span className="text-[16px] font-semibold text-black">
-                      {activeClient.email}
-                    </span>
-                  </div>
-                </div>
+                )}
 
                 {/* Saved Measurements & Blueprints block */}
                 <div
@@ -1307,35 +1371,67 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
           >
             {mobileSubScreen === 'form' ? (
               <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-2.5">
-                  <div className="flex flex-col min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between gap-0.5">
-                    <span className="text-[14px] font-medium text-[var(--muted)]">
-                      Client Name:
-                    </span>
-                    <span className="text-[16px] font-semibold text-black break-all">
-                      {activeClient.name}
-                    </span>
+                {activeClient ? (
+                  <div className="flex flex-col gap-2.5">
+                    <div className="flex flex-col min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between gap-0.5">
+                      <span className="text-[14px] font-medium text-[var(--muted)]">
+                        Client Name:
+                      </span>
+                      <span className="text-[16px] font-semibold text-black break-all">
+                        {activeClient.name}
+                      </span>
+                    </div>
+                    <div className="flex flex-col min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between gap-0.5">
+                      <span className="text-[14px] font-medium text-[var(--muted)]">
+                        Phone Number
+                      </span>
+                      <span className="text-[16px] font-semibold text-black break-all">
+                        {activeClient.phone}
+                      </span>
+                    </div>
+                    <div className="flex flex-col min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between gap-0.5">
+                      <span className="text-[14px] font-medium text-[var(--muted)]">
+                        Email Address
+                      </span>
+                      <span
+                        className="text-[16px] font-semibold text-black break-all"
+                        style={{ overflowWrap: 'anywhere' }}
+                      >
+                        {activeClient.email}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex flex-col min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between gap-0.5">
-                    <span className="text-[14px] font-medium text-[var(--muted)]">
-                      Phone Number
+                ) : (
+                  <div className="bg-[var(--card)] rounded-[8px] p-3 flex flex-col gap-2.5 border border-[var(--outline)]">
+                    <span className="text-[12px] font-semibold text-black">
+                      Client Information
                     </span>
-                    <span className="text-[16px] font-semibold text-black break-all">
-                      {activeClient.phone}
-                    </span>
+                    <input
+                      type="text"
+                      placeholder="Client full name *"
+                      value={newClientName}
+                      onChange={(e) => setNewClientName(e.target.value)}
+                      className="w-full h-8 rounded-[6px] bg-white border border-[var(--outline)] px-2.5 text-[12px] text-black focus:outline-none focus:border-[var(--primary)]"
+                      required
+                    />
+                    <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-2">
+                      <input
+                        type="tel"
+                        placeholder="Phone number"
+                        value={newClientPhone}
+                        onChange={(e) => setNewClientPhone(e.target.value)}
+                        className="w-full h-8 rounded-[6px] bg-white border border-[var(--outline)] px-2.5 text-[12px] text-black focus:outline-none focus:border-[var(--primary)]"
+                      />
+                      <input
+                        type="email"
+                        placeholder="Email address"
+                        value={newClientEmail}
+                        onChange={(e) => setNewClientEmail(e.target.value)}
+                        className="w-full h-8 rounded-[6px] bg-white border border-[var(--outline)] px-2.5 text-[12px] text-black focus:outline-none focus:border-[var(--primary)]"
+                      />
+                    </div>
                   </div>
-                  <div className="flex flex-col min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between gap-0.5">
-                    <span className="text-[14px] font-medium text-[var(--muted)]">
-                      Email Address
-                    </span>
-                    <span
-                      className="text-[16px] font-semibold text-black break-all"
-                      style={{ overflowWrap: 'anywhere' }}
-                    >
-                      {activeClient.email}
-                    </span>
-                  </div>
-                </div>
+                )}
 
                 <div
                   ref={savedMeasurementsBlockRef}

@@ -57,6 +57,7 @@ interface StoreContextType {
   deleteTemplate: (id: string) => void;
 
   resetToDemoData: () => void;
+  clearAllData: () => void;
   exportDataJson: () => void;
 
   // Nav helpers
@@ -79,16 +80,16 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | null>(null);
 
 const STORAGE_KEYS = {
-  CLIENTS: 'tailorfit_clients_v3',
-  SNAPSHOTS: 'tailorfit_snapshots_v3',
-  ORDERS: 'tailorfit_orders_v3',
-  SETTINGS: 'tailorfit_settings_v3',
+  CLIENTS: 'tailorfit_clients_v4',
+  SNAPSHOTS: 'tailorfit_snapshots_v4',
+  ORDERS: 'tailorfit_orders_v4',
+  SETTINGS: 'tailorfit_settings_v4',
 };
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
-  const [clients, setClients] = useState<Client[]>(SAMPLE_CLIENTS);
-  const [snapshots, setSnapshots] = useState<MeasurementSnapshot[]>(SAMPLE_SNAPSHOTS);
-  const [orders, setOrders] = useState<Order[]>(SAMPLE_ORDERS);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [snapshots, setSnapshots] = useState<MeasurementSnapshot[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 
   const [activeScreen, setActiveScreen] = useState<string>('overview');
@@ -294,8 +295,28 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setSnapshots(SAMPLE_SNAPSHOTS);
     setOrders(SAMPLE_ORDERS);
     setSettings(DEFAULT_SETTINGS);
+    setSelectedClientId(SAMPLE_CLIENTS[0]?.id || null);
+    setSelectedOrderId(null);
+    setSelectedSnapshotId(null);
     try {
-      localStorage.clear();
+      localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(SAMPLE_CLIENTS));
+      localStorage.setItem(STORAGE_KEYS.SNAPSHOTS, JSON.stringify(SAMPLE_SNAPSHOTS));
+      localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(SAMPLE_ORDERS));
+      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(DEFAULT_SETTINGS));
+    } catch {}
+  };
+
+  const clearAllData = () => {
+    setClients([]);
+    setSnapshots([]);
+    setOrders([]);
+    setSelectedClientId(null);
+    setSelectedOrderId(null);
+    setSelectedSnapshotId(null);
+    try {
+      localStorage.removeItem(STORAGE_KEYS.CLIENTS);
+      localStorage.removeItem(STORAGE_KEYS.SNAPSHOTS);
+      localStorage.removeItem(STORAGE_KEYS.ORDERS);
     } catch {}
   };
 
@@ -432,6 +453,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         deleteTemplate,
 
         resetToDemoData,
+        clearAllData,
         exportDataJson,
 
         openClientProfile,

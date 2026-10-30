@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '@/lib/store';
-import { Save, X, Trash2, Check } from 'lucide-react';
+import { Save, X, Trash2, Check, Download, Sparkles, RotateCcw } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { ToastContainer, ToastMessage } from '@/components/ui/Toasts';
@@ -19,11 +19,17 @@ import { GarmentTemplate } from '@/types';
 
 export function SettingsScreen() {
   const {
+    clients,
+    snapshots,
+    orders,
     settings,
     allHotspots,
     updateSettings,
     addTemplate,
     deleteTemplate,
+    clearAllData,
+    resetToDemoData,
+    exportDataJson,
   } = useStore();
 
   // Initial values from store
@@ -80,7 +86,7 @@ export function SettingsScreen() {
   const [expandedBlueprintTags, setExpandedBlueprintTags] = useState<Record<string, boolean>>({});
 
   // Active section tracking for left navigation
-  const [activeNav, setActiveNav] = useState<'standards' | 'blueprints' | 'sizing'>('standards');
+  const [activeNav, setActiveNav] = useState<'standards' | 'blueprints' | 'sizing' | 'data'>('standards');
 
   // Compute whether unit or currency has changed
   const isDirty = unit !== initialUnit || selectedCurrency !== initialCurrency;
@@ -121,10 +127,13 @@ export function SettingsScreen() {
       const standardsEl = document.getElementById('settings-standards') || document.getElementById('section-standards');
       const blueprintsEl = document.getElementById('settings-blueprints') || document.getElementById('section-blueprints');
       const sizingEl = document.getElementById('section-sizing');
+      const dataEl = document.getElementById('settings-data');
 
       const scrollPos = window.scrollY + 180;
 
-      if (sizingEl && scrollPos >= sizingEl.offsetTop) {
+      if (dataEl && scrollPos >= dataEl.offsetTop) {
+        setActiveNav('data');
+      } else if (sizingEl && scrollPos >= sizingEl.offsetTop) {
         setActiveNav('sizing');
       } else if (blueprintsEl && scrollPos >= blueprintsEl.offsetTop) {
         setActiveNav('blueprints');
@@ -137,7 +146,7 @@ export function SettingsScreen() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const scrollToSection = (sectionId: 'standards' | 'blueprints' | 'sizing') => {
+  const scrollToSection = (sectionId: 'standards' | 'blueprints' | 'sizing' | 'data') => {
     setActiveNav(sectionId);
     const el = document.getElementById(`settings-${sectionId}`) || document.getElementById(`section-${sectionId}`);
     if (el) {
@@ -260,6 +269,7 @@ export function SettingsScreen() {
     { id: 'standards' as const, label: 'Measurement & Billing Standards' },
     { id: 'blueprints' as const, label: 'Garment Blueprints' },
     { id: 'sizing' as const, label: 'Sizing/Measurements' },
+    { id: 'data' as const, label: 'Atelier Data Management' },
   ];
 
   return (
@@ -641,6 +651,127 @@ export function SettingsScreen() {
                   ))}
                 </div>
               )}
+            </section>
+
+            {/* ===============================================================
+                SECTION 4: Atelier Data Management
+                - Clear all records to a clean slate (Zero State)
+                - Load demo atelier data for showcase
+                - Export complete atelier backup JSON
+                =============================================================== */}
+            <section
+              id="settings-data"
+              className="w-full bg-[#F8F8F8] rounded-[6px] p-4 lg:p-6 flex flex-col"
+            >
+              <div className="mb-6">
+                <span className="text-[11px] font-normal tracking-[0.3px] uppercase text-[var(--muted)] block mb-1">
+                  WORKSPACE &amp; ATELIER STORAGE
+                </span>
+                <h2 className="text-[16px] font-medium text-black leading-tight">
+                  Atelier Data Management
+                </h2>
+                <div className="w-full h-px bg-[var(--hairline)] mt-3" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Card 1: Reset to Clean Slate */}
+                <div className="bg-white rounded-[8px] p-4 flex flex-col justify-between border border-[#EDEDED] hover:border-[#DCDCDC] transition-colors">
+                  <div>
+                    <div className="w-9 h-9 rounded-full bg-[#FFF1F1] flex items-center justify-center text-[#E53E3E] mb-3">
+                      <Trash2 className="w-4 h-4 stroke-[2]" />
+                    </div>
+                    <h3 className="text-[14px] font-semibold text-black leading-tight mb-1">
+                      Reset to Clean Slate
+                    </h3>
+                    <p className="text-[12px] text-[var(--text-2)] leading-relaxed mb-3">
+                      Purge all clients, measurement snapshots, and studio orders to work with an empty workspace.
+                    </p>
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#F5F5F5] text-[11px] font-medium text-[var(--muted)] mb-4">
+                      <span>{clients.length} clients</span>
+                      <span>•</span>
+                      <span>{orders.length} orders</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearAllData();
+                      addToast({
+                        type: 'velocity',
+                        message: 'Atelier reset to clean slate (zero records).',
+                      });
+                    }}
+                    className="h-9 px-4 rounded-[24px] bg-[#FFF5F5] border border-[#FFD6D6] text-[#E53E3E] text-[13px] font-medium hover:bg-[#FFEBEB] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Clear All Data</span>
+                  </button>
+                </div>
+
+                {/* Card 2: Load Demo Atelier Data */}
+                <div className="bg-white rounded-[8px] p-4 flex flex-col justify-between border border-[#EDEDED] hover:border-[#DCDCDC] transition-colors">
+                  <div>
+                    <div className="w-9 h-9 rounded-full bg-[#F0F5FF] flex items-center justify-center text-[var(--primary)] mb-3">
+                      <Sparkles className="w-4 h-4 stroke-[2]" />
+                    </div>
+                    <h3 className="text-[14px] font-semibold text-black leading-tight mb-1">
+                      Load Demo Atelier Data
+                    </h3>
+                    <p className="text-[12px] text-[var(--text-2)] leading-relaxed mb-3">
+                      Populate your atelier with sample clients (Chloe Dallas, etc.), measurements, snapshots, and active orders.
+                    </p>
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#F5F5F5] text-[11px] font-medium text-[var(--muted)] mb-4">
+                      <span>Curated demonstration dataset</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetToDemoData();
+                      addToast({
+                        type: 'velocity',
+                        message: 'Demo atelier data loaded successfully.',
+                      });
+                    }}
+                    className="h-9 px-4 rounded-[24px] bg-[var(--primary)] text-white text-[13px] font-medium hover:bg-[var(--primary)]/90 transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Load Demo Data</span>
+                  </button>
+                </div>
+
+                {/* Card 3: Export Atelier Backup */}
+                <div className="bg-white rounded-[8px] p-4 flex flex-col justify-between border border-[#EDEDED] hover:border-[#DCDCDC] transition-colors">
+                  <div>
+                    <div className="w-9 h-9 rounded-full bg-[#F4F4F6] flex items-center justify-center text-black mb-3">
+                      <Download className="w-4 h-4 stroke-[2]" />
+                    </div>
+                    <h3 className="text-[14px] font-semibold text-black leading-tight mb-1">
+                      Export Atelier Backup
+                    </h3>
+                    <p className="text-[12px] text-[var(--text-2)] leading-relaxed mb-3">
+                      Download a JSON file containing all client profiles, measurement records, and studio orders.
+                    </p>
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#F5F5F5] text-[11px] font-medium text-[var(--muted)] mb-4">
+                      <span>JSON backup export</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      exportDataJson();
+                      addToast({
+                        type: 'velocity',
+                        message: 'Atelier backup file exported.',
+                      });
+                    }}
+                    className="h-9 px-4 rounded-[24px] bg-[#F2F2F2] border border-[#DDDBDB] text-[var(--text-2)] text-[13px] font-medium hover:bg-[#EAEAEA] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export JSON</span>
+                  </button>
+                </div>
+              </div>
             </section>
 
             {/* ===============================================================
