@@ -85,9 +85,6 @@ export function SettingsScreen() {
   // Expanded tag chips state per blueprint card
   const [expandedBlueprintTags, setExpandedBlueprintTags] = useState<Record<string, boolean>>({});
 
-  // Active section tracking for left navigation
-  const [activeNav, setActiveNav] = useState<'standards' | 'blueprints' | 'sizing' | 'data'>('standards');
-
   // Compute whether unit or currency has changed
   const isDirty = unit !== initialUnit || selectedCurrency !== initialCurrency;
 
@@ -120,40 +117,6 @@ export function SettingsScreen() {
       if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     };
   }, []);
-
-  // Scroll observer to update activeNav on scroll
-  useEffect(() => {
-    const handleScroll = () => {
-      const standardsEl = document.getElementById('settings-standards') || document.getElementById('section-standards');
-      const blueprintsEl = document.getElementById('settings-blueprints') || document.getElementById('section-blueprints');
-      const sizingEl = document.getElementById('section-sizing');
-      const dataEl = document.getElementById('settings-data');
-
-      const scrollPos = window.scrollY + 180;
-
-      if (dataEl && scrollPos >= dataEl.offsetTop) {
-        setActiveNav('data');
-      } else if (sizingEl && scrollPos >= sizingEl.offsetTop) {
-        setActiveNav('sizing');
-      } else if (blueprintsEl && scrollPos >= blueprintsEl.offsetTop) {
-        setActiveNav('blueprints');
-      } else if (standardsEl) {
-        setActiveNav('standards');
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const scrollToSection = (sectionId: 'standards' | 'blueprints' | 'sizing' | 'data') => {
-    setActiveNav(sectionId);
-    const el = document.getElementById(`settings-${sectionId}`) || document.getElementById(`section-${sectionId}`);
-    if (el) {
-      const offset = el.getBoundingClientRect().top + window.scrollY - 80;
-      window.scrollTo({ top: offset, behavior: 'smooth' });
-    }
-  };
 
   // Toggle "+N more" / "Show less"
   const toggleBlueprintTags = (id: string) => {
@@ -265,104 +228,35 @@ export function SettingsScreen() {
 
   const blueprints = settings?.templates || [];
 
-  const navItems = [
-    { id: 'standards' as const, label: 'Measurement & Billing Standards' },
-    { id: 'blueprints' as const, label: 'Garment Blueprints' },
-    { id: 'sizing' as const, label: 'Sizing/Measurements' },
-    { id: 'data' as const, label: 'Atelier Data Management' },
-  ];
-
   return (
     <div className="w-full min-h-screen bg-[var(--page)] select-none text-[var(--text)] pb-[88px] lg:pb-12">
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
 
-      {/* Main Responsive Container: 1280px design width, fluid */}
-      <div className="w-full max-w-[1216px] mx-auto px-2 sm:px-4 lg:px-0 pt-4">
-        {/* ===================================================================
-            MOBILE NAVIGATION ROW (below 1024px)
-            Horizontally scrollable row of pill buttons, 44px tall, scroll-snap
-            =================================================================== */}
-        <div className="lg:hidden w-full overflow-x-auto pb-3 mb-2 flex items-center gap-2 snap-x scrollbar-none">
-          {navItems.map((item) => {
-            const isActive = activeNav === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => scrollToSection(item.id)}
-                className={cn(
-                  'snap-start shrink-0 h-[44px] px-4 rounded-full text-[14px] font-medium transition-colors cursor-pointer flex items-center justify-center whitespace-nowrap',
-                  isActive
-                    ? 'bg-[#F8F9FF] text-[var(--primary)] border border-[var(--primary)] font-semibold'
-                    : 'bg-[#F2F2F2] text-[var(--muted)] hover:text-black'
-                )}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
+      {/* Main Responsive Container: Flush with Navbar (1216px max-width, matching navbar padding) */}
+      <div className="w-full max-w-[1216px] mx-auto pt-4 px-3 sm:px-4 xl:px-0">
+        <div className="w-full bg-white p-[2px] rounded-[8px] flex flex-col gap-[2px] shadow-2xs">
+          {/* New Settings Header */}
+          <div className="w-full bg-white rounded-t-[6px] px-5 sm:px-6 py-5">
+            <h1 className="text-[20px] sm:text-[22px] font-bold text-black tracking-tight leading-tight">
+              Settings
+            </h1>
+            <p className="text-[13px] sm:text-[14px] text-[var(--muted)] mt-1">
+              Manage your account settings and preferences
+            </p>
+          </div>
 
-        {/* ===================================================================
-            DESKTOP & RESPONSIVE LAYOUT
-            =================================================================== */}
-        <div className="w-full flex flex-col lg:flex-row items-start gap-[25px]">
-          {/* =================================================================
-              1. LEFT NAVIGATION COLUMN (295px wide, Desktop)
-              ================================================================= */}
-          <aside className="hidden lg:block w-[295px] shrink-0 bg-white p-[2px] rounded-[8px] sticky top-20">
-            <div className="w-full bg-[#F8F8F8] rounded-[6px] p-3 flex flex-col gap-3">
-              <h2 className="text-[16px] font-bold text-black leading-none">
-                Settings
+          {/* ===============================================================
+              SECTION 1: Measurement & Billing Standards
+              =============================================================== */}
+          <section
+            id="settings-standards"
+            className="w-full bg-[#F8F8F8] rounded-[6px] p-4 lg:p-6 flex flex-col"
+          >
+            <div className="mb-6">
+              <h2 className="text-[16px] font-semibold text-black leading-tight">
+                Measurement &amp; Billing Standards
               </h2>
-
-              <nav className="flex flex-col gap-0" aria-label="Settings Sections">
-                {navItems.map((item) => {
-                  const isActive = activeNav === item.id;
-                  return (
-                    <div
-                      key={item.id}
-                      className="bg-white p-[3px] rounded-[8px]"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => scrollToSection(item.id)}
-                        className={cn(
-                          'w-full h-[43px] rounded-[6px] px-3 text-[14px] font-medium text-left transition-colors cursor-pointer flex items-center justify-between',
-                          isActive
-                            ? 'bg-[#F8F9FF] text-[var(--primary)]'
-                            : 'bg-[#F2F2F2] text-[var(--muted)] hover:text-black'
-                        )}
-                      >
-                        <span className="truncate">{item.label}</span>
-                      </button>
-                    </div>
-                  );
-                })}
-              </nav>
             </div>
-          </aside>
-
-          {/* =================================================================
-              2. MAIN PANEL (Remaining width, ~892px)
-              ================================================================= */}
-          <main className="w-full lg:w-[892px] lg:flex-1 bg-white p-[2px] rounded-[8px] flex flex-col gap-[2px] min-w-0">
-            {/* ===============================================================
-                SECTION 1: Measurement & Billing Standards
-                =============================================================== */}
-            <section
-              id="settings-standards"
-              className="w-full bg-[#F8F8F8] rounded-[6px] p-4 lg:p-6 flex flex-col"
-            >
-              <div className="mb-6">
-                <span className="text-[11px] font-normal tracking-[0.3px] uppercase text-[var(--muted)] block mb-1">
-                  DEFAULT UNITS AND CURRENCY SYMBOLS
-                </span>
-                <h2 className="text-[16px] font-medium text-black leading-tight">
-                  Measurement &amp; Billing Standards
-                </h2>
-                <div className="w-full h-px bg-[var(--hairline)] mt-3" />
-              </div>
 
               {/* Control 1: Default Measurement Unit */}
               <div className="mb-6">
@@ -429,7 +323,7 @@ export function SettingsScreen() {
             </section>
 
             {/* ===============================================================
-                SECTION 2: Garment Blueprints (Requirement B)
+                SECTION 2: Garments Blueprints
                 - Selectable from Sizing/Measurements catalog
                 - Delete saved templates with Undo toast
                 =============================================================== */}
@@ -437,16 +331,10 @@ export function SettingsScreen() {
               id="settings-blueprints"
               className="w-full bg-[#F8F8F8] rounded-[6px] p-4 lg:p-6 flex flex-col"
             >
-              <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-3 mb-6">
-                <div className="flex-1 min-w-0">
-                  <span className="text-[11px] font-normal tracking-[0.3px] uppercase text-[var(--muted)] block mb-1">
-                    TAILORING TEMPLATES
-                  </span>
-                  <h2 className="text-[16px] font-medium text-black leading-tight">
-                    Garment Blueprints
-                  </h2>
-                  <div className="w-full h-px bg-[var(--hairline)] mt-3" />
-                </div>
+              <div className="flex items-center justify-between gap-3 mb-6">
+                <h2 className="text-[16px] font-semibold text-black leading-tight">
+                  Garments Blueprints
+                </h2>
 
                 <button
                   type="button"
@@ -457,7 +345,7 @@ export function SettingsScreen() {
                     setTemplateFormError('');
                     setShowAddTemplateModal(true);
                   }}
-                  className="h-9 max-lg:h-[44px] max-lg:w-full px-4 rounded-[24px] bg-[#F2F2F2] border border-[#DDDBDB] text-[var(--text-2)] text-[14px] font-medium hover:bg-[#EAEAEA] transition-colors cursor-pointer shrink-0 flex items-center justify-center"
+                  className="h-9 px-4 rounded-[24px] bg-[#F2F2F2] border border-[#DDDBDB] text-black text-[13px] font-medium hover:bg-[#EAEAEA] transition-colors cursor-pointer shrink-0 flex items-center justify-center"
                 >
                   Add Template
                 </button>
@@ -556,16 +444,23 @@ export function SettingsScreen() {
               id="section-sizing"
               className="w-full bg-[#F8F8F8] rounded-[6px] p-4 lg:p-6 flex flex-col"
             >
-              <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-3 mb-4">
-                <div className="flex-1 min-w-0">
-                  <span className="text-[11px] font-normal tracking-[0.3px] uppercase text-[var(--muted)] block mb-1">
-                    ANATOMICAL ZONE CATALOG ({allHotspots.length} STANDARD LANDMARKS)
-                  </span>
-                  <h2 className="text-[16px] font-medium text-black leading-tight">
-                    Sizing/Measurements
-                  </h2>
-                  <div className="w-full h-px bg-[var(--hairline)] mt-3" />
-                </div>
+              <div className="flex items-center justify-between gap-3 mb-5">
+                <h2 className="text-[16px] font-semibold text-black leading-tight">
+                  Sizing/Measurements
+                </h2>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    addToast({
+                      type: 'velocity',
+                      message: 'All 21 standard anatomical landmarks active.',
+                    });
+                  }}
+                  className="h-9 px-4 rounded-[24px] bg-[#F2F2F2] border border-[#DDDBDB] text-black text-[13px] font-medium hover:bg-[#EAEAEA] transition-colors cursor-pointer shrink-0 flex items-center justify-center"
+                >
+                  Add Measurement
+                </button>
               </div>
 
               {/* Anatomical Zone Filter Pills */}
@@ -664,13 +559,9 @@ export function SettingsScreen() {
               className="w-full bg-[#F8F8F8] rounded-[6px] p-4 lg:p-6 flex flex-col"
             >
               <div className="mb-6">
-                <span className="text-[11px] font-normal tracking-[0.3px] uppercase text-[var(--muted)] block mb-1">
-                  WORKSPACE &amp; ATELIER STORAGE
-                </span>
-                <h2 className="text-[16px] font-medium text-black leading-tight">
+                <h2 className="text-[16px] font-semibold text-black leading-tight">
                   Atelier Data Management
                 </h2>
-                <div className="w-full h-px bg-[var(--hairline)] mt-3" />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -777,7 +668,7 @@ export function SettingsScreen() {
             {/* ===============================================================
                 BOTTOM SAVE STRIP
                 =============================================================== */}
-            <div className="w-full bg-white rounded-[6px] min-h-[51px] px-4 py-2 flex items-center justify-end max-lg:py-3">
+            <div className="w-full bg-white rounded-b-[6px] min-h-[51px] px-4 sm:px-6 py-4 flex items-center justify-end">
               <motion.button
                 type="button"
                 disabled={!isDirty || saveStatus === 'loading'}
@@ -838,7 +729,6 @@ export function SettingsScreen() {
                 </AnimatePresence>
               </motion.button>
             </div>
-          </main>
         </div>
       </div>
 
