@@ -607,7 +607,16 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
     setSaveStatus('loading');
 
     setTimeout(() => {
-      const rawPrice = parseFloat(price.replace(/[^0-9.]/g, '')) || 0;
+      // Price parsing with strict non-negative validation (A03)
+      let rawPrice = 0;
+      const trimmedPrice = price.trim();
+      if (trimmedPrice) {
+        const sanitized = trimmedPrice.replace(/[^\d.-]/g, '');
+        const num = parseFloat(sanitized);
+        if (!isNaN(num) && num >= 0) {
+          rawPrice = Math.round(num * 100) / 100;
+        }
+      }
 
       const measurementObj: Record<string, number> = {};
       fields.forEach((f) => {
@@ -652,18 +661,22 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
             unit: unitLabel,
             measurements: measurementObj,
             notes: notes || 'Taken from Order diagram',
+            mannequinGender,
           });
           snapshotIdToUse = createdSnapshot.id;
         }
       }
+
+      const isoDueDate = dueDate.trim() ? parseDueDateToISO(dueDate) : '';
 
       if (existingOrder) {
         updateOrder(existingOrder.id, {
           garmentType: garmentType.trim() || 'Bespoke Order',
           measurementSnapshotId: snapshotIdToUse || undefined,
           price: rawPrice,
+          currency: existingOrder.currency || currencySymbol,
           status: orderStatus,
-          pickupDateTime: dueDate ? parseDueDateToISO(dueDate) : existingOrder.pickupDateTime,
+          pickupDateTime: isoDueDate,
           notes,
           referenceImages,
         });
@@ -675,8 +688,9 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
           garmentType: garmentType.trim() || 'Bespoke Order',
           measurementSnapshotId: snapshotIdToUse || undefined,
           price: rawPrice,
+          currency: currencySymbol,
           status: orderStatus,
-          pickupDateTime: parseDueDateToISO(dueDate),
+          pickupDateTime: isoDueDate,
           notes,
           referenceImages,
         });
@@ -1058,7 +1072,8 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                           >
                             <option value="In Progress">In Progress</option>
                             <option value="Pending">Pending</option>
-                            <option value="Ready">Ready</option>
+                            <option value="Ready">Ready for pickup</option>
+                            <option value="Picked Up">Collected (Picked Up)</option>
                             <option value="Completed">Completed</option>
                             <option value="Paused">Paused</option>
                           </select>
@@ -1497,6 +1512,32 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                     </p>
                   )}
                 </div>
+
+                {existingOrder && (
+                  <div>
+                    <label className="text-[12px] font-medium text-black mb-1 block">
+                      Order Status
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={orderStatus}
+                        onChange={(e) => {
+                          setOrderStatus(e.target.value as OrderStatus);
+                          setHasFormEdited(true);
+                        }}
+                        className="w-full bg-[var(--field-on-card)] border border-[#EDEDED] rounded-[8px] px-3 h-12 text-[14px] font-medium text-black focus:outline-none appearance-none cursor-pointer"
+                      >
+                        <option value="In Progress">In Progress</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Ready">Ready for pickup</option>
+                        <option value="Picked Up">Collected (Picked Up)</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Paused">Paused</option>
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-[var(--text-2)] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="text-[12px] font-medium text-black mb-1 block">

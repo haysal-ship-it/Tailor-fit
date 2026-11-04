@@ -274,6 +274,9 @@ export interface ResolvedHotspotItem {
 }
 
 export interface TurntableRigProps {
+  initialAngle?: MannequinViewAngle;
+  activeView?: 'front' | 'back' | 'left' | 'right';
+  onViewChange?: (view: 'front' | 'back' | 'left' | 'right') => void;
   gender: MannequinGender;
   onGenderChange?: (gender: MannequinGender) => void;
   showGenderToggle?: boolean;
@@ -288,6 +291,9 @@ export interface TurntableRigProps {
 
 export const TurntableRig: React.FC<TurntableRigProps> = ({
   gender,
+  initialAngle = 0,
+  activeView,
+  onViewChange,
   onGenderChange,
   showGenderToggle = false,
   resolvedHotspots,
@@ -371,8 +377,8 @@ export const TurntableRig: React.FC<TurntableRigProps> = ({
 
   // Physics state in a single ref — NEVER React state
   const physicsRef = useRef({
-    target: 0,           // radians, unbounded
-    display: 0,          // radians, unbounded
+    target: initialAngle * Math.PI / 180,           // radians, unbounded
+    display: initialAngle * Math.PI / 180,          // radians, unbounded
     dv: { v: 0 },        // SmoothDamp internal velocity
     vel: 0,              // coasting angular velocity (rad/s)
     dragging: false,
@@ -405,10 +411,19 @@ export const TurntableRig: React.FC<TurntableRigProps> = ({
     s.dragging = false;
     s.snapping = false;
     s.buttonTurning = true;
-    s.target += wrapPi(desiredAngleRad - s.target);
+    s.target = s.display + wrapPi(desiredAngleRad - s.display);
+    s.dv.v = 0;
     invalidateRef.current?.();
   }, []);
 
+  const onViewChangeRef = useRef(onViewChange);
+  useEffect(() => { onViewChangeRef.current = onViewChange; }, [onViewChange]);
+  useEffect(() => {
+    if (!activeView) return;
+    const angles = { front: 0, right: Math.PI / 2, back: Math.PI, left: -Math.PI / 2 };
+    const desired = angles[activeView];
+    if (Math.abs(wrapPi(physicsRef.current.display - desired)) > 0.21) turnToAngleRad(desired);
+  }, [activeView, turnToAngleRad]);
   // Main Three.js + Physics + Native Input setup
   useEffect(() => {
     const viewer = viewerRef.current;
@@ -526,12 +541,14 @@ export const TurntableRig: React.FC<TurntableRigProps> = ({
       }
       if (!force && matchedKey === s.activeButtonKey) return;
       s.activeButtonKey = matchedKey;
+      if (matchedKey) onViewChangeRef.current?.(matchedKey as 'front' | 'back' | 'left' | 'right');
 
       for (const btn of VIEW_BUTTONS) {
         const el = buttonRefs.current[btn.key];
         if (!el) continue;
         const isActive = btn.key === matchedKey;
         el.setAttribute('data-active', isActive ? 'true' : 'false');
+        el.setAttribute('aria-pressed', String(isActive));
         if (isActive) {
           el.className =
             'px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors bg-[#2D1A10] text-white shadow-xs';
@@ -637,7 +654,7 @@ export const TurntableRig: React.FC<TurntableRigProps> = ({
 
       if (!s.dragging) {
         if (Math.abs(s.vel) >= c.stopSpeed) {
-          s.target += s.vel * dt;
+          s.target += s.vel * (1 - Math.exp(-c.friction * dt)) / c.friction;
           s.vel *= Math.exp(-c.friction * dt);
           if (Math.abs(s.vel) < c.stopSpeed) {
             s.vel = 0;
@@ -664,7 +681,13 @@ export const TurntableRig: React.FC<TurntableRigProps> = ({
               ? c.smoothSnap
               : c.smoothCoast;
 
-      s.display = smoothDamp(s.display, s.target, s.dv, smoothTime, dt);
+      if (s.dragging || reducedMotion || (!s.buttonTurning && !s.snapping)) {
+        s.display = s.target;
+        s.dv.v = 0;
+        if (reducedMotion) s.vel = 0;
+      } else {
+        s.display = smoothDamp(s.display, s.target, s.dv, smoothTime, dt);
+      }
 
       const settled =
         !s.dragging &&
@@ -738,7 +761,8 @@ export const TurntableRig: React.FC<TurntableRigProps> = ({
       getBox3: () => new THREE.Box3().setFromObject(pivot),
     };
 
-    // Render initial frame
+    // Render initial frame at the requested angle.
+    pivot.rotation.y = physicsRef.current.display;
     renderer.render(scene, camera);
     syncHotspotsOverlay();
 
@@ -783,6 +807,9 @@ export const TurntableRig: React.FC<TurntableRigProps> = ({
 
       const s = physicsRef.current;
       try {
+        if (s.dragging || !e.isPrimary) return;
+        s.target = s.display;
+        s.dv.v = 0;
         viewer.setPointerCapture(e.pointerId);
       } catch {
         // Ignore capture errors on synthetic events
@@ -809,7 +836,7 @@ export const TurntableRig: React.FC<TurntableRigProps> = ({
       const dx = e.clientX - s.lastX;
       s.lastX = e.clientX;
       s.moved = Math.hypot(e.clientX - s.startX, e.clientY - s.startY);
-      s.target += dx * cfgRef.current.radPerPx; // +dx turns front surface right
+      s.target += dx * cfgRef.current.radPerPx * 400 / Math.max(1, widthPx); // +dx turns front surface right
       s.samples.push({ x: e.clientX, t: now });
       const cutoff = now - 180;
       while (s.samples.length > 2 && s.samples[0].t < cutoff) {
@@ -832,6 +859,13 @@ export const TurntableRig: React.FC<TurntableRigProps> = ({
         // Ignore
       }
 
+      if (e.type !== 'pointerup') {
+        s.vel = 0;
+        s.target = s.display;
+        s.dv.v = 0;
+        invalidate();
+        return;
+      }
       const now = performance.now();
       const c = cfgRef.current;
       const reducedMotion = reducedMotionRef.current;
@@ -843,7 +877,7 @@ export const TurntableRig: React.FC<TurntableRigProps> = ({
         return;
       }
 
-      const v = reducedMotion ? 0 : estimateReleaseVelocity(s.samples, now, c);
+      const v = reducedMotion ? 0 : estimateReleaseVelocity(s.samples, now, { ...c, radPerPx: c.radPerPx * 400 / Math.max(1, widthPx) });
 
       // Gentle magnet to the 4 views when released slowly (< 0.8 rad/s) within 8 deg
       const nearest = Math.round(s.target / (Math.PI / 2)) * (Math.PI / 2);
@@ -883,7 +917,7 @@ export const TurntableRig: React.FC<TurntableRigProps> = ({
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      if (e.target !== viewer || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
       e.preventDefault();
       const c = cfgRef.current;
       const stepDeg = e.shiftKey ? c.keyStepShiftDeg : c.keyStepDeg;
@@ -893,7 +927,9 @@ export const TurntableRig: React.FC<TurntableRigProps> = ({
       s.vel = 0;
       s.snapping = false;
       s.buttonTurning = true;
-      s.target += dir * stepRad;
+      s.target = s.display + dir * stepRad;
+      s.display = s.target;
+      s.dv.v = 0;
       invalidate();
     };
 

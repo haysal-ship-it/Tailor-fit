@@ -22,37 +22,55 @@ export const ANATOMICAL_ZONES: AnatomicalZoneMeta[] = [
 ];
 
 /**
+ * Strict calendar date verification:
+ * Checks whether year, month (1-12), and day form a valid calendar day.
+ * Rejects 31/02/2026, 31/04/2026, and non-leap day 29/02/2025.
+ */
+export function isValidCalendarDate(year: number, month: number, day: number): boolean {
+  if (year < 1900 || year > 2100) return false;
+  if (month < 1 || month > 12) return false;
+  if (day < 1) return false;
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return day <= daysInMonth;
+}
+
+/**
  * Shared date helper to parse DD/MM/YYYY, DD-MM-YYYY, or YYYY-MM-DD into a valid ISO string.
+ * Strictly verifies calendar validity and rejects impossible dates (e.g. 31/02/2026).
+ * Does not silently invent an arbitrary +7 days fallback for blank input.
  */
 export function parseDueDateToISO(raw: string | undefined): string {
-  const fallback = new Date(Date.now() + 7 * 86400000).toISOString();
-  if (!raw || !raw.trim()) return fallback;
+  if (!raw || !raw.trim()) return '';
   const trimmed = raw.trim();
 
   // Check DD/MM/YYYY or DD-MM-YYYY
   const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
   if (dmyMatch) {
     const day = parseInt(dmyMatch[1], 10);
-    const month = parseInt(dmyMatch[2], 10) - 1;
+    const month = parseInt(dmyMatch[2], 10);
     const year = parseInt(dmyMatch[3], 10);
-    const dt = new Date(Date.UTC(year, month, day, 15, 0, 0));
-    if (!isNaN(dt.getTime())) return dt.toISOString();
+    if (!isValidCalendarDate(year, month, day)) {
+      return '';
+    }
+    return new Date(Date.UTC(year, month - 1, day, 0, 0, 0)).toISOString();
   }
 
   // Check YYYY-MM-DD or YYYY/MM/DD
-  const ymdMatch = trimmed.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  const ymdMatch = trimmed.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
   if (ymdMatch) {
     const year = parseInt(ymdMatch[1], 10);
-    const month = parseInt(ymdMatch[2], 10) - 1;
+    const month = parseInt(ymdMatch[2], 10);
     const day = parseInt(ymdMatch[3], 10);
-    const dt = new Date(Date.UTC(year, month, day, 15, 0, 0));
-    if (!isNaN(dt.getTime())) return dt.toISOString();
+    if (!isValidCalendarDate(year, month, day)) {
+      return '';
+    }
+    return new Date(Date.UTC(year, month - 1, day, 0, 0, 0)).toISOString();
   }
 
   const parsed = new Date(trimmed);
   if (!isNaN(parsed.getTime())) return parsed.toISOString();
 
-  return fallback;
+  return '';
 }
 
 /**
@@ -444,79 +462,64 @@ export function normalizeMeasurementsRecord(
 
 export const DEFAULT_TEMPLATES: GarmentTemplate[] = [
   {
-    id: 'gown_dress',
-    name: 'Gown/Dress',
+    id: 'bespoke_african_gown',
+    name: 'Bespoke African Gown',
     fieldKeys: [
       'neck_circumference',
-      'neckline',
-      'shoulder_width',
+      'sleeve_length',
       'bust_chest',
       'waist_circumference',
       'hip_height',
       'front_length',
       'body_length',
-      'sleeve_length',
-      'armhole',
-      'wrist_circumference',
     ],
-    description: 'Evening wear, party gowns, and bridal couture dresses.',
-  },
-  {
-    id: 'suits_blazers',
-    name: 'Suits/Blazers',
-    fieldKeys: [
-      'neck_circumference',
-      'shoulder_to_neck',
-      'shoulder_width',
-      'bust_chest',
-      'waist_circumference',
-      'hip_height',
-      'front_length',
-      'body_length',
-      'sleeve_length',
-      'biceps',
-      'armhole',
-      'elbow_length',
-      'wrist_circumference',
-      'inseam',
-      'outseam',
-      'thigh_circumference',
-      'rise',
-    ],
-    description: 'Full bespoke fitting for two-piece suits, blazers, and tailored trousers.',
-  },
-  {
-    id: 'trousers_shorts',
-    name: 'Trousers/Shorts',
-    fieldKeys: [
-      'waist_circumference',
-      'hip_height',
-      'rise',
-      'thigh_circumference',
-      'thigh_length',
-      'knee_circumference',
-      'inseam',
-      'outseam',
-    ],
-    description: 'Fittings for tailored or pleated trousers, slacks, and shorts.',
+    description:
+      'Traditional african couture gown, bridal styles corset-backed silhouettes and embellished trains',
   },
   {
     id: 'shirt_blouse',
     name: 'Shirt/Blouse',
     fieldKeys: [
       'neck_circumference',
-      'shoulder_to_neck',
-      'shoulder_width',
+      'sleeve_length',
       'bust_chest',
       'waist_circumference',
-      'front_length',
-      'body_length',
-      'sleeve_length',
+      'shoulder_width',
       'biceps',
       'armhole',
       'wrist_circumference',
     ],
-    description: 'Essential anatomical measurements for bespoke dress shirts and blouses.',
+    description:
+      'Essential measurements for bespoke dress shirts, casual button downs and tailored blouses',
+  },
+  {
+    id: 'trousers',
+    name: 'Trousers',
+    fieldKeys: [
+      'neck_circumference',
+      'sleeve_length',
+      'bust_chest',
+      'waist_circumference',
+      'hip_height',
+      'inseam',
+      'outseam',
+    ],
+    description: 'Fittings for tailored pants, pleated trousers and custom chinos/pants',
+  },
+  {
+    id: 'bespoke_african_gown_corset',
+    name: 'Bespoke African Gown',
+    fieldKeys: [
+      'neck_circumference',
+      'sleeve_length',
+      'bust_chest',
+      'waist_circumference',
+      'hip_height',
+      'front_length',
+      'body_length',
+    ],
+    description:
+      'Traditional african couture gown, bridal styles corset-backed silhouettes and embellished trains',
   },
 ];
 
@@ -755,6 +758,7 @@ export const SAMPLE_ORDERS: Order[] = [
     ],
     price: 130000,
     paidAmount: 100000,
+    currency: '₦',
     notes: 'Hand-stitched silk faille peak lapel, custom horn buttons, double vent.',
     status: 'In Progress',
     pickupDateTime: '2026-10-14T15:00:00.000Z',
@@ -784,6 +788,7 @@ export const SAMPLE_ORDERS: Order[] = [
     ],
     price: 130000,
     paidAmount: 130000,
+    currency: '₦',
     notes: 'Hand-stitched, monogram design on wrist and gold buttons.',
     status: 'In Progress',
     pickupDateTime: '2026-09-23T16:00:00.000Z',
@@ -813,6 +818,7 @@ export const SAMPLE_ORDERS: Order[] = [
     ],
     price: 130000,
     paidAmount: 130000,
+    currency: '₦',
     notes: 'Completed fitting and pressed for collection.',
     status: 'In Progress',
     pickupDateTime: '2026-09-12T16:00:00.000Z',
@@ -842,6 +848,7 @@ export const SAMPLE_ORDERS: Order[] = [
     ],
     price: 130000,
     paidAmount: 130000,
+    currency: '₦',
     notes: 'Couture bridal drape and hand-beaded train.',
     status: 'In Progress',
     pickupDateTime: '2026-10-18T16:00:00.000Z',
@@ -870,6 +877,7 @@ export const SAMPLE_ORDERS: Order[] = [
       },
     ],
     price: 240000,
+    currency: '₦',
     notes: 'Final fitting approved, gold thread embroidery complete.',
     status: 'Completed',
     pickupDateTime: '2026-09-17T14:00:00.000Z',
@@ -898,6 +906,7 @@ export const SAMPLE_ORDERS: Order[] = [
       },
     ],
     price: 120000,
+    currency: '₦',
     notes: 'Fabric shipment delayed from artisan weaver.',
     status: 'Paused',
     pickupDateTime: '2026-09-07T18:00:00.000Z',
@@ -916,6 +925,7 @@ export const SAMPLE_ORDERS: Order[] = [
       },
     ],
     price: 95000,
+    currency: '₦',
     notes: 'Set of two bespoke tuxedo shirts with Marcella bib front.',
     status: 'Ready',
     pickupDateTime: '2026-09-13T11:00:00.000Z',
@@ -944,6 +954,7 @@ export const SAMPLE_ORDERS: Order[] = [
       },
     ],
     price: 210000,
+    currency: '₦',
     notes: 'Hand embroidery underway at partner atelier.',
     status: 'In Progress',
     pickupDateTime: '2026-09-18T15:30:00.000Z',

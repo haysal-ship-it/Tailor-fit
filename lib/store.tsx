@@ -21,6 +21,7 @@ import {
 } from './initial-data';
 
 interface StoreContextType {
+  isHydrated: boolean;
   clients: Client[];
   snapshots: MeasurementSnapshot[];
   orders: Order[];
@@ -59,6 +60,7 @@ interface StoreContextType {
   resetToDemoData: () => void;
   clearAllData: () => void;
   exportDataJson: () => void;
+  restoreBackupData: (payload: import('./backup').BackupPayload) => boolean;
 
   // Nav helpers
   openClientProfile: (clientId: string) => void;
@@ -87,6 +89,7 @@ const STORAGE_KEYS = {
 };
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
+  const [isHydrated, setIsHydrated] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [snapshots, setSnapshots] = useState<MeasurementSnapshot[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -97,78 +100,89 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null);
 
-  // Load from localStorage on mount with canonical key migration
+  // Load from localStorage synchronously on mount with canonical key migration
   useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        const savedClients = localStorage.getItem(STORAGE_KEYS.CLIENTS);
-        const savedSnapshots = localStorage.getItem(STORAGE_KEYS.SNAPSHOTS);
-        const savedOrders = localStorage.getItem(STORAGE_KEYS.ORDERS);
-        const savedSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    try {
+      const savedClients = localStorage.getItem(STORAGE_KEYS.CLIENTS);
+      const savedSnapshots = localStorage.getItem(STORAGE_KEYS.SNAPSHOTS);
+      const savedOrders = localStorage.getItem(STORAGE_KEYS.ORDERS);
+      const savedSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
 
-        if (savedClients) {
-          setClients(JSON.parse(savedClients));
-        }
-        if (savedSnapshots) {
-          const parsed: MeasurementSnapshot[] = JSON.parse(savedSnapshots);
-          setSnapshots(
-            parsed.map((s) => ({
-              ...s,
-              measurements: normalizeMeasurementsRecord(s.measurements),
-            }))
-          );
-        }
-        if (savedOrders) {
-          setOrders(JSON.parse(savedOrders));
-        }
-        if (savedSettings) {
-          const parsedSettings: AppSettings = JSON.parse(savedSettings);
-          const migratedTemplates = (parsedSettings.templates || DEFAULT_SETTINGS.templates)
-            .filter((t) => t.id !== 'all')
-            .map((t) => ({
-              ...t,
-              fieldKeys: Array.from(
-                new Set((t.fieldKeys || []).map((k) => resolveCanonicalKey(k)))
-              ),
-            }));
-          setSettings({
-            ...DEFAULT_SETTINGS,
-            ...parsedSettings,
-            templates:
-              migratedTemplates.length > 0 ? migratedTemplates : DEFAULT_SETTINGS.templates,
-          });
-        }
-      } catch {
-        // ignore storage error
+      if (savedClients) {
+        setClients(JSON.parse(savedClients));
       }
-    }, 0);
-    return () => clearTimeout(timer);
+      if (savedSnapshots) {
+        const parsed: MeasurementSnapshot[] = JSON.parse(savedSnapshots);
+        setSnapshots(
+          parsed.map((s) => ({
+            ...s,
+            measurements: normalizeMeasurementsRecord(s.measurements),
+          }))
+        );
+      }
+      if (savedOrders) {
+        setOrders(JSON.parse(savedOrders));
+      }
+      if (savedSettings) {
+        const parsedSettings: AppSettings = JSON.parse(savedSettings);
+        const migratedTemplates = (parsedSettings.templates || DEFAULT_SETTINGS.templates)
+          .filter((t) => t.id !== 'all')
+          .map((t) => ({
+            ...t,
+            fieldKeys: Array.from(
+              new Set((t.fieldKeys || []).map((k) => resolveCanonicalKey(k)))
+            ),
+          }));
+        setSettings({
+          ...DEFAULT_SETTINGS,
+          ...parsedSettings,
+          templates:
+            migratedTemplates.length > 0 ? migratedTemplates : DEFAULT_SETTINGS.templates,
+        });
+      }
+    } catch (e) {
+      console.error('Failed to parse saved state from localStorage:', e);
+    } finally {
+      setIsHydrated(true);
+    }
   }, []);
 
-  // Save to localStorage whenever state changes
+  // Save to localStorage whenever state changes, guarded by isHydrated to prevent overwriting
   useEffect(() => {
+    if (!isHydrated) return;
     try {
       localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(clients));
-    } catch {}
-  }, [clients]);
+    } catch (e) {
+      console.error('Storage error saving clients:', e);
+    }
+  }, [clients, isHydrated]);
 
   useEffect(() => {
+    if (!isHydrated) return;
     try {
       localStorage.setItem(STORAGE_KEYS.SNAPSHOTS, JSON.stringify(snapshots));
-    } catch {}
-  }, [snapshots]);
+    } catch (e) {
+      console.error('Storage error saving snapshots:', e);
+    }
+  }, [snapshots, isHydrated]);
 
   useEffect(() => {
+    if (!isHydrated) return;
     try {
       localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
-    } catch {}
-  }, [orders]);
+    } catch (e) {
+      console.error('Storage error saving orders:', e);
+    }
+  }, [orders, isHydrated]);
 
   useEffect(() => {
+    if (!isHydrated) return;
     try {
       localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
-    } catch {}
-  }, [settings]);
+    } catch (e) {
+      console.error('Storage error saving settings:', e);
+    }
+  }, [settings, isHydrated]);
 
   // Combined hotspots: defaults + custom fields from settings (deduplicated by key)
   const allHotspots: HotspotDefinition[] = React.useMemo(() => {
@@ -186,7 +200,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const addClient = (clientData: Omit<Client, 'id' | 'createdAt'>): Client => {
     const newClient: Client = {
       ...clientData,
-      id: `c-${Date.now()}`,
+      id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       createdAt: new Date().toISOString(),
     };
     setClients((prev) => [newClient, ...prev]);
@@ -211,7 +225,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const addSnapshot = (snapshotData: Omit<MeasurementSnapshot, 'id'>): MeasurementSnapshot => {
     const newSnapshot: MeasurementSnapshot = {
       ...snapshotData,
-      id: `ms-${Date.now()}`,
+      id: `ms-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     };
     setSnapshots((prev) => [newSnapshot, ...prev]);
     return newSnapshot;
@@ -230,7 +244,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const addOrder = (orderData: Omit<Order, 'id' | 'createdAt'>): Order => {
     const newOrder: Order = {
       ...orderData,
-      id: `ord-${Date.now().toString().slice(-4)}`,
+      currency: orderData.currency || settings?.currency || '₦',
+      id: `ord-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       createdAt: new Date().toISOString(),
     };
     setOrders((prev) => [newOrder, ...prev]);
@@ -338,6 +353,31 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     URL.revokeObjectURL(url);
   };
 
+  const restoreBackupData = (payload: import('./backup').BackupPayload): boolean => {
+    try {
+      // Save emergency recovery copy before restoring
+      const preRestore = {
+        clients,
+        snapshots,
+        orders,
+        settings,
+        savedAt: new Date().toISOString(),
+      };
+      localStorage.setItem('tailorfit_pre_restore_backup', JSON.stringify(preRestore));
+    } catch {}
+
+    setClients(payload.clients);
+    setSnapshots(payload.snapshots);
+    setOrders(payload.orders);
+    if (payload.settings) {
+      setSettings(payload.settings);
+    }
+    setSelectedClientId(null);
+    setSelectedOrderId(null);
+    setSelectedSnapshotId(null);
+    return true;
+  };
+
   // Nav helpers
   const openClientProfile = (clientId: string) => {
     setSelectedClientId(clientId);
@@ -361,18 +401,29 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setActiveScreen('orders');
   };
 
-  // Query helpers
-  const getClientById = (id: string) => clients.find((c) => c.id === id);
+  // Query helpers stabilized with useCallback to prevent infinite effect triggers
+  const getClientById = React.useCallback(
+    (id: string) => clients.find((c) => c.id === id),
+    [clients]
+  );
 
-  const getClientOrders = (clientId: string) =>
-    orders
-      .filter((o) => o.clientId === clientId)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const getClientOrders = React.useCallback(
+    (clientId: string) =>
+      orders
+        .filter((o) => o.clientId === clientId)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [orders]
+  );
 
-  const getClientSnapshots = (clientId: string) =>
-    snapshots.filter((s) => s.clientId === clientId);
+  const getClientSnapshots = React.useCallback(
+    (clientId: string) => snapshots.filter((s) => s.clientId === clientId),
+    [snapshots]
+  );
 
-  const getSnapshotById = (id: string) => snapshots.find((s) => s.id === id);
+  const getSnapshotById = React.useCallback(
+    (id: string) => snapshots.find((s) => s.id === id),
+    [snapshots]
+  );
 
   const getTodayStr = () => {
     const d = new Date();
@@ -418,6 +469,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   return (
     <StoreContext.Provider
       value={{
+        isHydrated,
         clients,
         snapshots,
         orders,
@@ -455,6 +507,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         resetToDemoData,
         clearAllData,
         exportDataJson,
+        restoreBackupData,
 
         openClientProfile,
         openNewMeasurementForClient,

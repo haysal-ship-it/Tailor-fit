@@ -12,6 +12,10 @@ export interface ToastMessage {
   title?: string;
   message: string;
   onUndo?: () => void;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
   duration?: number;
 }
 
@@ -82,6 +86,8 @@ function ToastItem({
       transition={shouldReduceMotion ? { duration: 0.1 } : springSmooth}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onFocus={handleMouseEnter}
+      onBlur={handleMouseLeave}
       className={cn(
         'pointer-events-auto w-full rounded-2xl p-3.5 bg-[var(--surface-1)] border shadow-xl flex items-center justify-between gap-3 overflow-hidden relative',
         toast.type === 'warning'
@@ -122,6 +128,18 @@ function ToastItem({
       </div>
 
       <div className="flex items-center gap-2">
+        {toast.action && (
+          <button
+            type="button"
+            onClick={() => {
+              toast.action!.onClick();
+              onDismiss(toast.id);
+            }}
+            className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[var(--primary)] text-white hover:opacity-90 transition-opacity cursor-pointer shrink-0"
+          >
+            {toast.action.label}
+          </button>
+        )}
         {toast.type === 'undo' && toast.onUndo && (
           <button
             type="button"

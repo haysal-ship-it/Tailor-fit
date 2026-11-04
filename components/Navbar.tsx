@@ -6,6 +6,7 @@ import { useStore } from '@/lib/store';
 import { House, UsersRound, Settings } from 'lucide-react';
 import { springSnappy } from '@/lib/motion-tokens';
 import { NotificationDropdown } from '@/components/ui/NotificationDropdown';
+import { HelpMenu } from '@/components/onboarding/HelpMenu';
 import { cn } from '@/lib/utils';
 
 export function OrigamiTailorFitLogo({ className = 'w-[44px] h-[31px]' }: { className?: string }) {
@@ -94,6 +95,7 @@ export function Navbar() {
                   key={item.id}
                   type="button"
                   id={`nav-pill-${item.id}`}
+                  data-tour={item.id === 'clients' ? 'nav-clients' : undefined}
                   aria-current={item.isActive ? 'page' : undefined}
                   onClick={() => setActiveScreen(item.id as any)}
                   className={cn(
@@ -116,8 +118,9 @@ export function Navbar() {
               ))}
             </nav>
 
-            {/* Right: Notification bell */}
-            <div className="flex items-center gap-2">
+            {/* Right: Help & Notification */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <HelpMenu />
               <NotificationDropdown />
             </div>
           </div>
@@ -134,6 +137,7 @@ export function Navbar() {
             <button
               key={`mobile-${item.id}`}
               type="button"
+              data-tour={item.id === 'clients' ? 'nav-clients' : undefined}
               aria-current={item.isActive ? 'page' : undefined}
               onClick={() => setActiveScreen(item.id as any)}
               className={cn(

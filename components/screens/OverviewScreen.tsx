@@ -28,6 +28,10 @@ import {
   parseDueDateToISO,
 } from '@/lib/initial-data';
 import { cn } from '@/lib/utils';
+import { getOrderStatusPresentation, type OrderStatusPresentation } from '@/lib/status';
+import { useTour } from '@/components/onboarding/TourProvider';
+import { TourInvitation, TourCompletionFeedback } from '@/components/onboarding/TourInvitation';
+import { ContextualTip } from '@/components/onboarding/ContextualTip';
 
 interface CalendarOrderItem {
   id: string;
@@ -35,7 +39,8 @@ interface CalendarOrderItem {
   client: string;
   garment: string;
   time: string;
-  status: 'pending' | 'completed' | 'paused';
+  status: string;
+  statusPresentation: OrderStatusPresentation;
 }
 
 interface OverviewScreenProps {
@@ -54,10 +59,23 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
     settings,
     allHotspots,
     deleteTemplate,
+    selectedClientId,
+    setSelectedClientId,
+    getClientById,
   } = useStore();
   const shouldReduceMotion = useReducedMotion();
   const unitLabel = settings?.defaultUnit || 'cm';
   const currencySymbol = settings?.currency || '₦';
+
+  const {
+    isReadyForInvitation,
+    startTour,
+    dismissTour,
+    deferInvitation,
+    justFinishedTour,
+    dismissCompletion,
+    registerBlocker,
+  } = useTour();
 
   // Responsive check for 1024px breakpoint via useSyncExternalStore
   const isDesktop = React.useSyncExternalStore(
@@ -91,6 +109,19 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
   const clientPhoneInputRef = useRef<HTMLInputElement>(null);
   const clientEmailInputRef = useRef<HTMLInputElement>(null);
   const clientGarmentInputRef = useRef<HTMLInputElement>(null);
+
+  // Prefill intake form when selectedClientId is present (A05)
+  useEffect(() => {
+    if (selectedClientId) {
+      const client = getClientById(selectedClientId);
+      if (client) {
+        setClientName(client.name || '');
+        setClientPhone(client.phone || '');
+        setClientEmail(client.email || '');
+        setClientNotes(client.notes || '');
+      }
+    }
+  }, [selectedClientId, getClientById]);
 
   // System toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -150,6 +181,19 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
     value: string;
   } | null>(null);
   const [pointModalError, setPointModalError] = useState<string>('');
+
+  // Register blockers for onboarding guide & contextual tips when dialogs are active
+  useEffect(() => {
+    if (isTemplateModalOpen) {
+      return registerBlocker('template-dialog');
+    }
+  }, [isTemplateModalOpen, registerBlocker]);
+
+  useEffect(() => {
+    if (pointModalData !== null) {
+      return registerBlocker('point-modal');
+    }
+  }, [pointModalData, registerBlocker]);
 
   // Map canonical key -> hotspot metadata
   const hotspotMap = useMemo(() => {
@@ -214,11 +258,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
         ) {
           const clientObj = clients?.find((c) => c.id === ord.clientId);
           const cName = clientObj?.name || 'Client';
-          const rawStatus = (ord.status || '').toLowerCase();
-          let normalizedStatus: 'pending' | 'completed' | 'paused' = 'pending';
-          if (rawStatus.includes('complete') || rawStatus === 'ready')
-            normalizedStatus = 'completed';
-          else if (rawStatus.includes('pause')) normalizedStatus = 'paused';
+          const statusPres = getOrderStatusPresentation(ord.status, ord.pickupDateTime);
 
           const hours = d.getHours();
           const minutes = d.getMinutes();
@@ -233,7 +273,8 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
             client: cName,
             garment: ord.garmentType || 'Garment',
             time: timeStr,
-            status: normalizedStatus,
+            status: ord.status,
+            statusPresentation: statusPres,
           });
         }
       }
@@ -500,10 +541,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
       errors.phone = 'Phone Number is required';
       missing.push('Phone Number');
     }
-    if (!trimmedEmail) {
-      errors.email = 'Email Address is required';
-      missing.push('Email Address');
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       errors.email = 'Enter a valid email address';
       missing.push('Valid Email Address');
     }
@@ -535,22 +573,19 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
 
     setClientFormErrors({});
 
-    // Reuse existing client if matching name or email (case-insensitive)
-    const existingClient = clients.find(
-      (c) =>
-        c.name.trim().toLowerCase() === trimmedName.toLowerCase() ||
-        (c.email && c.email.trim().toLowerCase() === trimmedEmail.toLowerCase())
-    );
-
+    // Reconcile client identity explicitly by selectedClientId (A04)
     let targetClientId: string;
-    if (existingClient) {
-      updateClient(existingClient.id, {
+    let isExistingClient = false;
+
+    if (selectedClientId && getClientById(selectedClientId)) {
+      updateClient(selectedClientId, {
         name: trimmedName,
         phone: trimmedPhone,
         email: trimmedEmail,
-        notes: clientNotes.trim() || existingClient.notes,
+        notes: clientNotes.trim(),
       });
-      targetClientId = existingClient.id;
+      targetClientId = selectedClientId;
+      isExistingClient = true;
     } else {
       const newCl = addClient({
         name: trimmedName,
@@ -581,6 +616,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
       garmentType: trimmedGarment,
       measurements: activeMeasurementsOnly,
       notes: clientNotes,
+      mannequinGender: gender,
     });
 
     addOrder({
@@ -590,6 +626,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
       status: 'In Progress',
       pickupDateTime: parseDueDateToISO(clientDueDate),
       price: priceNum,
+      currency: currencySymbol,
       referenceImages: styleImages.map((url, i) => ({
         id: `ref-${Date.now()}-${i}`,
         url,
@@ -611,12 +648,19 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
     setMeasurements({});
     setSelectedTemplateId('');
     setSelectedTemplateName('');
+    if (selectedClientId) {
+      setSelectedClientId(null);
+    }
 
     showToast({
       type: 'success',
       title: 'Client & Order Saved',
-      message: `${existingClient ? 'Updated' : 'Created'} profile for "${trimmedName}" and booked order for "${trimmedGarment}".`,
-      duration: 4000,
+      message: `${isExistingClient ? 'Updated' : 'Created'} profile for "${trimmedName}" and booked order for "${trimmedGarment}". Find this order and its measurements in Clients.`,
+      duration: 5000,
+      action: {
+        label: 'Open client',
+        onClick: () => onOpenClient(targetClientId),
+      },
     });
   };
 
@@ -654,7 +698,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
     >
       <div>
         <h2 className="text-[16px] font-bold text-[var(--text)] leading-tight">
-          New Client
+          New Order &amp; Client Intake
         </h2>
         <p className="text-[12px] font-normal text-[var(--text-2)] mt-0.5 leading-snug">
           Enter client contact info, select garment template, and style notes.
@@ -663,18 +707,19 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
 
       <div className="bg-[var(--card)] rounded-[8px] flex flex-col gap-[2px] p-[2px]">
         {/* Section 1: Basic Information */}
-        <div className="bg-[var(--surface)] p-2.5 flex flex-col gap-1 rounded-[6px]">
+        <div data-tour="client-basics" className="bg-[var(--surface)] p-2.5 flex flex-col gap-1 rounded-[6px]">
           <h3 className="text-[14px] font-semibold text-[var(--text)]">
             Basic Information
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
             <Input
               ref={clientNameInputRef}
-              label="Client *"
+              label="Client name *"
               placeholder="e.g. Adriana Kunle"
               value={clientName}
               error={clientFormErrors.name}
               onChange={(e) => {
+                deferInvitation();
                 setClientName(e.target.value);
                 if (clientFormErrors.name) {
                   setClientFormErrors((prev) => {
@@ -692,6 +737,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
               value={clientGarment}
               error={clientFormErrors.garment}
               onChange={(e) => {
+                deferInvitation();
                 setClientGarment(e.target.value);
                 if (clientFormErrors.garment) {
                   setClientFormErrors((prev) => {
@@ -710,6 +756,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
               value={clientPhone}
               error={clientFormErrors.phone}
               onChange={(e) => {
+                deferInvitation();
                 setClientPhone(e.target.value);
                 if (clientFormErrors.phone) {
                   setClientFormErrors((prev) => {
@@ -722,7 +769,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
             />
             <Input
               ref={clientEmailInputRef}
-              label="Email Address *"
+              label="Email address (optional)"
               placeholder="name@example.com"
               type="email"
               value={clientEmail}
@@ -751,10 +798,10 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
           </div>
         </div>
 
-        {/* Section 3: Price/Due date */}
+        {/* Section 3: Price and schedule */}
         <div className="bg-[var(--surface)] p-2.5 flex flex-col gap-1 rounded-[6px]">
           <h3 className="text-[14px] font-semibold text-[var(--text)]">
-            Price/Due date
+            Price and schedule
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
             <Input
@@ -767,7 +814,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
             />
             <div className="relative" ref={dueDatePickerRef}>
               <Input
-                label="Due Date"
+                label="Due date (DD/MM/YYYY)"
                 type="text"
                 placeholder="DD/MM/YYYY"
                 value={clientDueDate}
@@ -958,6 +1005,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
         >
           <button
             ref={triggerRef}
+            data-tour="choose-template"
             type="button"
             onClick={() => {
               setDialogSelectedTemplateId(
@@ -1061,12 +1109,17 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
       {centerView === 'mannequin' ? (
         <div
           id="overview-mannequin"
+          data-tour="mannequin-viewer"
           className="w-full flex flex-col items-center justify-center py-2 select-none flex-1 relative"
         >
+          {Boolean(selectedTemplateName) && (
+            <ContextualTip id="viewer-rotate" variant="inline" className="w-full max-w-sm mb-2" />
+          )}
           <RotatableMannequin
             gender={gender}
             onGenderChange={setGender}
-            showGenderToggle={false}
+            showControls={true}
+            showGenderToggle={true}
             measurements={measurements}
             activePointKeys={activePointKeys}
             selectedPointKey={pointModalData?.key || null}
@@ -1106,8 +1159,10 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
         </div>
       ) : (
         /* Measurement List View */
-        <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 py-1">
-          {visibleListFields.map((field, idx) => {
+        <div className="w-full flex flex-col gap-2 py-1">
+          <ContextualTip id="measurement-list" variant="inline" className="w-full" />
+          <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {visibleListFields.map((field, idx) => {
             const rawVal = measurements[field.id];
             const strVal = rawVal !== undefined ? String(rawVal) : '';
 
@@ -1159,13 +1214,14 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
               </div>
             );
           })}
+          </div>
         </div>
       )}
 
       {/* Mobile Inline Save Button */}
       {isMobile && (
         <div className="w-full pt-2 flex justify-end">
-          <MorphingSaveButton idleText="Save" onClick={handleSaveOrder} />
+          <MorphingSaveButton idleText="Save" onClick={handleSaveOrder} dataTour="save-order" />
         </div>
       )}
     </div>
@@ -1178,7 +1234,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
     >
       <div className="flex items-center justify-between">
         <h3 className="text-[14px] font-semibold text-[var(--text-strong)] leading-none">
-          Garment&apos;s Calendar
+          Pickup Calendar
         </h3>
         <div className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-strong)]">
           <span>{calendarMonthLabel}</span>
@@ -1186,7 +1242,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
             <button
               type="button"
               aria-label="Previous Month"
-              className="p-1 rounded hover:bg-neutral-200 transition-colors cursor-pointer"
+              className="w-7 h-7 flex items-center justify-center rounded hover:bg-neutral-200 focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:outline-none transition-colors cursor-pointer"
               title="Previous Month"
               onClick={() => {
                 setActiveDatePopover(null);
@@ -1200,7 +1256,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
             <button
               type="button"
               aria-label="Next Month"
-              className="p-1 rounded hover:bg-neutral-200 transition-colors cursor-pointer"
+              className="w-7 h-7 flex items-center justify-center rounded hover:bg-neutral-200 focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:outline-none transition-colors cursor-pointer"
               title="Next Month"
               onClick={() => {
                 setActiveDatePopover(null);
@@ -1214,6 +1270,8 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
           </div>
         </div>
       </div>
+
+      <ContextualTip id="calendar-dates" variant="inline" className="mt-0.5" />
 
       {/* Weekday row */}
       <div className="grid grid-cols-7 gap-[2px]">
@@ -1266,14 +1324,8 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
 
               {hasOrders && (
                 <span
-                  className={cn(
-                    'absolute bottom-1 right-1 w-2 h-2 rounded-full',
-                    status === 'completed'
-                      ? 'bg-[var(--completed)]'
-                      : status === 'paused'
-                      ? 'bg-[var(--paused)]'
-                      : 'bg-[var(--pending)]'
-                  )}
+                  className="absolute bottom-1 right-1 w-2 h-2 rounded-full"
+                  style={{ backgroundColor: dayOrders[0]?.statusPresentation.dotColor }}
                 />
               )}
             </button>
@@ -1317,8 +1369,14 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
                     className="w-full text-left flex items-center justify-between text-[11px] bg-[var(--chip)] hover:bg-[#EAEAEA] p-2 rounded-[6px] transition-colors cursor-pointer"
                   >
                     <div>
-                      <div className="font-medium text-[var(--text-strong)]">
-                        {item.client}
+                      <div className="font-medium text-[var(--text-strong)] flex items-center gap-1.5">
+                        <span>{item.client}</span>
+                        <span
+                          style={{ backgroundColor: item.statusPresentation.badgeColor }}
+                          className="px-1.5 py-0.5 rounded-full text-[9px] font-semibold text-white leading-none"
+                        >
+                          {item.statusPresentation.badgeLabel}
+                        </span>
                       </div>
                       <div className="text-[10px] text-[var(--muted)]">
                         {item.garment}
@@ -1374,7 +1432,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
 
   const renderRecentOrdersCard = () => (
     <div
-      id="overview-client-intake"
+      id="overview-recent-orders"
       className="w-full bg-[var(--card)] rounded-[6px] p-3 flex flex-col gap-2"
     >
       <h3 className="text-[14px] font-semibold text-[var(--text-strong)]">
@@ -1647,7 +1705,33 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
   };
 
   return (
-    <div className="w-full max-w-[1216px] mx-auto px-3 sm:px-4 xl:px-0 mt-3 lg:mt-4 pb-24 lg:pb-12 select-none text-[var(--text)]">
+    <div className="w-full max-w-[1216px] mx-auto px-3 sm:px-4 xl:px-0 mt-3 lg:mt-4 pb-24 lg:pb-12 text-[var(--text)]">
+      {/* Accessible Landmark Heading (A11, A16) */}
+      <h1 className="sr-only">TailorFit Studio Overview and Order Intake</h1>
+
+      {/* Onboarding Tour Welcome Invitation (Nonblocking) */}
+      {isReadyForInvitation && (
+        <div className="mb-3">
+          <TourInvitation
+            onStart={startTour}
+            onDismiss={dismissTour}
+          />
+        </div>
+      )}
+
+      {/* Onboarding Tour Completion Feedback */}
+      {justFinishedTour && (
+        <div className="mb-3">
+          <TourCompletionFeedback
+            hasDraft={Boolean(clientName.trim() || clientGarment.trim() || clientPhone.trim())}
+            onAction={() => {
+              dismissCompletion();
+              clientNameInputRef.current?.focus();
+            }}
+            onDismiss={dismissCompletion}
+          />
+        </div>
+      )}
       {/* =======================================================================
           PART A: MOBILE OVERVIEW (< 1024px)
           ======================================================================= */}
@@ -1681,7 +1765,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
 
               {/* Desktop Save Bar */}
               <div className="w-full px-4 py-2 flex justify-end items-center bg-[var(--surface)] rounded-[6px]">
-                <MorphingSaveButton idleText="Save" onClick={handleSaveOrder} />
+                <MorphingSaveButton idleText="Save" onClick={handleSaveOrder} dataTour="save-order" />
               </div>
             </div>
 
@@ -1762,6 +1846,8 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
                     </button>
                   </div>
 
+                  <ContextualTip id="template-fields" variant="inline" className="-mt-2 mb-1" />
+
                   {renderTemplatesModalList()}
 
                   <div className="flex items-center justify-end gap-2.5">
@@ -1826,6 +1912,8 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
                     <X className="w-4 h-4" />
                   </button>
                 </div>
+
+                <ContextualTip id="template-fields" variant="inline" className="-mt-1 mb-1" />
 
                 {renderTemplatesModalList()}
 

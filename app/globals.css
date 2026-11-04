@@ -53,8 +53,8 @@
   --text-strong: #100F0F;
   --text-date: #1B1B1B;
   --text-2: #595959;
-  --muted: #A2A2A2;
-  --weekday: #A8A8A8;
+  --muted: #595959;
+  --weekday: #595959;
 
   --primary: #1D49E8;
   --annotation: #079BF8;
@@ -75,7 +75,7 @@
   --pill-paused: #D93A4D;
   --band: #222222;
   --price-label: #A09F9F;
-  --sub: #8D8D8D;
+  --sub: #595959;
 
   /* Compatibility bindings for existing components & other screens (Clients, Settings) */
   --bg: var(--page);

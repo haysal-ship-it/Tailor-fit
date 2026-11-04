@@ -37,6 +37,7 @@ export interface MeasurementSnapshot {
   garmentType: string;
   measurements: Record<string, number | string>;
   notes?: string;
+  mannequinGender?: 'female' | 'male';
 }
 
 export interface Order {
@@ -47,6 +48,7 @@ export interface Order {
   referenceImages: ReferenceImage[];
   price: number;
   paidAmount?: number;
+  currency?: string;
   notes: string;
   status: OrderStatus;
   pickupDateTime: string;

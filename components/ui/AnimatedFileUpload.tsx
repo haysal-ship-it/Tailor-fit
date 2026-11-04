@@ -17,29 +17,42 @@ export function AnimatedFileUpload({
   images = [],
   onChange,
   className,
-  label = 'Tap to upload image',
+  label = 'Add reference images',
 }: AnimatedFileUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-  const [uploadError, setUploadError] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const shouldReduceMotion = useReducedMotion();
+
+  const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+  const MAX_IMAGES_COUNT = 6;
 
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const fileArray = Array.from(files);
-    setUploadError(false);
-    setUploadProgress(15);
+    setUploadError(null);
 
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev === null) return 15;
-        if (prev >= 90) {
-          clearInterval(interval);
-          return 90;
-        }
-        return prev + 25;
-      });
-    }, 80);
+    // Validate image mime types
+    const invalidTypes = fileArray.filter((f) => !f.type.startsWith('image/'));
+    if (invalidTypes.length > 0) {
+      setUploadError('Only image files (PNG, JPG, WebP) are supported.');
+      return;
+    }
+
+    // Validate size limit (5MB)
+    const oversized = fileArray.filter((f) => f.size > MAX_FILE_SIZE_BYTES);
+    if (oversized.length > 0) {
+      setUploadError('Image size exceeds 5MB limit.');
+      return;
+    }
+
+    // Validate total count
+    if (images.length + fileArray.length > MAX_IMAGES_COUNT) {
+      setUploadError(`Maximum ${MAX_IMAGES_COUNT} style references allowed.`);
+      return;
+    }
+
+    setUploadProgress(30);
 
     Promise.all(
       fileArray.map(
@@ -56,21 +69,17 @@ export function AnimatedFileUpload({
       )
     )
       .then((results) => {
+        setUploadProgress(100);
         setTimeout(() => {
-          clearInterval(interval);
-          setUploadProgress(100);
-          setTimeout(() => {
-            setUploadProgress(null);
-            if (results.length > 0 && onChange) {
-              onChange([...images, ...results]);
-            }
-          }, 200);
-        }, 350);
+          setUploadProgress(null);
+          if (results.length > 0 && onChange) {
+            onChange([...images, ...results]);
+          }
+        }, 150);
       })
       .catch(() => {
-        clearInterval(interval);
         setUploadProgress(null);
-        setUploadError(true);
+        setUploadError('Failed to process image attachment.');
       });
   };
 
@@ -123,14 +132,14 @@ export function AnimatedFileUpload({
                 transition={{ ease: 'easeOut', duration: 0.2 }}
               />
             </div>
-            <span className="text-[11px] text-[var(--text-2)] font-mono tabular-nums">
-              Uploading {uploadProgress}%
+            <span className="text-[11px] text-[var(--text-2)] font-medium">
+              Adding images…
             </span>
           </div>
         ) : uploadError ? (
-          <div className="flex flex-col items-center gap-1.5 text-[var(--status-danger)]">
-            <RefreshCw className="w-4 h-4 animate-spin" />
-            <span className="text-[12px] font-medium">Upload failed. Tap to retry</span>
+          <div className="flex flex-col items-center gap-1 text-[#E53E3E] px-4 text-center">
+            <span className="text-[12px] font-medium">{uploadError}</span>
+            <span className="text-[11px] text-[var(--muted)]">Tap to choose another file</span>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center px-3 text-center">

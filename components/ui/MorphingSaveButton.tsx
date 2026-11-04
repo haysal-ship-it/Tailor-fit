@@ -15,6 +15,7 @@ interface MorphingSaveButtonProps {
   className?: string;
   disabled?: boolean;
   style?: React.CSSProperties;
+  dataTour?: string;
 }
 
 export function MorphingSaveButton({
@@ -24,6 +25,7 @@ export function MorphingSaveButton({
   className,
   disabled = false,
   style,
+  dataTour,
 }: MorphingSaveButtonProps) {
   const [internalStatus, setInternalStatus] = useState<MorphingButtonStatus>('idle');
   const shouldReduceMotion = useReducedMotion();
@@ -56,6 +58,7 @@ export function MorphingSaveButton({
   return (
     <motion.button
       type="button"
+      data-tour={dataTour}
       disabled={disabled || status === 'loading'}
       onClick={handleClick}
       whileTap={disabled || status === 'loading' || shouldReduceMotion ? undefined : { scale: 0.97 }}

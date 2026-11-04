@@ -36,6 +36,9 @@ import {
 } from '@/lib/initial-data';
 import { springSmooth, springSnappy } from '@/lib/motion-tokens';
 import { cn } from '@/lib/utils';
+import { convertMeasurement } from '@/lib/units';
+import { getOrderStatusPresentation, formatDate } from '@/lib/status';
+import { ContextualTip } from '@/components/onboarding/ContextualTip';
 
 interface ClientsScreenProps {
   onOpenClient?: (clientId: string) => void;
@@ -301,11 +304,21 @@ export function ClientsScreen({
       const latest = snaps[0];
       const normalized = normalizeMeasurementsRecord(latest.measurements);
       const keys = Object.keys(normalized);
+
+      // Convert measurements if the snapshot's recorded unit differs from the active view unit (A02)
+      let measurementsToUse = normalized;
+      if (latest.unit && latest.unit !== unitLabel) {
+        measurementsToUse = {};
+        Object.entries(normalized).forEach(([k, val]) => {
+          measurementsToUse[k] = convertMeasurement(val, latest.unit, unitLabel);
+        });
+      }
+
       setActiveSnapshotId(latest.id);
       setSelectedTemplateName(latest.garmentType || 'Bespoke fitting');
       setSelectedTemplateId('');
       setActivePointKeys(keys);
-      setMeasurements(normalized);
+      setMeasurements(measurementsToUse);
     } else {
       setActiveSnapshotId('');
       setSelectedTemplateName('');
@@ -502,23 +515,12 @@ export function ClientsScreen({
     if (!selectedClientProfile) return [];
     const clientOrders = getClientOrders(selectedClientProfile.id);
     return clientOrders.map((ord) => {
-      const createdDateStr = ord.createdAt
-        ? new Date(ord.createdAt).toLocaleDateString('en-GB').replace(/\//g, '-')
-        : '09-10-2025';
-      const dateStr = `Size taken on ${createdDateStr}`;
+      const createdDateStr = ord.createdAt ? formatDate(ord.createdAt, '-') : '';
+      const dateStr = createdDateStr ? `Order created ${createdDateStr}` : 'Order created';
 
-      let badge = 'Urgent';
-      let badgeColor = 'var(--pill-urgent)';
-      if (ord.status === 'Ready' || ord.status === 'Completed' || ord.status === 'Picked Up') {
-        badge = ord.status;
-        badgeColor = 'var(--pill-completed)';
-      } else if (ord.status === 'Paused') {
-        badge = 'Paused';
-        badgeColor = 'var(--pill-paused)';
-      } else if (ord.status === 'Pending') {
-        badge = 'Pending';
-        badgeColor = 'var(--pill-pending)';
-      }
+      const statusPres = getOrderStatusPresentation(ord.status, ord.pickupDateTime);
+      const badge = statusPres.badgeLabel;
+      const badgeColor = statusPres.badgeColor;
 
       const imgs =
         ord.referenceImages && ord.referenceImages.length > 0
@@ -532,10 +534,11 @@ export function ClientsScreen({
         badgeColor,
         date: dateStr,
         price: ord.price ?? 0,
+        currency: ord.currency || currencySymbol,
         images: imgs,
       };
     });
-  }, [getClientOrders, selectedClientProfile?.id]);
+  }, [getClientOrders, selectedClientProfile?.id, currencySymbol]);
 
   // Open Edit Profile modal prefilled with current client
   const handleOpenEditProfile = (mode: 'edit' | 'create' | 'switch' = 'edit') => {
@@ -744,7 +747,9 @@ export function ClientsScreen({
   };
 
   return (
-    <div className="w-full max-w-[1216px] mx-auto mt-3 lg:mt-4 px-3 sm:px-4 xl:px-0 pb-24 lg:pb-12 select-none">
+    <div className="w-full max-w-[1216px] mx-auto mt-3 lg:mt-4 px-3 sm:px-4 xl:px-0 pb-24 lg:pb-12 text-[var(--text)]">
+      {/* Accessible Landmark Heading (A11, A16) */}
+      <h1 className="sr-only">Client Management &amp; Measurements Atelier</h1>
       {!selectedClientProfile ? (
         <div className="w-full bg-[var(--surface)] p-8 sm:p-14 rounded-[12px] border border-[var(--outline)] flex flex-col items-center justify-center text-center gap-4 shadow-xs">
           <div className="w-16 h-16 rounded-full bg-[var(--chip)] border border-[var(--outline)] flex items-center justify-center text-[var(--text-2)]">
@@ -920,6 +925,8 @@ export function ClientsScreen({
         {viewState !== 'Inline_NewOrder' ? (
           <>
             <div className="w-full bg-[var(--card)] rounded-[6px] px-4 sm:px-6 pt-4 pb-6 flex flex-col gap-4">
+              <ContextualTip id="reuse-fitting" variant="inline" className="mb-1" />
+
               {/* Underline Tabs: `Saved Measurements` | `Order History` */}
               <div
                 role="tablist"
@@ -1107,7 +1114,7 @@ export function ClientsScreen({
                           }}
                           className="w-full sm:w-auto h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[#E8E8E8] transition-colors flex items-center justify-center cursor-pointer shrink-0"
                         >
-                          Use Measurement
+                          Create order from these measurements
                         </button>
                       ) : (
                         <button
@@ -1134,7 +1141,8 @@ export function ClientsScreen({
                       <RotatableMannequin
                         gender={mannequinGender}
                         onGenderChange={setMannequinGender}
-                        showControls={false}
+                        showControls={true}
+                        showGenderToggle={true}
                         compact={false}
                         measurements={measurements}
                         activePointKeys={activePointKeys}
@@ -1431,7 +1439,8 @@ export function ClientsScreen({
                           <RotatableMannequin
                             gender={mannequinGender}
                             onGenderChange={setMannequinGender}
-                            showControls={false}
+                            showControls={true}
+                            showGenderToggle={true}
                             compact={false}
                             measurements={measurements}
                             activePointKeys={activePointKeys}
@@ -1525,11 +1534,20 @@ export function ClientsScreen({
                       {orderHistoryCards.map((card) => (
                         <div
                           key={card.id}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Order: ${card.title}, status ${card.badge}`}
                           onClick={() => {
                             if (onEditOrder) onEditOrder(card.id);
                           }}
+                          onKeyDown={(e) => {
+                            if ((e.key === 'Enter' || e.key === ' ') && onEditOrder) {
+                              e.preventDefault();
+                              onEditOrder(card.id);
+                            }
+                          }}
                           className={cn(
-                            'bg-[var(--surface)] rounded-[8px] p-[2px] flex flex-col gap-[2px] border border-transparent hover:border-[var(--selected)] transition-all',
+                            'bg-[var(--surface)] rounded-[8px] p-[2px] flex flex-col gap-[2px] border border-transparent hover:border-[var(--selected)] focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:outline-none transition-all text-left select-none',
                             onEditOrder && 'cursor-pointer'
                           )}
                         >
@@ -1583,7 +1601,7 @@ export function ClientsScreen({
                             <span className="text-[14px] font-bold text-[var(--text)] tabular-nums">
                               <AnimatedNumberMorph
                                 value={card.price}
-                                prefix={currencySymbol}
+                                prefix={card.currency || currencySymbol}
                               />
                             </span>
                           </div>
@@ -1939,7 +1957,8 @@ export function ClientsScreen({
                     <RotatableMannequin
                       gender={mannequinGender}
                       onGenderChange={setMannequinGender}
-                      showControls={false}
+                      showControls={true}
+                      showGenderToggle={true}
                       compact={false}
                       measurements={measurements}
                       activePointKeys={activePointKeys}
