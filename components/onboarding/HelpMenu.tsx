@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { HelpCircle, Play, RotateCcw, Compass, Check, X, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
+import { HelpCircle, Play, RotateCcw, Compass, Check, X, ArrowRight, ExternalLink } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useTour } from './TourProvider';
 import { cn } from '@/lib/utils';
@@ -169,6 +170,18 @@ export function HelpMenu() {
                 className="w-4 h-4 text-[var(--primary)] rounded border-gray-300 focus:ring-[var(--primary)] cursor-pointer"
               />
             </label>
+
+            <div className="my-1 border-t border-[var(--outline)]" />
+
+            {/* Item 5: Product Landing Page */}
+            <Link
+              href="/landing"
+              onClick={() => setIsOpen(false)}
+              className="w-full flex items-center justify-between px-3 py-2 text-[13px] font-medium text-black rounded-[8px] hover:bg-neutral-100 transition-colors"
+            >
+              <span>Product Overview & Landing</span>
+              <ExternalLink className="w-3.5 h-3.5 text-[var(--muted)]" />
+            </Link>
           </div>
         )}
       </div>

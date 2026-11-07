@@ -200,7 +200,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const addClient = (clientData: Omit<Client, 'id' | 'createdAt'>): Client => {
     const newClient: Client = {
       ...clientData,
-      id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       createdAt: new Date().toISOString(),
     };
     setClients((prev) => [newClient, ...prev]);
