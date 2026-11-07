@@ -54,93 +54,83 @@ export function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F8F8] text-[#1D1D1D] font-sans selection:bg-[#1D49E8]/15 selection:text-[#1D49E8] antialiased overflow-x-clip">
-      {/* 1. Header & Navigation */}
-      <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          scrolled
-            ? 'bg-white/85 backdrop-blur-md shadow-xs py-4 border-b border-black/5'
-            : 'bg-transparent py-6 sm:py-8'
-        }`}
-      >
-        <div className="max-w-[1440px] mx-auto px-6 sm:px-12 lg:px-20 flex items-center justify-between">
+      {/* 1. Header & Navigation (Figma Floating Pill) */}
+      <header className="fixed top-5 sm:top-8 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-[793px] transition-all duration-300">
+        <div className="bg-white rounded-[100px] p-[8px] pl-5 sm:pl-7 pr-2 sm:pr-2.5 shadow-[0_4px_24px_rgba(0,0,0,0.08)] border border-black/5 flex items-center justify-between h-[64px] sm:h-[69px]">
           {/* Logo */}
-          <Link href="/landing" className="flex items-center gap-3 group" aria-label="TailorFit home">
-            <div className="relative h-[32px] w-[140px] sm:w-[150px]">
+          <Link href="/landing" className="flex items-center gap-2 group shrink-0" aria-label="TailorFit home">
+            <div className="relative h-[28px] sm:h-[31.9px] w-[125px] sm:w-[142px]">
               <Image
-                src={scrolled ? '/assets/landing/logo-black.png' : '/assets/landing/logo-white.png'}
+                src="/assets/landing/logo-black.png"
                 alt="TailorFit Logo"
                 fill
                 priority
                 unoptimized
-                className="object-contain object-left transition-opacity duration-200"
+                className="object-contain object-left"
               />
             </div>
           </Link>
 
           {/* Desktop Nav Links */}
-          <nav className="hidden md:flex items-center gap-8">
-            <a
-              href="#how-it-works"
-              className={`text-[17px] font-medium transition-colors hover:opacity-100 ${
-                scrolled ? 'text-[#1D1D1D]/80 hover:text-black' : 'text-white/90 hover:text-white'
-              }`}
-            >
-              How it works
-            </a>
+          <nav className="hidden md:flex items-center gap-6 lg:gap-8 font-sans font-medium text-[16px] lg:text-[18px] text-black">
             <a
               href="#features"
-              className={`text-[17px] font-medium transition-colors hover:opacity-100 ${
-                scrolled ? 'text-[#1D1D1D]/80 hover:text-black' : 'text-white/90 hover:text-white'
-              }`}
+              className="text-[#1D1D1D] hover:text-black transition-colors"
             >
               Features
             </a>
             <a
+              href="#how-it-works"
+              className="text-[#1D1D1D] hover:text-black transition-colors"
+            >
+              How It Works
+            </a>
+            <a
               href="#faq"
-              className={`text-[17px] font-medium transition-colors hover:opacity-100 ${
-                scrolled ? 'text-[#1D1D1D]/80 hover:text-black' : 'text-white/90 hover:text-white'
-              }`}
+              className="text-[#1D1D1D] hover:text-black transition-colors"
             >
               FAQ
             </a>
           </nav>
 
-          {/* Desktop Auth / App CTAs */}
-          <div className="hidden md:flex items-center gap-4">
+          {/* Desktop Auth Actions */}
+          <div className="hidden md:flex items-center gap-4 shrink-0 font-sans font-medium text-[16px] lg:text-[18px]">
             <Link
               href="/signin"
-              className={`px-5 py-2.5 text-[17px] font-medium rounded-full transition-colors ${
-                scrolled
-                  ? 'text-[#1D1D1D] hover:bg-neutral-100'
-                  : 'text-white hover:bg-white/10'
-              }`}
+              className="text-[#1D1D1D] hover:text-black transition-colors px-2 py-1"
             >
               Log in
             </Link>
             <Link
-              href="/?tab=overview"
-              className="bg-black text-white hover:bg-neutral-900 px-6 py-3 rounded-full text-[16px] font-medium transition-all shadow-md hover:scale-[1.02] active:scale-[0.98]"
+              href="/signup"
+              className="bg-black text-white hover:bg-neutral-800 rounded-[32px] px-5 sm:px-6 py-2.5 sm:py-3 transition-colors text-center shadow-sm"
             >
-              Open Tailorfit
+              Sign up
             </Link>
           </div>
 
-          {/* Mobile Menu Toggle Button */}
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className={`md:hidden p-2 rounded-full transition-colors ${
-              scrolled ? 'text-black hover:bg-neutral-100' : 'text-white hover:bg-white/10'
-            }`}
-            aria-label={mobileMenuOpen ? 'Close navigation' : 'Open navigation'}
-          >
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          {/* Mobile Actions: Sign up pill + Hamburger toggle */}
+          <div className="flex md:hidden items-center gap-2">
+            <Link
+              href="/signup"
+              className="bg-black text-white text-[13px] font-medium rounded-full px-3.5 py-2"
+            >
+              Sign up
+            </Link>
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-full text-black hover:bg-neutral-100 transition-colors"
+              aria-label={mobileMenuOpen ? 'Close navigation' : 'Open navigation'}
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Dropdown Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden bg-white/95 backdrop-blur-xl border-b border-neutral-200 px-6 py-6 flex flex-col gap-4 shadow-xl animate-in slide-in-from-top-2">
+          <div className="md:hidden mt-2 bg-white/95 backdrop-blur-xl border border-black/5 rounded-[24px] p-5 flex flex-col gap-3 shadow-xl animate-in slide-in-from-top-2">
             <a
               href="#how-it-works"
               onClick={() => setMobileMenuOpen(false)}
@@ -162,19 +152,20 @@ export function LandingPage() {
             >
               FAQ
             </a>
-            <div className="flex flex-col gap-3 pt-2">
+            <div className="flex items-center justify-between pt-2">
               <Link
                 href="/signin"
                 onClick={() => setMobileMenuOpen(false)}
-                className="w-full text-center py-3 border border-neutral-300 text-neutral-800 rounded-full text-[16px] font-medium"
+                className="text-[16px] font-medium text-[#1D1D1D] py-2 px-3 hover:text-black"
               >
                 Log in
               </Link>
               <Link
                 href="/?tab=overview"
-                className="w-full text-center py-3 bg-black text-white rounded-full text-[16px] font-medium shadow-md"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-[14px] font-medium text-neutral-500 hover:text-black py-2 px-3"
               >
-                Open Tailorfit
+                Open Studio →
               </Link>
             </div>
           </div>

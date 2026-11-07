@@ -12,9 +12,9 @@ interface AuthLayoutProps {
 export function AuthLayout({ title, children }: AuthLayoutProps) {
   return (
     <div className="min-h-screen w-full bg-[#F2F2F2] flex items-center justify-center p-3 sm:p-6 lg:p-10 font-sans">
-      <div className="w-full max-w-[1360px] min-h-[600px] lg:h-[800px] flex flex-col-reverse lg:flex-row gap-3 lg:gap-[8px] items-stretch">
+      <div className="w-full max-w-lg lg:max-w-[1360px] min-h-[600px] lg:h-[800px] flex flex-col lg:flex-row gap-3 lg:gap-[8px] items-stretch justify-center">
         {/* Left: Auth Form Card */}
-        <div className="flex-1 bg-[#F8F8F8] border-2 border-white rounded-[32px] p-6 sm:p-10 lg:p-12 shadow-sm flex flex-col justify-between items-center relative min-h-[560px] lg:h-full">
+        <div className="w-full lg:flex-1 bg-[#F8F8F8] border-2 border-white rounded-[32px] p-6 sm:p-10 lg:p-12 shadow-sm flex flex-col justify-between items-center relative min-h-[560px] lg:h-full">
           {/* Main Content Area */}
           <div className="w-full max-w-[450px] flex flex-col items-center gap-8 my-auto">
             {/* Header: Logo & Title */}
@@ -61,8 +61,8 @@ export function AuthLayout({ title, children }: AuthLayoutProps) {
           </div>
         </div>
 
-        {/* Right: Cosmic Artwork Card */}
-        <div className="flex-1 relative rounded-[32px] overflow-hidden min-h-[220px] sm:min-h-[300px] lg:h-full shadow-sm bg-neutral-900">
+        {/* Right: Cosmic Artwork Card (Visible on Desktop only) */}
+        <div className="hidden lg:block lg:flex-1 relative rounded-[32px] overflow-hidden lg:h-full shadow-sm bg-neutral-900">
           <Image
             src="/assets/auth/auth-artwork.png"
             alt="Cosmic Atelier Nebula Artwork"
