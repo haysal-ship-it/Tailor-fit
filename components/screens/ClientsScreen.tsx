@@ -262,6 +262,32 @@ export function ClientsScreen({
           .slice(0, 2)
           .toUpperCase() || 'CL';
       const clientOrders = orders.filter((o) => o.clientId === c.id);
+      const clientSnaps = getClientSnapshots(c.id);
+      const latestSnap = clientSnaps[0];
+      const latestOrder = clientOrders[0];
+
+      const latestFittingGarment =
+        latestSnap?.garmentType ||
+        latestOrder?.garmentType ||
+        'Bespoke Fitting';
+
+      let latestFittingDate = '—';
+      const rawDate = latestSnap?.date || latestOrder?.createdAt || c.createdAt;
+      if (rawDate) {
+        const d = new Date(rawDate);
+        if (!isNaN(d.getTime())) {
+          const day = d.getDate();
+          const month = d.getMonth() + 1;
+          const yr = String(d.getFullYear()).slice(-2);
+          latestFittingDate = `${day}/${month}/${yr}`;
+        }
+      }
+
+      const bodyPointsCount = latestSnap
+        ? Object.keys(normalizeMeasurementsRecord(latestSnap.measurements))
+            .length
+        : 0;
+
       return {
         id: c.id,
         initials,
@@ -270,9 +296,12 @@ export function ClientsScreen({
         email: c.email || '',
         notes: c.notes || '',
         totalOrdersCount: clientOrders.length,
+        latestFittingGarment,
+        latestFittingDate,
+        bodyPointsCount,
       };
     });
-  }, [clients, orders]);
+  }, [clients, orders, getClientSnapshots]);
 
   const activeClientId = orderClientId || selectedClientId || null;
   const selectedClientProfile = useMemo(() => {
@@ -717,7 +746,7 @@ export function ClientsScreen({
     <div className="w-full max-w-[1216px] mx-auto mt-3 lg:mt-4 px-3 sm:px-4 xl:px-0 pb-24 lg:pb-12 text-[var(--text)]">
       {/* Accessible Landmark Heading (A11, A16) */}
       <h1 className="sr-only">Client Management &amp; Measurements Atelier</h1>
-      {!selectedClientProfile && showingOrder ? (<OrderWorkspace key={orderId||'new'} orderId={orderId} clientId={orderClientId} onBack={()=>onOrderBack?.()} onSaved={(id,cid)=>onOrderSaved?.(id,cid)} onEditClient={id=>handleOpenEditProfile('edit',id)}/>) : !selectedClientProfile && allClientList.length === 0 ? (
+      {Boolean(orderId) || (!selectedClientProfile && showingOrder) ? (<OrderWorkspace key={orderId||'new'} orderId={orderId} clientId={orderClientId} onBack={()=>onOrderBack?.()} onSaved={(id,cid)=>onOrderSaved?.(id,cid)} onEditClient={id=>handleOpenEditProfile('edit',id)}/>) : !selectedClientProfile && allClientList.length === 0 ? (
         <div className="w-full bg-[var(--surface)] p-8 sm:p-14 rounded-[12px] border border-[var(--outline)] flex flex-col items-center justify-center text-center gap-4 shadow-xs">
           <div className="w-16 h-16 rounded-full bg-[var(--chip)] border border-[var(--outline)] flex items-center justify-center text-[var(--text-2)]">
             <Users className="w-8 h-8 text-[var(--text-strong)]" />
@@ -759,116 +788,143 @@ export function ClientsScreen({
         </div>
       ) : !selectedClientProfile ? (
         /* ===================================================================
-           CLIENT DIRECTORY VIEW (Default landing view for Clients tab)
+           CLIENT DIRECTORY VIEW (Figma Redesign: Desktop 664:2188 & Mobile 664:2080)
            =================================================================== */
-        <div className="w-full bg-[var(--surface)] p-4 sm:p-6 rounded-[12px] border border-[var(--outline)] flex flex-col gap-5 shadow-xs">
+        <div className="w-full bg-white rounded-[8px] p-[2px] flex flex-col gap-[2px]">
           {/* Header Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--hairline)]">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center font-bold">
-                <Users className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-[20px] sm:text-[22px] font-bold text-[var(--text)]">Client Directory</h2>
-                  <span className="px-2.5 py-0.5 rounded-full bg-[var(--chip)] text-[12px] font-semibold text-[var(--text-2)] tabular-nums">
-                    {allClientList.length}
-                  </span>
-                </div>
-                <p className="text-[13px] text-[var(--muted)]">Select a client to view bespoke fittings, measurements, and order history.</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleOpenEditProfile('create')}
-              className="h-10 px-5 rounded-[24px] bg-[var(--primary)] text-white text-[13px] font-semibold hover:bg-[var(--primary)]/90 transition-colors shadow-xs cursor-pointer flex items-center gap-2 self-start sm:self-auto"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Client</span>
-            </button>
-          </div>
-
-          {/* Search Bar */}
-          <div className="w-full flex items-center gap-2.5 bg-[#F8F8F8] border border-[#EDEDED] rounded-[8px] px-3.5 h-11 transition-colors focus-within:border-[#1D49E8] focus-within:ring-1 focus-within:ring-[#1D49E8]">
-            <Search className="w-4 h-4 text-[#8E8E8E] shrink-0" />
-            <input
-              type="text"
-              value={directorySearch}
-              onChange={(e) => setDirectorySearch(e.target.value)}
-              placeholder="Search directory by name, phone, or email..."
-              className="w-full bg-transparent p-0 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none"
-            />
-            {directorySearch && (
-              <button
-                type="button"
-                onClick={() => setDirectorySearch('')}
-                className="text-[#8E8E8E] hover:text-[#1D1D1D] transition-colors p-1 cursor-pointer"
-                title="Clear search"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Clients Cards Grid */}
-          {filteredDirectoryClients.length === 0 ? (
-            <div className="py-12 text-center flex flex-col items-center justify-center gap-2">
-              <p className="text-[14px] text-[var(--muted)]">
-                No clients match &ldquo;{directorySearch}&rdquo;
+          <div className="w-full p-[24px] flex flex-col lg:flex-row items-start justify-between gap-[16px]">
+            <div className="flex flex-col gap-[4px] lg:gap-[8px] items-start">
+              <h2 className="text-[16px] font-semibold text-black leading-normal">
+                Client Directory
+              </h2>
+              <p className="text-[12px] font-normal text-[#595959] leading-normal">
+                Versioned anatomical measurements across customer visits.
               </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-[8px] w-full lg:w-auto shrink-0">
+              {/* Search Pill */}
+              <div className="bg-[#f1f1f1] border border-[#ededed] border-solid rounded-[32px] px-[12px] lg:px-[10px] py-[8px] flex items-center gap-[8px] w-full lg:w-[350px] transition-colors focus-within:border-[#1D49E8]">
+                <Search className="size-[16px] text-[#a3a3a3] shrink-0" />
+                <input
+                  type="text"
+                  value={directorySearch}
+                  onChange={(e) => setDirectorySearch(e.target.value)}
+                  placeholder="Search clients by name, phone number, email..."
+                  className="w-full bg-transparent p-0 text-[11px] sm:text-[12px] font-normal text-black placeholder:text-[#a3a3a3] focus:outline-none leading-normal"
+                />
+                {directorySearch && (
+                  <button
+                    type="button"
+                    onClick={() => setDirectorySearch('')}
+                    className="text-[#a3a3a3] hover:text-black transition-colors cursor-pointer shrink-0"
+                    title="Clear search"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Add New Client Pill Button */}
               <button
                 type="button"
-                onClick={() => setDirectorySearch('')}
-                className="text-[13px] text-[var(--primary)] font-medium hover:underline cursor-pointer"
+                onClick={() => handleOpenEditProfile('create')}
+                className="bg-[#1d49e8] hover:opacity-95 transition-opacity rounded-[24px] px-[14px] py-[8px] flex items-center justify-center w-full sm:w-auto cursor-pointer shrink-0"
               >
-                Clear search
+                <span className="text-[14px] font-medium text-white leading-normal whitespace-nowrap">
+                  Add New Client
+                </span>
               </button>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1">
-              {filteredDirectoryClients.map((client) => (
-                <div
-                  key={client.id}
-                  onClick={() => setSelectedClientId(client.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setSelectedClientId(client.id);
-                    }
-                  }}
-                  className="group bg-white rounded-[16px] border border-[#EDEDED] p-4 flex flex-col justify-between gap-4 hover:border-[#1D49E8] hover:shadow-md transition-all cursor-pointer text-left"
+          </div>
+
+          {/* Clients Cards Grid Container */}
+          <div className="w-full bg-[#f8f8f8] rounded-[6px] p-[16px] lg:p-[24px] min-h-[502px]">
+            {filteredDirectoryClients.length === 0 ? (
+              <div className="py-16 text-center flex flex-col items-center justify-center gap-2">
+                <p className="text-[14px] text-[#595959]">
+                  No clients match &ldquo;{directorySearch}&rdquo;
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setDirectorySearch('')}
+                  className="text-[13px] text-[#1d49e8] font-medium hover:underline cursor-pointer"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 rounded-full bg-[#1D1D1D] text-white flex items-center justify-center font-bold text-[14px] shrink-0 group-hover:scale-105 transition-transform">
-                        {client.initials}
+                  Clear search
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[16px] items-start w-full">
+                {filteredDirectoryClients.map((client, index) => (
+                  <div
+                    key={client.id}
+                    onClick={() => setSelectedClientId(client.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedClientId(client.id);
+                      }
+                    }}
+                    className="bg-white rounded-[24px] p-[16px] flex flex-col gap-[16px] justify-center w-full cursor-pointer text-left transition-shadow hover:shadow-sm"
+                  >
+                    <div className="flex flex-col gap-[16px] items-start w-full">
+                      {/* Identity Row */}
+                      <div className="flex items-center gap-[8px] w-full">
+                        <div
+                          className={cn(
+                            'rounded-[100px] size-[32px] p-[8px] flex items-center justify-center shrink-0',
+                            index % 4 === 3 ? 'bg-black' : 'bg-[#595959]'
+                          )}
+                        >
+                          <span className="text-[12px] font-bold text-white leading-normal whitespace-nowrap">
+                            {client.initials}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col gap-[2px] items-start justify-center min-w-0 flex-1">
+                          <p className="text-[14px] font-semibold text-black leading-normal truncate w-full">
+                            {client.name}
+                          </p>
+                          <div className="flex items-center gap-[4px]">
+                            <Phone className="size-[14px] text-[#595959] fill-current shrink-0" />
+                            <span className="text-[10px] font-normal text-black leading-normal whitespace-nowrap tabular-nums">
+                              {client.phone || 'No phone number'}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-[15px] font-bold text-[#1D1D1D] truncate group-hover:text-[#1D49E8] transition-colors">
-                          {client.name}
-                        </h3>
-                        <span className="text-[12px] text-[#727272] block truncate">
-                          {client.phone || client.email || 'No contact details'}
-                        </span>
+
+                      {/* Fitting Summary Box */}
+                      <div className="bg-[#f8f8f8] rounded-[8px] p-[8px] flex flex-col gap-[16px] items-start text-[10px] leading-normal w-full">
+                        <div className="flex items-center justify-between gap-[16px] w-full">
+                          <span className="font-normal text-[#4f4f4f] whitespace-nowrap shrink-0">
+                            Latest Fitting:
+                          </span>
+                          <span className="font-semibold text-black text-right truncate flex-1">
+                            {client.latestFittingGarment}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between font-normal text-[#4f4f4f] w-full whitespace-nowrap tabular-nums">
+                          <span>{client.latestFittingDate}</span>
+                          <span>{client.bodyPointsCount} body points</span>
+                        </div>
                       </div>
                     </div>
-                    <span className="px-2.5 py-1 rounded-full bg-[#F5F5F5] border border-[#EDEDED] text-[11px] font-semibold text-[#1D1D1D] shrink-0 tabular-nums">
-                      {client.totalOrdersCount} {client.totalOrdersCount === 1 ? 'order' : 'orders'}
-                    </span>
-                  </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-[#F5F5F5] text-[12px] text-[#727272]">
-                    <span className="truncate">{client.email || '—'}</span>
-                    <span className="font-semibold text-[#1D49E8] shrink-0 group-hover:translate-x-0.5 transition-transform">
-                      View profile →
-                    </span>
+                    {/* View Profile Button */}
+                    <div className="bg-[#f2f2f2] hover:bg-[#eaeaea] border border-[#dddbdb] border-solid rounded-[24px] p-[8px] flex items-center justify-center w-full transition-colors">
+                      <span className="text-[14px] font-medium text-[#595959] leading-normal whitespace-nowrap">
+                        View Profile
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       ) : (
       /* =====================================================================

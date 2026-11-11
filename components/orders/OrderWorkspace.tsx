@@ -1,7 +1,13 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { ArrowLeft, Download, Pencil } from "lucide-react";
+import {
+  Check,
+  ClipboardList,
+  Download,
+  PersonStanding,
+  X,
+} from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useDraft } from "@/lib/drafts/use-draft";
 import { RotatableMannequin } from "@/components/mannequin/RotatableMannequin";
@@ -13,11 +19,71 @@ import { AnimatedFileUpload } from "@/components/ui/AnimatedFileUpload";
 import { invoiceMoney } from "@/lib/invoices/model";
 import { downloadBlob } from "@/lib/data/backup";
 import { sendInvoice } from "@/lib/invoices/actions";
+import { formatDate, getOrderStatusPresentation } from "@/lib/status";
+import { cn } from "@/lib/utils";
 import type { Client, MeasurementSnapshot, Order, OrderStatus } from "@/types";
 
 const button =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[var(--outline)] px-4 text-sm font-medium hover:bg-[var(--chip)] focus-visible:outline-2 focus-visible:outline-[var(--primary)] disabled:opacity-50";
 const primary = `${button} border-transparent bg-[var(--primary)] text-white hover:opacity-90 hover:bg-[var(--primary)]`;
+
+function formatOrderCode(id: string): string {
+  if (!id) return "TF-00000";
+  if (id.toUpperCase().startsWith("TF-")) return id.toUpperCase();
+  const digits = id.replace(/\D/g, "");
+  if (digits.length > 0) {
+    return `TF-${digits.slice(-5).padStart(5, "0")}`;
+  }
+  const clean = id.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  return `TF-${clean.slice(-5).padStart(5, "0")}`;
+}
+
+function formatOrderPrice(amount: number | undefined, currency?: string): string {
+  const symbolMap: Record<string, string> = {
+    NGN: "₦",
+    "₦": "₦",
+    USD: "$",
+    $: "$",
+    GBP: "£",
+    "£": "£",
+    EUR: "€",
+    "€": "€",
+  };
+  const sym = symbolMap[currency || ""] || currency || "₦";
+  const num = typeof amount === "number" && !isNaN(amount) ? amount : 0;
+  return `${sym}${num.toLocaleString("en-US")}`;
+}
+
+const SELECTABLE_STATUSES: {
+  value: "Pending" | "Paused" | "Completed";
+  label: string;
+  description: string;
+  dotClass: string;
+  badgeBg: string;
+}[] = [
+  {
+    value: "Pending",
+    label: "Pending",
+    description: "Order is active and queued or underway in the workroom.",
+    dotClass: "bg-[#D97706]",
+    badgeBg: "bg-[#FEF3C7] text-[#92400E]",
+  },
+  {
+    value: "Paused",
+    label: "Paused",
+    description: "Work is temporarily on hold awaiting client fitting or fabric.",
+    dotClass: "bg-[#F83437]",
+    badgeBg: "bg-[#FEE2E2] text-[#B91C1C]",
+  },
+  {
+    value: "Completed",
+    label: "Completed",
+    description: "Garment construction and finishing are complete.",
+    dotClass: "bg-[#16A34A]",
+    badgeBg: "bg-[#DCFCE7] text-[#15803D]",
+  },
+];
+
 type Props = {
   orderId?: string;
   clientId?: string;
@@ -32,18 +98,67 @@ export function OrderWorkspace({
   onSaved,
   onEditClient,
 }: Props) {
-  const { orders, clients, snapshots, isHydrated, deleteOrder } = useStore();
+  const {
+    orders,
+    clients,
+    snapshots,
+    settings,
+    isHydrated,
+    deleteOrder,
+    updateOrderStatus,
+  } = useStore();
   const order = orders.find((o) => o.id === orderId);
   const client = clients.find((c) => c.id === (order?.clientId || clientId));
-  const snapshot = snapshots.find(
-    (s) => s.id === order?.measurementSnapshotId && s.clientId === client?.id,
-  );
+  const snapshot =
+    snapshots.find(
+      (s) => s.id === order?.measurementSnapshotId && s.clientId === client?.id,
+    ) || snapshots.find((s) => s.clientId === client?.id);
   const [editing, setEditing] = useState(!orderId),
-    [display, setDisplay] = useState("diagram");
-  const [dialog, setDialog] = useState<"email" | "delete" | null>(null),
+    [display, setDisplay] = useState<"diagram" | "list">("diagram");
+  const [dialog, setDialog] = useState<"email" | "delete" | "status" | null>(
+      null,
+    ),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const normalizeSelectableStatus = (
+    s?: OrderStatus | string,
+  ): "Pending" | "Paused" | "Completed" => {
+    if (s === "Paused") return "Paused";
+    if (s === "Completed" || s === "Ready" || s === "Picked Up")
+      return "Completed";
+    return "Pending";
+  };
+  const [selectedStatus, setSelectedStatus] = useState<
+    "Pending" | "Paused" | "Completed"
+  >(() => normalizeSelectableStatus(order?.status));
+
+  useEffect(() => {
+    if (order?.status) {
+      setSelectedStatus(normalizeSelectableStatus(order.status));
+    }
+  }, [order?.status]);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [isMenuOpen]);
+
   const [preview, setPreview] = useState<{
     fingerprint: string;
     recipient: string;
@@ -140,171 +255,531 @@ export function OrderWorkspace({
       />
     );
   if (!order || !client) return null;
+
+  const statusPres = getOrderStatusPresentation(
+    order.status,
+    order.pickupDateTime,
+  );
+  const numericMeasurements: Record<string, number> = {};
+  if (snapshot?.measurements) {
+    Object.entries(snapshot.measurements).forEach(([k, v]) => {
+      const n = typeof v === "number" ? v : parseFloat(String(v));
+      if (!isNaN(n) && n > 0) {
+        numericMeasurements[k] = n;
+      }
+    });
+  }
+
   return (
-    <section aria-label="Order details" className="min-w-0 space-y-5">
-      <button className={`${button} border-transparent px-0`} onClick={onBack}>
-        <ArrowLeft size={16} />
-        Back to order history
-      </button>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold">{order.garmentType}</h2>
-          <p className="mt-1 text-sm text-[var(--text-2)]">{order.status}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button className={button} onClick={() => setEditing(true)}>
-            <Pencil size={15} />
-            Edit order
+    <section
+      aria-label="Order details"
+      className="w-full bg-white rounded-[8px] p-[2px] flex flex-col gap-[2px]"
+    >
+      {/* Top Header: Back + Order Details */}
+      <div className="w-full p-[16px] flex items-center justify-between">
+        <div className="flex flex-col gap-[16px] items-start min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex items-center gap-[4px] text-[#595959] hover:text-black transition-colors cursor-pointer"
+          >
+            <img
+              src="/icons/order-details/arrow-u-up-left.svg"
+              alt=""
+              width={16}
+              height={16}
+              className="w-[16px] h-[16px] shrink-0"
+            />
+            <span className="text-[12px] font-normal leading-normal">Back</span>
           </button>
-          <ChoiceMenu
-            kind="menu"
-            placeholder="Options"
-            options={[
-              { value: "email", label: "Share to email" },
-              { value: "download", label: "Download PDF" },
-              { value: "delete", label: "Delete order", destructive: true },
-            ]}
-            onChoose={(choice) => {
-              setError("");
-              setNotice("");
-              if (choice === "download") void pdf(true);
-              else if (choice === "email") {
-                setDialog("email");
-                void pdf();
-              } else {
-                deleteVersion.current = order.version;
-                setDialog("delete");
-              }
-            }}
-            disabled={busy}
-          />
+          <h2 className="text-[16px] font-semibold leading-normal text-black">
+            Order Details
+          </h2>
         </div>
       </div>
-      {error && !dialog && (
-        <p role="alert" className="text-sm text-red-700">
-          {error}
-        </p>
-      )}
-      {notice && (
-        <p role="status" className="text-sm text-[var(--primary)]">
-          {notice}
-        </p>
-      )}
-      {busy && !dialog && <p role="status">Preparing PDF…</p>}
-      <div className="grid min-w-0 gap-1 rounded-lg bg-[var(--surface)] p-1 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-        <div className="min-w-0 space-y-6 p-4 sm:p-5">
-          <ClientSummary
-            client={client}
-            onEdit={() => onEditClient(client.id)}
-          />
-          <dl className="space-y-3 text-sm">
-            <Detail
-              label="Price"
-              value={invoiceMoney(order.price, order.currency || "")}
-            />
-            <Detail
-              label="Due date"
-              value={
-                order.pickupDateTime
-                  ? new Date(order.pickupDateTime).toLocaleDateString("en-GB")
-                  : "Not set"
-              }
-            />
-          </dl>
-          {order.notes && (
-            <div>
-              <h3 className="mb-2 text-sm font-semibold">Internal notes</h3>
-              <p className="whitespace-pre-wrap text-sm text-[var(--text-2)]">
-                {order.notes}
-              </p>
-            </div>
-          )}
-        </div>
-        <div className="min-w-0 rounded-lg bg-[var(--card)] p-4 sm:p-5">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold">Saved measurements</h3>
-            <div className="flex gap-1" aria-label="Measurement display">
-              <button
-                className={button}
-                aria-pressed={display === "diagram"}
-                onClick={() => setDisplay("diagram")}
-              >
-                Diagram
-              </button>
-              <button
-                className={button}
-                aria-pressed={display === "list"}
-                onClick={() => setDisplay("list")}
-              >
-                List
-              </button>
-            </div>
-          </div>
-          {!snapshot ? (
-            <p className="py-8 text-sm text-[var(--text-2)]">
-              Measurements not recorded for this order.
-            </p>
-          ) : display === "diagram" && snapshot.mannequinGender ? (
-            <RotatableMannequin
-              gender={snapshot.mannequinGender}
-              measurements={snapshot.measurements}
-              activePointKeys={Object.keys(snapshot.measurements)}
-              unit={snapshot.unit}
-              readOnly
-            />
-          ) : (
-            <MeasurementList snapshot={snapshot} />
-          )}
-        </div>
-      </div>
-      <div>
-        <h3 className="mb-3 text-sm font-semibold">Style references</h3>
-        {order.referenceImages.length ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {order.referenceImages.map((image, i) => (
-              <figure
-                key={image.id}
-                className="min-w-0 rounded-lg bg-[var(--surface)] p-3"
-              >
-                <Image
-                  unoptimized
-                  width={600}
-                  height={400}
-                  src={image.url}
-                  alt={image.title || `Style reference ${i + 1}`}
-                  className="h-52 w-full rounded-md object-contain"
-                />
-                <figcaption className="mt-2 break-words text-sm">
-                  {image.title || `Style reference ${i + 1}`}
-                  {image.note && (
-                    <p className="mt-1 text-[var(--text-2)]">{image.note}</p>
-                  )}
-                </figcaption>
-              </figure>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-[var(--text-2)]">No reference images.</p>
-        )}
-      </div>
-      {dialog === "delete" && (
-        <ConfirmDialog
-          title="Delete this order?"
-          onClose={() => setDialog(null)}
-          busy={busy}
-        >
-          <p className="text-sm leading-relaxed">
-            Delete {client.name}’s {order.garmentType} order? The client and
-            saved measurements will remain. This cannot be undone.
-          </p>
-          {error && (
-            <p role="alert" className="mt-3 text-sm text-red-700">
+
+      {/* Status/Error/Busy Notices */}
+      {(error && !dialog) || notice || (busy && !dialog) ? (
+        <div className="px-[16px] pb-2 flex flex-col gap-1">
+          {error && !dialog && (
+            <p role="alert" className="text-[12px] text-[#f83437] font-medium">
               {error}
             </p>
           )}
-          <div className="mt-6 flex justify-end gap-2">
+          {notice && (
+            <p role="status" className="text-[12px] text-[#1d49e8] font-medium">
+              {notice}
+            </p>
+          )}
+          {busy && !dialog && (
+            <p role="status" className="text-[12px] text-[#595959]">
+              Preparing PDF…
+            </p>
+          )}
+        </div>
+      ) : null}
+
+      {/* Main Content Wrapper */}
+      <div className="w-full p-[2px] flex flex-col gap-[2px] rounded-[8px]">
+        {/* Garment Title Bar with 3-dots Option Dropdown */}
+        <div className="bg-[#f8f8f8] rounded-[8px] px-[16px] py-[8px] flex items-center justify-between gap-[16px] w-full">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <p className="text-[14px] font-medium leading-normal text-black truncate">
+              {order.garmentType}
+            </p>
+            <span
+              className="px-2.5 py-0.5 rounded-full text-[11px] font-medium text-[#1D1D1D] shrink-0"
+              style={{ backgroundColor: statusPres.badgeColor }}
+            >
+              {statusPres.label}
+            </span>
+          </div>
+
+          <div ref={menuRef} className="relative flex items-center shrink-0">
             <button
-              className={button}
+              type="button"
+              aria-label="Order options"
+              aria-haspopup="menu"
+              aria-expanded={isMenuOpen}
+              disabled={busy}
+              onClick={() => setIsMenuOpen((prev) => !prev)}
+              className="bg-[#f2f2f2] hover:bg-[#e8e8e8] rounded-[32px] size-[40px] p-[4px] flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <img
+                src="/icons/order-details/dots-vertical.svg"
+                alt=""
+                width={24}
+                height={24}
+                className="w-[24px] h-[24px]"
+              />
+            </button>
+
+            {isMenuOpen && (
+              <div
+                role="menu"
+                aria-label="Order options"
+                className="absolute right-0 top-[calc(100%+6px)] z-50 w-[157px] bg-white border border-[#eeecec] rounded-[8px] p-[2px] shadow-lg flex flex-col items-start"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setError("");
+                    setNotice("");
+                    setDialog("email");
+                    void pdf();
+                  }}
+                  className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#f8f8f8] transition-colors cursor-pointer text-left"
+                >
+                  <img
+                    src="/icons/order-details/share.svg"
+                    alt=""
+                    width={16}
+                    height={16}
+                    className="w-[16px] h-[16px] shrink-0"
+                  />
+                  <span className="font-medium text-[12px] text-[#595959] whitespace-nowrap">
+                    Share to email
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setError("");
+                    setNotice("");
+                    void pdf(true);
+                  }}
+                  className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#f8f8f8] transition-colors cursor-pointer text-left"
+                >
+                  <img
+                    src="/icons/order-details/download.svg"
+                    alt=""
+                    width={16}
+                    height={16}
+                    className="w-[16px] h-[16px] shrink-0"
+                  />
+                  <span className="font-medium text-[12px] text-[#595959] whitespace-nowrap">
+                    Download PDF
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setError("");
+                    setNotice("");
+                    setSelectedStatus(normalizeSelectableStatus(order.status));
+                    setDialog("status");
+                  }}
+                  className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#f8f8f8] transition-colors cursor-pointer text-left"
+                >
+                  <img
+                    src="/icons/order-details/download.svg"
+                    alt=""
+                    width={16}
+                    height={16}
+                    className="w-[16px] h-[16px] shrink-0"
+                  />
+                  <span className="font-medium text-[12px] text-[#595959] whitespace-nowrap">
+                    Update status
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setError("");
+                    setNotice("");
+                    deleteVersion.current = order.version;
+                    setDialog("delete");
+                  }}
+                  className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#fff5f5] transition-colors cursor-pointer text-left"
+                >
+                  <img
+                    src="/icons/order-details/trash.svg"
+                    alt=""
+                    width={16}
+                    height={16}
+                    className="w-[16px] h-[16px] shrink-0"
+                  />
+                  <span className="font-medium text-[12px] text-[#f83437] whitespace-nowrap">
+                    Delete order
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Two-Column Split: Left Order Metadata + Right Saved Measurements */}
+        <div className="w-full bg-white p-[2px] rounded-[8px] flex flex-col lg:flex-row gap-[2px] items-start">
+          {/* Left Column: Metadata + Style References */}
+          <div className="w-full lg:flex-1 px-[12px] py-[24px] flex flex-col gap-[24px] self-stretch">
+            <div className="flex items-start justify-between gap-4 w-full leading-normal">
+              <span className="text-[12px] font-normal text-[#a2a2a2] shrink-0">
+                Order id
+              </span>
+              <span className="text-[14px] font-medium text-black text-right tabular-nums">
+                {formatOrderCode(order.id)}
+              </span>
+            </div>
+
+            <div className="flex items-start justify-between gap-4 w-full leading-normal">
+              <span className="text-[12px] font-normal text-[#a2a2a2] shrink-0">
+                Client Name:
+              </span>
+              <span className="text-[14px] font-medium text-black text-right">
+                {client.name}
+              </span>
+            </div>
+
+            <div className="flex items-start justify-between gap-4 w-full leading-normal">
+              <span className="text-[12px] font-normal text-[#a2a2a2] shrink-0">
+                Phone Number:
+              </span>
+              <span className="text-[14px] font-medium text-black text-right tabular-nums">
+                {client.phone || "Not provided"}
+              </span>
+            </div>
+
+            <div className="flex items-start justify-between gap-4 w-full leading-normal">
+              <span className="text-[12px] font-normal text-[#a2a2a2] shrink-0">
+                Email Address:
+              </span>
+              <span className="text-[14px] font-medium text-black text-right break-all">
+                {client.email || "Not provided"}
+              </span>
+            </div>
+
+            <div className="flex items-start justify-between gap-4 w-full leading-normal">
+              <span className="text-[12px] font-normal text-[#a2a2a2] shrink-0">
+                Price:{" "}
+              </span>
+              <span className="text-[14px] font-medium text-black text-right tabular-nums">
+                {formatOrderPrice(
+                  order.price,
+                  order.currency || settings.currency,
+                )}
+              </span>
+            </div>
+
+            <div className="flex items-start justify-between gap-4 w-full leading-normal">
+              <span className="text-[12px] font-normal text-[#a2a2a2] shrink-0">
+                Due date:
+              </span>
+              <span className="text-[14px] font-medium text-black text-right tabular-nums">
+                {order.pickupDateTime
+                  ? formatDate(order.pickupDateTime, "/")
+                  : "Not set"}
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-[8px] items-start w-full">
+              <span className="text-[12px] font-normal text-[#a2a2a2] leading-normal">
+                Style references:
+              </span>
+              <div className="grid grid-cols-3 gap-[8px] w-full">
+                {order.referenceImages && order.referenceImages.length > 0 ? (
+                  <>
+                    {order.referenceImages.map((image, i) => (
+                      <div
+                        key={image.id || i}
+                        className="bg-[#d9d9d9] h-[100px] rounded-[16px] overflow-hidden relative"
+                      >
+                        <Image
+                          unoptimized
+                          fill
+                          src={image.url}
+                          alt={image.title || `Style reference ${i + 1}`}
+                          className="object-cover"
+                        />
+                      </div>
+                    ))}
+                    {Array.from({
+                      length: Math.max(0, 3 - order.referenceImages.length),
+                    }).map((_, idx) => (
+                      <div
+                        key={`placeholder-${idx}`}
+                        className="bg-[#d9d9d9] h-[100px] rounded-[16px]"
+                      />
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    <div className="bg-[#d9d9d9] h-[100px] rounded-[16px]" />
+                    <div className="bg-[#d9d9d9] h-[100px] rounded-[16px]" />
+                    <div className="bg-[#d9d9d9] h-[100px] rounded-[16px]" />
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Saved Measurements (Mannequin view / List view) */}
+          <div className="w-full lg:w-[709px] bg-[#f8f8f8] rounded-[6px] p-[12px] flex flex-col gap-[25px] self-stretch shrink-0">
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-[8px]">
+                <span className="text-[14px] font-bold text-black leading-normal whitespace-nowrap">
+                  Saved measurements
+                </span>
+                <span className="size-[4px] rounded-full bg-[#a2a2a2] shrink-0" />
+                <span className="text-[12px] lg:text-[14px] font-normal text-[#a2a2a2] leading-normal whitespace-nowrap">
+                  {display === "diagram" ? "Mannequin view" : "List view"}
+                </span>
+              </div>
+
+              {/* View Mode Switcher Pill */}
+              <div
+                className="bg-white p-[8px] rounded-[32px] flex items-center shrink-0"
+                role="group"
+                aria-label="Measurement display"
+              >
+                <div className="bg-[#f2f2f2] px-[8px] py-[6px] rounded-[24px] flex items-center gap-[4px]">
+                  <button
+                    type="button"
+                    aria-label="Mannequin view"
+                    aria-pressed={display === "diagram"}
+                    onClick={() => setDisplay("diagram")}
+                    className={cn(
+                      "p-[4px] rounded-[32px] flex items-center justify-center transition-colors cursor-pointer",
+                      display === "diagram"
+                        ? "bg-[#1d49e8] text-white"
+                        : "bg-white text-[#595959] hover:text-black",
+                    )}
+                  >
+                    <PersonStanding className="size-[16px]" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="List view"
+                    aria-pressed={display === "list"}
+                    onClick={() => setDisplay("list")}
+                    className={cn(
+                      "p-[4px] rounded-[32px] flex items-center justify-center transition-colors cursor-pointer",
+                      display === "list"
+                        ? "bg-[#1d49e8] text-white"
+                        : "bg-white text-[#595959] hover:text-black",
+                    )}
+                  >
+                    <ClipboardList className="size-[16px]" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {!snapshot ? (
+              <div className="py-16 text-center flex-1 flex items-center justify-center">
+                <p className="text-[14px] text-[#a2a2a2]">
+                  Measurements not recorded for this order.
+                </p>
+              </div>
+            ) : display === "diagram" ? (
+              <div className="flex-1 flex items-center justify-center py-2">
+                <RotatableMannequin
+                  gender={snapshot.mannequinGender || "female"}
+                  measurements={numericMeasurements}
+                  activePointKeys={Object.keys(numericMeasurements)}
+                  unit={snapshot.unit}
+                  readOnly
+                />
+              </div>
+            ) : (
+              <MeasurementList snapshot={snapshot} />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Update Status Modal (Paused, Pending, Completed) */}
+      {dialog === "status" && (
+        <ConfirmDialog
+          title="Update Order Status"
+          onClose={() => setDialog(null)}
+          busy={busy}
+        >
+          <p className="text-[13px] text-[#595959] leading-relaxed mb-4">
+            Choose the current workroom status for{" "}
+            <span className="font-semibold text-black">{client.name}</span>’s{" "}
+            <span className="font-semibold text-black">
+              {order.garmentType}
+            </span>{" "}
+            order.
+          </p>
+
+          <div
+            role="radiogroup"
+            aria-label="Order status"
+            className="flex flex-col gap-2.5"
+          >
+            {SELECTABLE_STATUSES.map((opt) => {
+              const isSelected = selectedStatus === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  onClick={() => setSelectedStatus(opt.value)}
+                  className={cn(
+                    "w-full p-3.5 rounded-[12px] border text-left flex items-center justify-between gap-3 transition-all cursor-pointer",
+                    isSelected
+                      ? "border-[#1d49e8] bg-[#1d49e8]/[0.04]"
+                      : "border-[#ededed] bg-[#f8f8f8] hover:bg-[#f2f2f2]",
+                  )}
+                >
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "size-2 rounded-full shrink-0",
+                          opt.dotClass,
+                        )}
+                      />
+                      <span className="text-[14px] font-semibold text-black">
+                        {opt.label}
+                      </span>
+                    </div>
+                    <span className="text-[12px] text-[#595959] leading-snug">
+                      {opt.description}
+                    </span>
+                  </div>
+
+                  <div
+                    className={cn(
+                      "size-5 rounded-full flex items-center justify-center shrink-0 transition-colors",
+                      isSelected
+                        ? "bg-[#1d49e8] text-white"
+                        : "border border-[#dddbdb] bg-white",
+                    )}
+                  >
+                    {isSelected && <Check className="size-3 stroke-[2.5]" />}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {error && (
+            <p role="alert" className="mt-3 text-[12px] text-[#f83437]">
+              {error}
+            </p>
+          )}
+
+          <div className="mt-6 flex items-center justify-end gap-2.5">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setDialog(null)}
+              className="h-10 px-5 rounded-full bg-[#f2f2f2] border border-[#dddbdb] text-[13px] font-medium text-[#595959] hover:text-black hover:bg-[#e8e8e8] transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setError("");
+                try {
+                  const ok = await updateOrderStatus(order.id, selectedStatus);
+                  if (ok) {
+                    setDialog(null);
+                    setNotice(`Order status updated to ${selectedStatus}.`);
+                    window.dispatchEvent(
+                      new CustomEvent("tailorfit:notice", {
+                        detail: `Order status updated to ${selectedStatus}.`,
+                      }),
+                    );
+                  } else {
+                    setError(
+                      "Could not update status. Please check your connection and try again.",
+                    );
+                  }
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              className="h-10 px-6 rounded-full bg-[#1d49e8] text-white text-[13px] font-medium hover:opacity-95 transition-opacity cursor-pointer disabled:opacity-50"
+            >
+              {busy ? "Updating…" : "Update Status"}
+            </button>
+          </div>
+        </ConfirmDialog>
+      )}
+
+      {/* Delete Order Confirmation Dialog */}
+      {dialog === "delete" && (
+        <ConfirmDialog
+          title="Delete Order?"
+          onClose={() => setDialog(null)}
+          busy={busy}
+        >
+          <p className="text-[13px] text-[#595959] leading-relaxed">
+            Are you sure you want to delete{" "}
+            <span className="font-semibold text-black">{client.name}</span>’s{" "}
+            <span className="font-semibold text-black">
+              {order.garmentType}
+            </span>{" "}
+            order? The client profile and saved measurements will remain. This
+            action cannot be undone.
+          </p>
+          {error && (
+            <p role="alert" className="mt-3 text-[12px] text-[#f83437]">
+              {error}
+            </p>
+          )}
+          <div className="mt-6 flex items-center justify-end gap-2.5">
+            <button
+              type="button"
+              className="h-10 px-5 rounded-full bg-[#f2f2f2] border border-[#dddbdb] text-[13px] font-medium text-[#595959] hover:text-black hover:bg-[#e8e8e8] transition-colors cursor-pointer"
               disabled={busy}
               onClick={() => setDialog(null)}
               autoFocus
@@ -312,7 +787,8 @@ export function OrderWorkspace({
               Cancel
             </button>
             <button
-              className={`${button} bg-red-700 text-white hover:bg-red-800`}
+              type="button"
+              className="h-10 px-6 rounded-full bg-[#f83437] text-white text-[13px] font-medium hover:bg-[#d92629] transition-colors cursor-pointer disabled:opacity-50"
               disabled={busy}
               onClick={async () => {
                 setBusy(true);
@@ -335,11 +811,13 @@ export function OrderWorkspace({
                 }
               }}
             >
-              {busy ? "Deleting…" : "Delete order"}
+              {busy ? "Deleting…" : "Delete Order"}
             </button>
           </div>
         </ConfirmDialog>
       )}
+
+      {/* Share to Email / Review Invoice Dialog */}
       {dialog === "email" && (
         <ConfirmDialog
           title="Review invoice"
@@ -507,26 +985,29 @@ function ClientSummary({
 }
 function MeasurementList({ snapshot }: { snapshot: MeasurementSnapshot }) {
   const { allHotspots } = useStore();
+  const entries = Object.entries(snapshot.measurements);
   return (
-    <dl className="divide-y divide-[var(--outline)]">
-      {Object.entries(snapshot.measurements).map(([key, val]) => (
+    <div className="flex flex-col items-start w-full text-[14px] leading-normal">
+      {entries.map(([key, val]) => (
         <div
           key={key}
-          className="flex flex-wrap justify-between gap-3 py-3 text-sm"
+          className="bg-white border-b-[0.5px] border-[#ddd] border-solid px-[16px] py-[8px] flex items-start justify-between w-full"
         >
-          <dt>
+          <span className="font-normal text-[#a2a2a2]">
             {allHotspots.find((h) => h.key === key)?.label ||
               key.replaceAll("_", " ")}
-          </dt>
-          <dd className="font-medium">
-            {val === "" ? "Not recorded" : `${val} ${snapshot.unit}`}
-          </dd>
+          </span>
+          <span className="font-medium text-black tabular-nums">
+            {val === "" ? "Not recorded" : `${val}${snapshot.unit}`}
+          </span>
         </div>
       ))}
-      {!Object.keys(snapshot.measurements).length && (
-        <p className="py-6 text-sm">Measurements not recorded.</p>
+      {!entries.length && (
+        <p className="py-6 text-[14px] text-[#a2a2a2] w-full text-center">
+          Measurements not recorded.
+        </p>
       )}
-    </dl>
+    </div>
   );
 }
 

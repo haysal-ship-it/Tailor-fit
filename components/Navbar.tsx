@@ -44,7 +44,12 @@ export function Navbar() {
 
   const handleNavClick = (id: string) => {
     if (id === 'clients') {
-      setSelectedClientId(null);
+      if (window.dispatchEvent(new Event('tailorfit:before-navigation', { cancelable: true }))) {
+        setSelectedClientId(null);
+        window.dispatchEvent(new Event('tailorfit:reset-clients-route'));
+        navigate('clients');
+      }
+      return;
     }
     setActiveScreen(id as any);
   };

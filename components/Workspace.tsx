@@ -85,6 +85,17 @@ function TailorFitApp() {
     return () => window.removeEventListener("popstate", read);
   }, [setActiveScreen, setSelectedClientId]);
   React.useEffect(() => {
+    const handleResetClients = () => {
+      routeOrder(undefined, undefined, true);
+    };
+    window.addEventListener("tailorfit:reset-clients-route", handleResetClients);
+    return () =>
+      window.removeEventListener(
+        "tailorfit:reset-clients-route",
+        handleResetClients,
+      );
+  }, []);
+  React.useEffect(() => {
     const handle = (event: Event) => {
       setToasts((prev) => [
         ...prev,
