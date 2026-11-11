@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { browserSupabase } from '@/lib/supabase/browser';
+import { safeReturnTo } from '@/lib/auth/navigation';
 
 interface GoogleAuthButtonProps {
   label?: string;
@@ -11,21 +12,22 @@ interface GoogleAuthButtonProps {
 
 export function GoogleAuthButton({
   label = 'Continue with Google',
-  redirectTo = '/?tab=overview',
+  redirectTo = '/app?tab=overview',
 }: GoogleAuthButtonProps) {
-  const router = useRouter();
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleClick = () => {
+  const handleClick = async () => {
     setLoading(true);
-    // Simulate brief OAuth redirection
-    setTimeout(() => {
-      router.push(redirectTo);
-    }, 400);
+    setError('');
+    try {
+      const { error } = await browserSupabase().auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(safeReturnTo(redirectTo))}` } });
+      if(error) throw error;
+    } catch(error) { setError(error instanceof Error ? error.message : 'Google sign-in failed. Please retry.'); setLoading(false); }
   };
 
   return (
-    <button
+    <div><button
       type="button"
       onClick={handleClick}
       disabled={loading}
@@ -44,6 +46,6 @@ export function GoogleAuthButton({
       <span className="text-[14px] font-medium text-[#595959] whitespace-nowrap">
         {loading ? 'Connecting...' : label}
       </span>
-    </button>
+    </button>{error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}</div>
   );
 }

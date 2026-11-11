@@ -13,6 +13,7 @@ export type AnatomicalZoneId =
   | 'arms';
 
 export interface ReferenceImage {
+  storagePath?: string;
   id: string;
   url: string;
   note?: string;
@@ -20,6 +21,8 @@ export interface ReferenceImage {
 }
 
 export interface Client {
+  version?: number;
+  photoPath?: string;
   id: string;
   name: string;
   phone: string;
@@ -30,6 +33,7 @@ export interface Client {
 }
 
 export interface MeasurementSnapshot {
+  version?: number;
   id: string;
   clientId: string;
   date: string;
@@ -41,6 +45,7 @@ export interface MeasurementSnapshot {
 }
 
 export interface Order {
+  version?: number;
   id: string;
   clientId: string;
   garmentType: string;
@@ -78,6 +83,8 @@ export interface GarmentTemplate {
 }
 
 export interface AppSettings {
+  version?: number;
+  onboarding?: Record<string, unknown>;
   defaultUnit: UnitType;
   currency?: string;
   customFields: HotspotDefinition[];

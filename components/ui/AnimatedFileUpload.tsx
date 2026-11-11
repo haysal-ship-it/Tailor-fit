@@ -33,7 +33,7 @@ export function AnimatedFileUpload({
     setUploadError(null);
 
     // Validate image mime types
-    const invalidTypes = fileArray.filter((f) => !f.type.startsWith('image/'));
+    const invalidTypes = fileArray.filter((f) => !['image/jpeg','image/png','image/webp'].includes(f.type));
     if (invalidTypes.length > 0) {
       setUploadError('Only image files (PNG, JPG, WebP) are supported.');
       return;
@@ -113,7 +113,7 @@ export function AnimatedFileUpload({
       >
         <input
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp"
           multiple
           className="sr-only"
           onChange={(e) => {

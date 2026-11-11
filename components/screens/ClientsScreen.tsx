@@ -3,11 +3,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '@/lib/store';
+import { OrderWorkspace } from '@/components/orders/OrderWorkspace';
+import { ChoiceMenu } from '@/components/ui/ChoiceMenu';
 import {
   Phone,
   AtSign,
-  MoreVertical,
-  Pencil,
   Trash2,
   ChevronDown,
   CornerUpLeft,
@@ -41,6 +41,7 @@ import { getOrderStatusPresentation, formatDate } from '@/lib/status';
 import { ContextualTip } from '@/components/onboarding/ContextualTip';
 
 interface ClientsScreenProps {
+  orderId?:string;newOrder?:boolean;orderClientId?:string;onOrderBack?:()=>boolean;onOrderSaved?:(id:string,clientId:string)=>void;
   onOpenClient?: (clientId: string) => void;
   onNewMeasurement?: (clientId: string) => void;
   onNewOrder?: (clientId: string) => void;
@@ -81,7 +82,7 @@ export function ClientsScreen({
   onOpenClient,
   onNewMeasurement,
   onNewOrder,
-  onEditOrder,
+  onEditOrder, orderId, newOrder, orderClientId, onOrderBack, onOrderSaved,
 }: ClientsScreenProps) {
   const {
     clients,
@@ -90,6 +91,7 @@ export function ClientsScreen({
     allHotspots,
     selectedClientId,
     setSelectedClientId,
+    saveIntake,
     addClient,
     updateClient,
     deleteClient,
@@ -102,11 +104,13 @@ export function ClientsScreen({
     resetToDemoData,
   } = useStore();
 
+  const showingOrder=!!(orderId||newOrder);
   const unitLabel = settings?.defaultUnit || 'cm';
   const currencySymbol = settings?.currency || '₦';
 
   // Primary 4-view state machine matching the 9 Figma frames
   const [viewState, setViewState] = useState<ClientsViewState>('SavedMeasurements_Default');
+  useEffect(()=>{if(showingOrder)queueMicrotask(()=>setViewState('OrderHistory_Grid'));},[showingOrder,orderId]);
 
   // Mannequin state
   const [mannequinGender, setMannequinGender] = useState<'female' | 'male'>('female');
@@ -115,7 +119,7 @@ export function ClientsScreen({
   );
 
   // Header overflow `⋮` menu & Snapshot dropdown states
-  const [isOverflowMenuOpen, setIsOverflowMenuOpen] = useState(false);
+  const [, setIsOverflowMenuOpen] = useState(false);
   const [isSnapshotDropdownOpen, setIsSnapshotDropdownOpen] = useState(false);
   const [isNewOrderTemplateDropdownOpen, setIsNewOrderTemplateDropdownOpen] = useState(false);
 
@@ -269,15 +273,15 @@ export function ClientsScreen({
     });
   }, [clients, orders]);
 
-  const activeClientId = selectedClientId || allClientList[0]?.id || null;
+  const activeClientId = orderClientId || selectedClientId || (showingOrder?null:allClientList[0]?.id) || null;
   const selectedClientProfile = useMemo(() => {
     if (allClientList.length === 0) return null;
     return (
       allClientList.find((c) => c.id === activeClientId) ||
-      allClientList[0] ||
+      (showingOrder||selectedClientId?null:allClientList[0]) ||
       null
     );
-  }, [allClientList, activeClientId]);
+  }, [allClientList, activeClientId, showingOrder, selectedClientId]);
 
   // Client's saved snapshots from store
   const clientSnapshots = useMemo(() => {
@@ -332,13 +336,8 @@ export function ClientsScreen({
     return clientSnapshots.find((s) => s.id === activeSnapshotId) || clientSnapshots[0];
   }, [clientSnapshots, activeSnapshotId]);
 
-  const otherSnapshots = useMemo(() => {
-    const filtered = clientSnapshots.filter((s) => s.id !== activeSnapshot?.id);
-    return filtered.length > 0 ? filtered : clientSnapshots;
-  }, [clientSnapshots, activeSnapshot]);
-
   // Persist measurement changes directly to store snapshot (unless in Inline_NewOrder)
-  const persistMeasurementsToStore = (
+  const persistMeasurementsToStore = async (
     nextKeys: string[],
     nextMeasurements: Record<string, number>,
     garmentLabel?: string
@@ -360,7 +359,7 @@ export function ClientsScreen({
         ...(garmentLabel ? { garmentType: garmentLabel } : {}),
       });
     } else {
-      const created = addSnapshot({
+      const created = await addSnapshot({
         clientId: selectedClientProfile.id,
         date: new Date().toLocaleDateString('en-GB', {
           day: '2-digit',
@@ -371,6 +370,7 @@ export function ClientsScreen({
         garmentType: garmentLabel || selectedTemplateName || 'Bespoke wedding gown',
         measurements: filteredObj,
       });
+      if(!created)return;
       setActiveSnapshotId(created.id);
     }
   };
@@ -540,37 +540,41 @@ export function ClientsScreen({
     });
   }, [getClientOrders, selectedClientProfile?.id, currencySymbol]);
 
+  const profileEditId=useRef<string|null>(null);
   // Open Edit Profile modal prefilled with current client
-  const handleOpenEditProfile = (mode: 'edit' | 'create' | 'switch' = 'edit') => {
+  const handleOpenEditProfile = (mode: 'edit' | 'create' | 'switch' = 'edit', clientId?:string) => {
+    const profile=clientId?clients.find(c=>c.id===clientId):selectedClientProfile;
+    profileEditId.current=profile?.id||null;
     setIsOverflowMenuOpen(false);
-    if (mode === 'create' || !selectedClientProfile) {
+    if (mode === 'create' || !profile) {
       setEditName('');
       setEditPhone('');
       setEditEmail('');
       setEditNotes('');
       setEditProfileMode(mode === 'switch' ? 'switch' : 'create');
     } else {
-      setEditName(selectedClientProfile.name);
-      setEditPhone(selectedClientProfile.phone);
-      setEditEmail(selectedClientProfile.email);
-      setEditNotes(selectedClientProfile.notes);
+      setEditName(profile.name);
+      setEditPhone(profile.phone);
+      setEditEmail(profile.email);
+      setEditNotes(profile.notes);
       setEditProfileMode(mode);
     }
     setIsEditProfileModalOpen(true);
   };
 
-  const handleSaveProfileModal = (e: React.FormEvent) => {
+  const handleSaveProfileModal = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedName = editName.trim();
     if (!trimmedName) return;
 
-    if (editProfileMode === 'create' || !selectedClientProfile) {
-      const created = addClient({
+    if (editProfileMode === 'create' || !profileEditId.current) {
+      const created = await addClient({
         name: trimmedName,
         phone: editPhone.trim(),
         email: editEmail.trim(),
         notes: editNotes.trim(),
       });
+      if(!created)return;
       setSelectedClientId(created.id);
       showToast({
         type: 'success',
@@ -579,12 +583,13 @@ export function ClientsScreen({
         duration: 3000,
       });
     } else {
-      updateClient(selectedClientProfile.id, {
+      const updated = await updateClient(profileEditId.current, {
         name: trimmedName,
         phone: editPhone.trim(),
         email: editEmail.trim(),
         notes: editNotes.trim(),
       });
+      if(!updated)return;
       showToast({
         type: 'success',
         title: 'Profile Updated',
@@ -595,10 +600,10 @@ export function ClientsScreen({
     setIsEditProfileModalOpen(false);
   };
 
-  const handleConfirmDeleteClient = () => {
+  const handleConfirmDeleteClient = async () => {
     if (!selectedClientProfile) return;
     const name = selectedClientProfile.name;
-    deleteClient(selectedClientProfile.id);
+    if(!await deleteClient(selectedClientProfile.id))return;
     setIsDeleteConfirmOpen(false);
     showToast({
       type: 'success',
@@ -609,7 +614,7 @@ export function ClientsScreen({
   };
 
   // Create Order from Use Measurement Flow (Desktop Frame 3 / Mobile Frame 1)
-  const handleCreateOrderFromUseFlow = () => {
+  const handleCreateOrderFromUseFlow = async () => {
     if (!selectedClientProfile) return;
     const raw = parseFloat(useFlowPrice.replace(/[^0-9.]/g, ''));
     const parsedPrice = isNaN(raw) ? 0 : raw;
@@ -622,7 +627,7 @@ export function ClientsScreen({
           }))
         : [];
 
-    addOrder({
+    const savedOrder=await addOrder({
       clientId: selectedClientProfile.id,
       garmentType: activeSnapshot?.garmentType || 'Gown/ Dress',
       measurementSnapshotId: activeSnapshot?.id,
@@ -633,6 +638,7 @@ export function ClientsScreen({
       pickupDateTime: parseDueDateToISO(useFlowDueDate),
     });
 
+    if(!savedOrder)return;
     setUseFlowImages([]);
     setUseFlowPrice('');
     setUseFlowDueDate('');
@@ -647,42 +653,10 @@ export function ClientsScreen({
   };
 
   // Save Order from Inline New Order Workspace (Desktop Frame 5 / Mobile Frame 2)
-  const handleSaveInlineNewOrder = () => {
-    let targetClientId = selectedClientProfile?.id;
-    const typedName = newOrderClientName.trim();
-    if (
-      typedName &&
-      (!selectedClientProfile ||
-        typedName.toLowerCase() !== selectedClientProfile.name.toLowerCase())
-    ) {
-      const existing = clients.find(
-        (c) => c.name.toLowerCase() === typedName.toLowerCase()
-      );
-      if (existing) {
-        targetClientId = existing.id;
-      } else {
-        const created = addClient({
-          name: typedName,
-          phone: newOrderPhone.trim(),
-          email: newOrderEmail.trim(),
-          notes: newOrderNotes.trim(),
-        });
-        targetClientId = created.id;
-        setSelectedClientId(created.id);
-      }
-    }
-
-    if (!targetClientId) {
-      const created = addClient({
-        name: typedName || 'New Client',
-        phone: newOrderPhone.trim(),
-        email: newOrderEmail.trim(),
-        notes: newOrderNotes.trim(),
-      });
-      targetClientId = created.id;
-      setSelectedClientId(created.id);
-    }
-
+  const inlineRequest=useRef('');
+  const handleSaveInlineNewOrder = async () => {
+    const typedName=newOrderClientName.trim();
+    const selected=selectedClientProfile && (!typedName||typedName===selectedClientProfile.name)?selectedClientProfile:undefined;
     const raw = parseFloat(newOrderPrice.replace(/[^0-9.]/g, ''));
     const parsedPrice = isNaN(raw) ? 0 : raw;
     const refImgs =
@@ -703,30 +677,14 @@ export function ClientsScreen({
       }
     });
 
-    const createdSnapshot = addSnapshot({
-      clientId: targetClientId,
-      date: new Date().toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      }),
-      unit: unitLabel,
-      garmentType: newOrderGarmentType.trim() || selectedTemplateName || 'Gown/ Dress',
-      measurements: filteredMeasurements,
-      notes: newOrderNotes.trim(),
+    const saved=await saveIntake({
+      requestId:inlineRequest.current||(inlineRequest.current=crypto.randomUUID()),
+      client:selected||{name:typedName||'New Client',phone:newOrderPhone.trim(),email:newOrderEmail.trim(),notes:newOrderNotes.trim()},
+      snapshot:{date:new Date().toISOString().slice(0,10),unit:unitLabel,garmentType:newOrderGarmentType.trim()||selectedTemplateName||'Gown/ Dress',measurements:filteredMeasurements,notes:newOrderNotes.trim()},
+      order:{garmentType:newOrderGarmentType.trim()||'Gown/ Dress',referenceImages:refImgs,price:parsedPrice,notes:newOrderNotes.trim(),status:'In Progress',pickupDateTime:parseDueDateToISO(newOrderDueDate)}
     });
-    setActiveSnapshotId(createdSnapshot.id);
-
-    addOrder({
-      clientId: targetClientId,
-      garmentType: newOrderGarmentType.trim() || 'Gown/ Dress',
-      measurementSnapshotId: createdSnapshot.id,
-      referenceImages: refImgs,
-      price: parsedPrice,
-      notes: newOrderNotes.trim() || 'Bespoke order created in workspace.',
-      status: 'In Progress',
-      pickupDateTime: parseDueDateToISO(newOrderDueDate),
-    });
+    if(!saved)return;
+    inlineRequest.current='';setSelectedClientId(saved.clientId);setActiveSnapshotId(saved.snapshotId||'');
 
     setNewOrderClientName('');
     setNewOrderGarmentType('');
@@ -750,7 +708,7 @@ export function ClientsScreen({
     <div className="w-full max-w-[1216px] mx-auto mt-3 lg:mt-4 px-3 sm:px-4 xl:px-0 pb-24 lg:pb-12 text-[var(--text)]">
       {/* Accessible Landmark Heading (A11, A16) */}
       <h1 className="sr-only">Client Management &amp; Measurements Atelier</h1>
-      {!selectedClientProfile ? (
+      {!selectedClientProfile && showingOrder ? (<OrderWorkspace key={orderId||'new'} orderId={orderId} clientId={orderClientId} onBack={()=>onOrderBack?.()} onSaved={(id,cid)=>onOrderSaved?.(id,cid)} onEditClient={id=>handleOpenEditProfile('edit',id)}/>) : !selectedClientProfile ? (
         <div className="w-full bg-[var(--surface)] p-8 sm:p-14 rounded-[12px] border border-[var(--outline)] flex flex-col items-center justify-center text-center gap-4 shadow-xs">
           <div className="w-16 h-16 rounded-full bg-[var(--chip)] border border-[var(--outline)] flex items-center justify-center text-[var(--text-2)]">
             <Users className="w-8 h-8 text-[var(--text-strong)]" />
@@ -851,11 +809,7 @@ export function ClientsScreen({
               type="button"
               onClick={() => {
                 setIsOverflowMenuOpen(false);
-                setViewState((prev) =>
-                  prev === 'Inline_NewOrder'
-                    ? 'SavedMeasurements_Default'
-                    : 'Inline_NewOrder'
-                );
+                onNewOrder?.(selectedClientProfile.id);
               }}
               className={cn(
                 'flex-1 sm:flex-initial h-9 px-4 rounded-[24px] border text-[12px] font-medium transition-colors flex items-center justify-center cursor-pointer',
@@ -867,53 +821,10 @@ export function ClientsScreen({
               New order
             </button>
 
-            <button
-              type="button"
-              aria-label="Client profile actions"
-              aria-haspopup="menu"
-              aria-expanded={isOverflowMenuOpen}
-              onClick={() => setIsOverflowMenuOpen((prev) => !prev)}
-              className="w-9 h-9 rounded-full bg-[var(--chip)] hover:bg-[#E8E8E8] flex items-center justify-center text-[var(--text-2)] hover:text-[var(--text)] transition-colors shrink-0 cursor-pointer"
-            >
-              <MoreVertical className="w-4 h-4" />
-            </button>
-
-            {/* Overflow Menu Popover (Desktop Frame 2 & Mobile Frame 4) */}
-            <AnimatePresence>
-              {isOverflowMenuOpen && (
-                <motion.div
-                  role="menu"
-                  aria-label="Client profile actions"
-                  initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                  transition={springSmooth}
-                  className="absolute right-0 top-[calc(100%+6px)] z-40 w-[148px] bg-[var(--surface)] border border-[var(--outline)] rounded-[8px] p-1 shadow-[0_8px_24px_rgba(0,0,0,0.08)] flex flex-col gap-0.5"
-                >
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => handleOpenEditProfile('edit')}
-                    className="w-full px-2.5 py-2 rounded-[6px] bg-[var(--card)] hover:bg-[#EFEFEF] flex items-center gap-2 text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--text)] transition-colors text-left cursor-pointer"
-                  >
-                    <Pencil className="w-3.5 h-3.5 shrink-0" />
-                    <span>Edit Profile</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setIsOverflowMenuOpen(false);
-                      setIsDeleteConfirmOpen(true);
-                    }}
-                    className="w-full px-2.5 py-2 rounded-[6px] hover:bg-[var(--card)] flex items-center gap-2 text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--paused)] transition-colors text-left cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 shrink-0" />
-                    <span>Delete</span>
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <ChoiceMenu kind="menu" iconOnly placeholder="Client profile actions"
+              options={[{value:'edit',label:'Edit profile'},{value:'delete',label:'Delete client',destructive:true}]}
+              onChoose={value=>value==='edit'?handleOpenEditProfile('edit'):setIsDeleteConfirmOpen(true)}
+            />
           </div>
         </div>
 
@@ -940,7 +851,7 @@ export function ClientsScreen({
                     viewState === 'SavedMeasurements_Default' ||
                     viewState === 'SavedMeasurements_UseFlow'
                   }
-                  onClick={() => setViewState('SavedMeasurements_Default')}
+                  onClick={() => {if(showingOrder&&onOrderBack?.()===false)return;setViewState('SavedMeasurements_Default');}}
                   className={cn(
                     'pb-2.5 text-[12px] sm:text-[13px] transition-colors relative cursor-pointer',
                     viewState === 'SavedMeasurements_Default' ||
@@ -964,7 +875,7 @@ export function ClientsScreen({
                   id="clients-order-history-tab"
                   role="tab"
                   aria-selected={viewState === 'OrderHistory_Grid'}
-                  onClick={() => setViewState('OrderHistory_Grid')}
+                  onClick={() => {if(showingOrder&&onOrderBack?.()===false)return;setViewState('OrderHistory_Grid');}}
                   className={cn(
                     'pb-2.5 text-[12px] sm:text-[13px] transition-colors relative cursor-pointer',
                     viewState === 'OrderHistory_Grid'
@@ -987,73 +898,14 @@ export function ClientsScreen({
                   VIEW STATE 1: `SavedMeasurements_Default`
                   (Desktop Frames 1 & 2, Mobile Frames 3 & 4)
                   ============================================================= */}
-              {viewState === 'SavedMeasurements_Default' && (
+              {!showingOrder && viewState === 'SavedMeasurements_Default' && (
                 <div className="flex flex-col gap-4 pt-1">
                   {/* Snapshot Selector Pill + Metadata Header + Use Measurement CTA */}
                   <div
                     ref={snapshotDropdownRef}
                     className="flex flex-col gap-3 relative"
                   >
-                    {/* Snapshot Selector Dropdown Pill */}
-                    <div
-                      id="client-snapshot-selector"
-                      className="relative w-[300px] max-w-full"
-                    >
-                      <button
-                        type="button"
-                        disabled={clientSnapshots.length === 0}
-                        aria-haspopup="listbox"
-                        aria-expanded={isSnapshotDropdownOpen}
-                        onClick={() => {
-                          if (clientSnapshots.length > 0) {
-                            setIsSnapshotDropdownOpen((prev) => !prev);
-                          }
-                        }}
-                        className={cn(
-                          'w-full h-8 px-3.5 rounded-[24px] bg-[var(--surface)] border border-[var(--outline)] flex items-center justify-between gap-2 text-[12px] text-[var(--text-2)] transition-colors',
-                          clientSnapshots.length > 0
-                            ? 'hover:border-[var(--muted)] cursor-pointer'
-                            : 'opacity-60 cursor-default'
-                        )}
-                      >
-                        <span className="truncate">
-                          {clientSnapshots.length > 0 && activeSnapshot
-                            ? `${activeSnapshot.garmentType}. ${activeSnapshot.date}`
-                            : 'No saved measurements'}
-                        </span>
-                        <ChevronDown className="w-3.5 h-3.5 text-[var(--text-2)] shrink-0" />
-                      </button>
-
-                      {/* Mobile Dropdown Menu (anchors directly below selector pill on mobile as in Mobile Frame 4) */}
-                      <AnimatePresence>
-                        {isSnapshotDropdownOpen && clientSnapshots.length > 0 && (
-                          <motion.div
-                            role="listbox"
-                            initial={{ opacity: 0, y: -4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -4 }}
-                            transition={springSmooth}
-                            className="sm:hidden absolute left-0 top-[calc(100%+4px)] w-full bg-[var(--surface)] border border-[var(--outline)] rounded-[8px] p-1 shadow-[0_8px_24px_rgba(0,0,0,0.06)] z-30 flex flex-col gap-0.5"
-                          >
-                            {otherSnapshots.map((snap, idx) => (
-                              <button
-                                key={snap.id}
-                                type="button"
-                                role="option"
-                                aria-selected={snap.id === activeSnapshot?.id}
-                                onClick={() => handleSelectSnapshot(snap.id)}
-                                className={cn(
-                                  'w-full px-3 py-2 rounded-[6px] text-left text-[12px] text-[var(--text-2)] hover:bg-[var(--card)] hover:text-[var(--text)] transition-colors cursor-pointer',
-                                  idx === 0 && 'bg-[var(--card)]'
-                                )}
-                              >
-                                {snap.garmentType}. {snap.date}
-                              </button>
-                            ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
+                    <ChoiceMenu className="w-[300px] max-w-full" label="Saved fitting" placeholder="No saved measurements" disabled={!clientSnapshots.length} value={activeSnapshot?.id||''} options={clientSnapshots.map(s=>({value:s.id,label:`${s.garmentType} · ${s.date}`}))} onChoose={handleSelectSnapshot}/>
 
                     {/* Snapshot Title + Subtitle + CTA Pill Button */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative">
@@ -1073,35 +925,7 @@ export function ClientsScreen({
                             : `No measurement snapshots recorded for ${selectedClientProfile.name} yet.`}
                         </p>
 
-                        {/* Desktop Dropdown Menu (positioned right below the title as in Desktop Frame 2) */}
-                        <AnimatePresence>
-                          {isSnapshotDropdownOpen && clientSnapshots.length > 0 && (
-                            <motion.div
-                              role="listbox"
-                              initial={{ opacity: 0, y: -4 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -4 }}
-                              transition={springSmooth}
-                              className="hidden sm:flex absolute left-0 top-[26px] w-[260px] bg-[var(--surface)] border border-[var(--outline)] rounded-[8px] p-1 shadow-[0_8px_24px_rgba(0,0,0,0.06)] z-30 flex-col gap-0.5"
-                            >
-                              {otherSnapshots.map((snap, idx) => (
-                                <button
-                                  key={snap.id}
-                                  type="button"
-                                  role="option"
-                                  aria-selected={snap.id === activeSnapshot?.id}
-                                  onClick={() => handleSelectSnapshot(snap.id)}
-                                  className={cn(
-                                    'w-full px-3 py-2 rounded-[6px] text-left text-[12px] text-[var(--text-2)] hover:bg-[var(--card)] hover:text-[var(--text)] transition-colors cursor-pointer',
-                                    idx === 0 && 'bg-[var(--card)]'
-                                  )}
-                                >
-                                  {snap.garmentType}. {snap.date}
-                                </button>
-                              ))}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+
                       </div>
 
                       {clientSnapshots.length > 0 ? (
@@ -1228,67 +1052,19 @@ export function ClientsScreen({
                   VIEW STATE 2: `SavedMeasurements_UseFlow`
                   (Desktop Frame 3, Mobile Frame 1)
                   ============================================================= */}
-              {viewState === 'SavedMeasurements_UseFlow' && (
+              {!showingOrder && viewState === 'SavedMeasurements_UseFlow' && (
                 <div className="flex flex-col gap-3.5 pt-0.5">
                   {/* Back Link */}
                   <button
                     type="button"
-                    onClick={() => setViewState('SavedMeasurements_Default')}
+                    onClick={() => {if(showingOrder&&onOrderBack?.()===false)return;setViewState('SavedMeasurements_Default');}}
                     className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--text)] transition-colors w-fit cursor-pointer"
                   >
                     <CornerUpLeft className="w-3.5 h-3.5" />
                     <span>Back</span>
                   </button>
 
-                  {/* Snapshot Selector Dropdown Pill */}
-                  <div
-                    ref={snapshotDropdownRef}
-                    className="relative w-[260px] max-w-full"
-                  >
-                    <button
-                      type="button"
-                      aria-haspopup="listbox"
-                      aria-expanded={isSnapshotDropdownOpen}
-                      onClick={() => setIsSnapshotDropdownOpen((prev) => !prev)}
-                      className="w-full h-8 px-3.5 rounded-[24px] bg-[var(--surface)] border border-[var(--outline)] flex items-center justify-between gap-2 text-[12px] text-[var(--text-2)] hover:border-[var(--muted)] transition-colors cursor-pointer"
-                    >
-                      <span className="truncate">
-                        {activeSnapshot
-                          ? `${activeSnapshot.garmentType}. ${activeSnapshot.date}`
-                          : 'Bespoke wedding gown. 25/10/2026'}
-                      </span>
-                      <ChevronDown className="w-3.5 h-3.5 text-[var(--text-2)] shrink-0" />
-                    </button>
-
-                    <AnimatePresence>
-                      {isSnapshotDropdownOpen && (
-                        <motion.div
-                          role="listbox"
-                          initial={{ opacity: 0, y: -4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -4 }}
-                          transition={springSmooth}
-                          className="absolute left-0 top-[calc(100%+4px)] w-full bg-[var(--surface)] border border-[var(--outline)] rounded-[8px] p-1 shadow-[0_8px_24px_rgba(0,0,0,0.06)] z-30 flex flex-col gap-0.5"
-                        >
-                          {otherSnapshots.map((snap, idx) => (
-                            <button
-                              key={snap.id}
-                              type="button"
-                              role="option"
-                              aria-selected={snap.id === activeSnapshot?.id}
-                              onClick={() => handleSelectSnapshot(snap.id)}
-                              className={cn(
-                                'w-full px-3 py-2 rounded-[6px] text-left text-[12px] text-[var(--text-2)] hover:bg-[var(--card)] hover:text-[var(--text)] transition-colors cursor-pointer',
-                                idx === 0 && 'bg-[var(--card)]'
-                              )}
-                            >
-                              {snap.garmentType}. {snap.date}
-                            </button>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
+                  <ChoiceMenu className="w-[300px] max-w-full" label="Saved fitting" placeholder="No saved measurements" value={activeSnapshot?.id||''} options={clientSnapshots.map(s=>({value:s.id,label:`${s.garmentType} · ${s.date}`}))} onChoose={handleSelectSnapshot}/>
 
                   {/* 2-Column Split wrapped in white surface frame for crisp seam separation */}
                   <div className="bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col lg:flex-row gap-[2px] items-stretch">
@@ -1499,7 +1275,8 @@ export function ClientsScreen({
                   VIEW STATE 3: `OrderHistory_Grid`
                   (Desktop Frame 4: 4-Column Order Card Grid)
                   ============================================================= */}
-              {viewState === 'OrderHistory_Grid' && (
+              {showingOrder&&<OrderWorkspace key={orderId||`new:${orderClientId||'choose'}`} orderId={orderId} clientId={orderClientId} onBack={()=>onOrderBack?.()} onSaved={(id,cid)=>onOrderSaved?.(id,cid)} onEditClient={id=>handleOpenEditProfile('edit',id)}/>}
+              {!showingOrder && viewState === 'OrderHistory_Grid' && (
                 <div className="pt-1">
                   {orderHistoryCards.length === 0 ? (
                     <div className="w-full bg-[var(--surface)] rounded-[12px] p-10 sm:p-14 border border-[var(--outline)] flex flex-col items-center justify-center text-center gap-3">
@@ -1614,7 +1391,7 @@ export function ClientsScreen({
             </div>
 
             {/* Bottom White Action Bar for `SavedMeasurements_UseFlow` (Desktop Frame 3 & Mobile Frame 1) */}
-            {viewState === 'SavedMeasurements_UseFlow' && (
+            {!showingOrder && viewState === 'SavedMeasurements_UseFlow' && (
               <div className="w-full bg-[var(--surface)] rounded-[6px] px-4 sm:px-6 py-3 flex items-center justify-end">
                 <motion.button
                   type="button"
@@ -1644,7 +1421,7 @@ export function ClientsScreen({
                   </h2>
                   <button
                     type="button"
-                    onClick={() => setViewState('SavedMeasurements_Default')}
+                    onClick={() => {if(showingOrder&&onOrderBack?.()===false)return;setViewState('SavedMeasurements_Default');}}
                     className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--text)] transition-colors cursor-pointer"
                   >
                     <CornerUpLeft className="w-3.5 h-3.5" />
@@ -1749,7 +1526,7 @@ export function ClientsScreen({
                             transition={springSmooth}
                             className="absolute left-0 top-[calc(100%+4px)] w-full bg-[var(--surface)] border border-[var(--outline)] rounded-[8px] p-1 shadow-[0_8px_24px_rgba(0,0,0,0.06)] z-30 flex flex-col gap-0.5"
                           >
-                            {clientSnapshots.map((snap, idx) => (
+                            {clientSnapshots.map((snap) => (
                               <button
                                 key={snap.id}
                                 type="button"
@@ -1766,8 +1543,7 @@ export function ClientsScreen({
                                   setIsNewOrderTemplateDropdownOpen(false);
                                 }}
                                 className={cn(
-                                  'w-full px-3 py-2 rounded-[6px] text-left text-[12px] text-[var(--text-2)] hover:bg-[var(--card)] hover:text-[var(--text)] transition-colors cursor-pointer',
-                                  idx === 0 && 'bg-[var(--card)]'
+                                  'w-full px-3 py-2 rounded-[6px] text-left text-[12px] text-[var(--text-2)] hover:bg-[var(--card)] hover:text-[var(--text)] transition-colors cursor-pointer'
                                 )}
                               >
                                 {snap.garmentType}. {snap.date}
@@ -2176,7 +1952,7 @@ export function ClientsScreen({
                             key={client.id}
                             type="button"
                             onClick={() => {
-                              setSelectedClientId(client.id);
+                              if(onOpenClient)onOpenClient(client.id);else setSelectedClientId(client.id);
                               setIsEditProfileModalOpen(false);
                             }}
                             className={cn(

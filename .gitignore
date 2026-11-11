@@ -1,5 +1,9 @@
 node_modules/
 .next/
+.next-landing/
+.next-cloud-test/
+.next-order-test/
+scripts/.test-invoices.mjs
 coverage/
 .DS_Store
 *.log

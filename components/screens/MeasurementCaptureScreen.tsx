@@ -120,7 +120,7 @@ export function MeasurementCaptureScreen() {
     setUnit(newUnit);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientId) {
       alert('Please select or specify a client');
@@ -128,23 +128,23 @@ export function MeasurementCaptureScreen() {
     }
 
     if (existingSnapshot) {
-      updateSnapshot(existingSnapshot.id, {
+      if(!await updateSnapshot(existingSnapshot.id, {
         clientId,
         date,
         unit,
         garmentType,
         measurements,
         notes,
-      });
+      }))return;
     } else {
-      addSnapshot({
+      if(!await addSnapshot({
         clientId,
         date,
         unit,
         garmentType,
         measurements,
         notes,
-      });
+      }))return;
     }
 
     if (clientId) {

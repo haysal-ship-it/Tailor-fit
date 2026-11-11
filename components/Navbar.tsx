@@ -29,7 +29,8 @@ export function OrigamiTailorFitLogo({ className = 'w-[44px] h-[31px]' }: { clas
 }
 
 export function Navbar() {
-  const { activeScreen, setActiveScreen } = useStore();
+  const { activeScreen, setActiveScreen: navigate } = useStore();
+  const setActiveScreen=(screen:string)=>{if(window.dispatchEvent(new Event('tailorfit:before-navigation',{cancelable:true})))navigate(screen);};
   const shouldReduceMotion = useReducedMotion();
 
   const isOverview =

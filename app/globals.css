@@ -47,6 +47,10 @@
   --page: #F2F2F2;
   --surface: #FFFFFF;
   --card: #F8F8F8;
+  --field-bg: var(--card);
+  --field-border: var(--outline);
+  --field-placeholder: var(--muted);
+  --field-focus: var(--primary);
   --chip: #F2F2F2;
   --outline: #DDDBDB;
   --dashed: #F2F2F2;
@@ -69,7 +73,7 @@
 
   /* Clients screen tokens */
   --track: #D9D8D8;
-  --field-on-card: #F1F1F1;
+  --field-on-card: var(--field-bg);
   --field-on-card-border: #EDEDED;
   --pill-urgent: #F06B05;
   --pill-pending: #A0B900;
@@ -137,3 +141,14 @@ html, body, button, input, select, textarea, a {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted);
 }
+
+/* Shared field colours; component-specific shape and sizing are preserved. */
+:root input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]):not([type="submit"]):not([type="button"]),
+:root textarea, :root select, :root button[data-field="true"] {
+  background-color: var(--field-bg); border-color: var(--field-border); color: var(--text); caret-color: var(--primary);
+}
+:root input::placeholder, :root textarea::placeholder { color: var(--field-placeholder); opacity: 1; }
+:root input:focus-visible, :root textarea:focus-visible, :root select:focus-visible, :root button[data-field="true"]:focus-visible {
+  border-color: var(--field-focus); outline: 2px solid var(--field-focus); outline-offset: 2px;
+}
+:root input[aria-invalid="true"], :root textarea[aria-invalid="true"] { border-color: var(--status-danger); }

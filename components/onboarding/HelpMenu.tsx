@@ -175,7 +175,7 @@ export function HelpMenu() {
 
             {/* Item 5: Product Landing Page */}
             <Link
-              href="/landing"
+              href="/"
               onClick={() => setIsOpen(false)}
               className="w-full flex items-center justify-between px-3 py-2 text-[13px] font-medium text-black rounded-[8px] hover:bg-neutral-100 transition-colors"
             >

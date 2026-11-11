@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { readBackup } from '@/lib/data/backup';
 import { useStore } from '@/lib/store';
 import {
   Save,
@@ -209,44 +210,16 @@ export function SettingsScreen() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handleRestoreFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const text = event.target?.result as string;
-        const parsed = JSON.parse(text);
-        const validation = validateBackupPayload(parsed);
-        if (!validation.isValid || !validation.data || !validation.counts) {
-          addToast({
-            type: 'error',
-            message: validation.error || 'The backup file is corrupt or invalid.',
-          });
-          return;
-        }
-
-        setRestoreCandidate({
-          data: validation.data,
-          counts: validation.counts,
-        });
-        setShowRestoreConfirm(true);
-      } catch (err) {
-        addToast({
-          type: 'error',
-          message: 'Failed to read JSON backup file. Please ensure it is valid JSON.',
-        });
-      } finally {
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      }
-    };
-    reader.readAsText(file);
+  const handleRestoreFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file=e.target.files?.[0];if(!file)return;
+    try{const data=await readBackup(file);setRestoreCandidate({data,counts:{clients:data.clients.length,orders:data.orders.length,snapshots:data.snapshots.length}});setShowRestoreConfirm(true);}
+    catch(error){addToast({type:'error',message:error instanceof Error?error.message:'Could not read this backup.'});}
+    finally{if(fileInputRef.current)fileInputRef.current.value='';}
   };
 
-  const handleConfirmRestore = () => {
+  const handleConfirmRestore = async () => {
     if (!restoreCandidate) return;
-    const ok = restoreBackupData(restoreCandidate.data);
+    const ok = await restoreBackupData(restoreCandidate.data);
     if (ok) {
       addToast({
         type: 'velocity',
@@ -291,11 +264,12 @@ export function SettingsScreen() {
     else if (selectedCurrency.includes('Euro') || selectedCurrency.includes('€')) sym = '€';
     else if (selectedCurrency.includes('Pound') || selectedCurrency.includes('£')) sym = '£';
 
-    updateSettings({
+    const saved=await updateSettings({
       defaultUnit: unit,
       currency: sym,
     });
 
+    if(!saved){setSaveStatus('idle');return;}
     setSaveStatus('success');
     addToast({
       type: 'velocity',
@@ -327,7 +301,7 @@ export function SettingsScreen() {
   };
 
   // Add Template submission
-  const handleCreateTemplate = (e: React.FormEvent) => {
+  const handleCreateTemplate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTemplateName.trim()) {
       setTemplateFormError('Please enter a template name.');
@@ -345,7 +319,7 @@ export function SettingsScreen() {
       fieldKeys: selectedFieldKeys,
     };
 
-    addTemplate(created);
+    if(!await addTemplate(created))return;
 
     setNewTemplateName('');
     setNewTemplateDesc('');
@@ -359,8 +333,8 @@ export function SettingsScreen() {
   };
 
   // Delete Template handler with Undo support
-  const handleDeleteTemplate = (tmpl: GarmentTemplate) => {
-    deleteTemplate(tmpl.id);
+  const handleDeleteTemplate = async (tmpl: GarmentTemplate) => {
+    if(!await deleteTemplate(tmpl.id))return;
     setDeletedTemplateUndo(tmpl);
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     undoTimerRef.current = setTimeout(() => {
@@ -368,9 +342,9 @@ export function SettingsScreen() {
     }, 5000);
   };
 
-  const handleUndoDeleteTemplate = () => {
+  const handleUndoDeleteTemplate = async () => {
     if (!deletedTemplateUndo) return;
-    addTemplate(deletedTemplateUndo);
+    if(!await addTemplate(deletedTemplateUndo))return;
     setDeletedTemplateUndo(null);
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
   };
@@ -1144,7 +1118,7 @@ export function SettingsScreen() {
               </div>
 
               <p className="text-[13px] text-[var(--text-2)] leading-relaxed">
-                This will permanently remove <strong>{clients.length} clients</strong>, <strong>{snapshots.length} snapshots</strong>, and <strong>{orders.length} orders</strong> stored on this device.
+                This will permanently remove <strong>{clients.length} clients</strong>, <strong>{snapshots.length} snapshots</strong>, and <strong>{orders.length} orders</strong> saved in your online workspace.
               </p>
 
               <div className="pt-2 flex justify-end gap-2">
@@ -1157,8 +1131,8 @@ export function SettingsScreen() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    clearAllData();
+                  onClick={async () => {
+                    if(!await clearAllData())return;
                     setShowClearConfirm(false);
                     addToast({
                       type: 'velocity',
@@ -1221,8 +1195,8 @@ export function SettingsScreen() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    resetToDemoData();
+                  onClick={async () => {
+                    if(!await resetToDemoData())return;
                     setShowDemoConfirm(false);
                     addToast({
                       type: 'velocity',

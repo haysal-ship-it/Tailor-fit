@@ -51,7 +51,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
     orders,
     settings,
     allHotspots,
-    addClient,
+    saveIntake,
     addOrder,
     updateOrder,
     addSnapshot,
@@ -121,37 +121,11 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
     };
   }, []);
 
-  // Client resolution
-  const clientId = initialClientId || existingOrder?.clientId || clients[0]?.id || null;
+  // Legacy container resolves only the explicitly supplied client.
+  const clientId = existingOrder?.clientId || initialClientId || null;
   const activeClient = useMemo(() => {
-    if (!clientId) {
-      if (clients.length > 0) {
-        return {
-          id: clients[0].id,
-          name: clients[0].name,
-          phone: clients[0].phone || '—',
-          email: clients[0].email || '—',
-        };
-      }
-      return null;
-    }
-    const found = clients.find((c) => c.id === clientId);
-    if (found) {
-      return {
-        id: found.id,
-        name: found.name,
-        phone: found.phone || '—',
-        email: found.email || '—',
-      };
-    }
-    return clients[0]
-      ? {
-          id: clients[0].id,
-          name: clients[0].name,
-          phone: clients[0].phone || '—',
-          email: clients[0].email || '—',
-        }
-      : null;
+    const found = clients.find(c => c.id === clientId);
+    return found ? {id: found.id, name: found.name, phone: found.phone || 'Not provided', email: found.email || 'Not provided'} : null;
   }, [clients, clientId]);
 
   const [newClientName, setNewClientName] = useState('');
@@ -577,7 +551,8 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
   };
 
   // Submit order (Create or Update)
-  const handleCreateOrder = (e: React.FormEvent) => {
+  const orderRequest=useRef('');
+  const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
 
     let hasError = false;
@@ -606,7 +581,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
 
     setSaveStatus('loading');
 
-    setTimeout(() => {
+    {
       // Price parsing with strict non-negative validation (A03)
       let rawPrice = 0;
       const trimmedPrice = price.trim();
@@ -628,80 +603,23 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
         ? ''
         : selectedSavedTemplateId;
 
-      let resolvedClientId = activeClient?.id;
-      if (!resolvedClientId) {
-        const nameToUse = newClientName.trim() || 'New Client';
-        const created = addClient({
-          name: nameToUse,
-          phone: newClientPhone.trim(),
-          email: newClientEmail.trim(),
-          notes: 'Created via Order Sheet',
-        });
-        resolvedClientId = created.id;
-      }
-
-      if (hasDiagramEdited || !snapshotIdToUse) {
-        if (existingOrder?.measurementSnapshotId && snapshotIdToUse) {
-          updateSnapshot(existingOrder.measurementSnapshotId, {
-            measurements: measurementObj,
-            garmentType: garmentType.trim() || 'Bespoke Order',
-          });
-          snapshotIdToUse = existingOrder.measurementSnapshotId;
-        } else {
-          const createdSnapshot = addSnapshot({
-            clientId: resolvedClientId,
-            date: new Date()
-              .toLocaleDateString('en-GB', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-              })
-              .replace(/\//g, '-'),
-            garmentType: garmentType.trim() || 'Bespoke Order',
-            unit: unitLabel,
-            measurements: measurementObj,
-            notes: notes || 'Taken from Order diagram',
-            mannequinGender,
-          });
-          snapshotIdToUse = createdSnapshot.id;
-        }
-      }
-
-      const isoDueDate = dueDate.trim() ? parseDueDateToISO(dueDate) : '';
-
-      if (existingOrder) {
-        updateOrder(existingOrder.id, {
-          garmentType: garmentType.trim() || 'Bespoke Order',
-          measurementSnapshotId: snapshotIdToUse || undefined,
-          price: rawPrice,
-          currency: existingOrder.currency || currencySymbol,
-          status: orderStatus,
-          pickupDateTime: isoDueDate,
-          notes,
-          referenceImages,
-        });
-        setSaveStatus('success');
-        setCreatedToastMessage('Order updated');
-      } else {
-        addOrder({
-          clientId: resolvedClientId,
-          garmentType: garmentType.trim() || 'Bespoke Order',
-          measurementSnapshotId: snapshotIdToUse || undefined,
-          price: rawPrice,
-          currency: currencySymbol,
-          status: orderStatus,
-          pickupDateTime: isoDueDate,
-          notes,
-          referenceImages,
-        });
-        setSaveStatus('success');
-        setCreatedToastMessage('Order created');
-      }
+      const result=await saveIntake({
+        requestId:orderRequest.current || (orderRequest.current=crypto.randomUUID()),
+        client:activeClient||{name:newClientName.trim()||'New Client',phone:newClientPhone.trim(),email:newClientEmail.trim(),notes:'Created via Order Sheet'},
+        snapshot:hasDiagramEdited||!snapshotIdToUse?{
+          id:existingOrder?.measurementSnapshotId&&snapshotIdToUse?existingOrder.measurementSnapshotId:undefined,
+          date:new Date().toISOString().slice(0,10),unit:unitLabel,garmentType:garmentType.trim(),measurements:measurementObj,notes,mannequinGender
+        }:undefined,
+        order:{...existingOrder,garmentType:garmentType.trim(),measurementSnapshotId:snapshotIdToUse||undefined,price:rawPrice,currency:existingOrder?.currency||currencySymbol,status:orderStatus,pickupDateTime:dueDate.trim()?parseDueDateToISO(dueDate):'',notes,referenceImages}
+      });
+      if(!result){setSaveStatus('idle');return;}
+      orderRequest.current='';
+      setSaveStatus('success');setCreatedToastMessage(existingOrder?'Order updated':'Order created');
 
       setTimeout(() => {
         onClose();
       }, 650);
-    }, 450);
+    }
   };
 
   // Shared Mannequin 3D Rotatable Diagram component

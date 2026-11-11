@@ -19,7 +19,7 @@ export function AuthLayout({ title, children }: AuthLayoutProps) {
           <div className="w-full max-w-[450px] flex flex-col items-center gap-8 my-auto">
             {/* Header: Logo & Title */}
             <div className="flex flex-col items-center gap-4 text-center">
-              <Link href="/landing" className="group cursor-pointer" aria-label="TailorFit Home">
+              <Link href="/" className="group cursor-pointer" aria-label="TailorFit Home">
                 <div className="h-[38.5px] w-[55px] relative overflow-hidden transition-transform group-hover:scale-105">
                   <Image
                     src="/assets/auth/logo-icon.png"
@@ -47,13 +47,13 @@ export function AuthLayout({ title, children }: AuthLayoutProps) {
           {/* Legal Links Footer */}
           <div className="flex items-center gap-4 pt-6 mt-4 text-[#595959] text-[14px]">
             <Link
-              href="/landing#faq"
+              href="/terms"
               className="border-b border-[#595959] pb-[1px] hover:text-black transition-colors"
             >
               Terms
             </Link>
             <Link
-              href="/landing#faq"
+              href="/privacy"
               className="border-b border-[#595959] pb-[1px] hover:text-black transition-colors"
             >
               Privacy Policy

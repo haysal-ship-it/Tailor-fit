@@ -71,8 +71,8 @@ export function ClientProfileScreen({
     );
   }
 
-  const saveNotes = () => {
-    updateClient(client.id, { notes: notesDraft });
+  const saveNotes = async () => {
+    if(!await updateClient(client.id, { notes: notesDraft }))return;
     setIsEditingNotes(false);
   };
 

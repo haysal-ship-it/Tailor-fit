@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useStore } from '@/lib/store';
+import { useDraft } from '@/lib/drafts/use-draft';
+import { useAccount } from '@/components/auth/AccountProvider';
 import {
   PersonStanding,
   ClipboardList,
@@ -50,10 +52,7 @@ interface OverviewScreenProps {
 
 export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
   const {
-    addClient,
-    updateClient,
-    addOrder,
-    addSnapshot,
+    saveIntake,
     orders,
     clients,
     settings,
@@ -151,6 +150,14 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
 
   // Measurements state: single source of truth for both diagram points and list view
   const [measurements, setMeasurements] = useState<Record<string, number>>({});
+
+  const account = useAccount();
+  const draft = useDraft('overview-intake', {clientName,clientGarment,clientPhone,clientEmail,clientPrice,clientDueDate,clientNotes,styleImages,gender,centerView,selectedTemplateId,selectedTemplateName,activePointKeys,measurements,selectedClientId}, d=>{
+    setClientName(String(d.clientName||''));setClientGarment(String(d.clientGarment||''));setClientPhone(String(d.clientPhone||''));setClientEmail(String(d.clientEmail||''));setClientPrice(String(d.clientPrice||''));setClientDueDate(String(d.clientDueDate||''));setClientNotes(String(d.clientNotes||''));
+    setStyleImages((d.styleImages||[]) as string[]);setGender(d.gender==='male'?'male':'female');setCenterView(d.centerView==='table'?'table':'mannequin');
+    setSelectedTemplateId(String(d.selectedTemplateId||''));setSelectedTemplateName(String(d.selectedTemplateName||''));setActivePointKeys((d.activePointKeys||[]) as string[]);setMeasurements((d.measurements||{}) as Record<string,number>);
+    if(typeof d.selectedClientId==='string')setSelectedClientId(d.selectedClientId);
+  }, !!(clientName||clientGarment||clientPhone||clientEmail||clientPrice||clientDueDate||clientNotes||styleImages.length||activePointKeys.length));
 
   // Undo toast when a field is removed
   const [undoToast, setUndoToast] = useState<{
@@ -523,6 +530,8 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
   };
 
   const handleSaveOrder = async () => {
+    if(!draft.loaded || !account.requireAccount()) throw new Error("Sign in to save your work.");
+    await draft.flush().catch(()=>{});
     const trimmedName = clientName.trim();
     const trimmedPhone = clientPhone.trim();
     const trimmedEmail = clientEmail.trim();
@@ -573,67 +582,17 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
 
     setClientFormErrors({});
 
-    // Reconcile client identity explicitly by selectedClientId (A04)
-    let targetClientId: string;
-    let isExistingClient = false;
-
-    if (selectedClientId && getClientById(selectedClientId)) {
-      updateClient(selectedClientId, {
-        name: trimmedName,
-        phone: trimmedPhone,
-        email: trimmedEmail,
-        notes: clientNotes.trim(),
-      });
-      targetClientId = selectedClientId;
-      isExistingClient = true;
-    } else {
-      const newCl = addClient({
-        name: trimmedName,
-        phone: trimmedPhone,
-        email: trimmedEmail,
-        notes: clientNotes.trim(),
-      });
-      targetClientId = newCl.id;
-    }
-
-    const activeMeasurementsOnly: Record<string, number> = {};
-    activePointKeys.forEach((k) => {
-      if (measurements[k] !== undefined) {
-        activeMeasurementsOnly[k] = measurements[k];
-      }
+    const isExistingClient = !!(selectedClientId && getClientById(selectedClientId));
+    const activeMeasurementsOnly = Object.fromEntries(activePointKeys.filter(k=>measurements[k]!==undefined).map(k=>[k,measurements[k]]));
+    const saved=await saveIntake({
+      requestId:draft.getId(),
+      client:{...(isExistingClient?getClientById(selectedClientId!):{}),name:trimmedName,phone:trimmedPhone,email:trimmedEmail,notes:clientNotes.trim()},
+      snapshot:{date:new Date().toISOString().slice(0,10),unit:unitLabel,garmentType:trimmedGarment,measurements:activeMeasurementsOnly,notes:clientNotes,mannequinGender:gender},
+      order:{garmentType:trimmedGarment,status:'In Progress',pickupDateTime:parseDueDateToISO(clientDueDate),price:priceNum,currency:currencySymbol,referenceImages:styleImages.map((url,i)=>({id:`ref-${i}`,url,title:`Style Ref ${i+1}`})),notes:clientNotes}
     });
-
-    const snapshot = addSnapshot({
-      clientId: targetClientId,
-      date: new Date()
-        .toLocaleDateString('en-GB', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-        })
-        .replace(/\//g, '-'),
-      unit: unitLabel,
-      garmentType: trimmedGarment,
-      measurements: activeMeasurementsOnly,
-      notes: clientNotes,
-      mannequinGender: gender,
-    });
-
-    addOrder({
-      clientId: targetClientId,
-      garmentType: trimmedGarment,
-      measurementSnapshotId: snapshot.id,
-      status: 'In Progress',
-      pickupDateTime: parseDueDateToISO(clientDueDate),
-      price: priceNum,
-      currency: currencySymbol,
-      referenceImages: styleImages.map((url, i) => ({
-        id: `ref-${Date.now()}-${i}`,
-        url,
-        title: `Style Ref ${i + 1}`,
-      })),
-      notes: clientNotes,
-    });
+    if(!saved)throw new Error('Not saved. Review the message above and retry.');
+    const targetClientId=saved.clientId;
+    await draft.discard();
 
     // Reset intake form fields cleanly after save
     setClientName('');
@@ -936,6 +895,8 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
 
         {/* Section 4: Notes */}
         <div className="bg-[var(--surface)] p-2.5 flex flex-col gap-1 rounded-[6px]">
+      {draft.warning&&<p role="alert" className="text-sm text-red-700">{draft.warning}</p>}
+      <div className="mb-3 flex flex-wrap items-center gap-3 text-sm text-[var(--text-muted)]"><span>{account.user?'Unsaved changes stay on this device until you save online.':'Unfinished drafts stay on this device for 24 hours.'}</span><button type="button" className="min-h-11 underline" onClick={async()=>{await draft.discard();setClientName('');setClientGarment('');setClientPhone('');setClientEmail('');setClientPrice('');setClientDueDate('');setClientNotes('');setStyleImages([]);setActivePointKeys([]);setMeasurements({});setSelectedClientId(null);}}>Discard draft</button></div>
           <h3 className="text-[14px] font-semibold text-[var(--text)]">Notes</h3>
           <div className="pt-0.5">
             <Textarea

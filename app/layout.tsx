@@ -1,6 +1,7 @@
 import type {Metadata, Viewport} from 'next';
 import {Manrope} from 'next/font/google';
 import './globals.css';
+import { AccountProvider } from '@/components/auth/AccountProvider';
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -35,7 +36,7 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="en" className={manrope.variable}>
       <body className="font-sans antialiased bg-[var(--page)] text-[var(--text)] min-h-screen selection:bg-[var(--primary)]/15 selection:text-[var(--primary)]">
-        {children}
+        <AccountProvider>{children}</AccountProvider>
       </body>
     </html>
   );
