@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import { useAccount } from "@/components/auth/AccountProvider";
-import { WorkspaceAccountBar } from "@/components/auth/WorkspaceAccountBar";
 import { StoreProvider, useStore } from "@/lib/store";
 import { TourProvider } from "@/components/onboarding/TourProvider";
 import { Navbar } from "@/components/Navbar";
@@ -169,7 +168,6 @@ function TailorFitApp() {
 
       {/* Navigation Header & Mobile Dock */}
       <Navbar />
-      <WorkspaceAccountBar />
 
       {/* Main Content Area */}
       <main id="main-content" className="flex-1 w-full">

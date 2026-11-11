@@ -895,8 +895,6 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
 
         {/* Section 4: Notes */}
         <div className="bg-[var(--surface)] p-2.5 flex flex-col gap-1 rounded-[6px]">
-      {draft.warning&&<p role="alert" className="text-sm text-red-700">{draft.warning}</p>}
-      <div className="mb-3 flex flex-wrap items-center gap-3 text-sm text-[var(--text-muted)]"><span>{account.user?'Unsaved changes stay on this device until you save online.':'Unfinished drafts stay on this device for 24 hours.'}</span><button type="button" className="min-h-11 underline" onClick={async()=>{await draft.discard();setClientName('');setClientGarment('');setClientPhone('');setClientEmail('');setClientPrice('');setClientDueDate('');setClientNotes('');setStyleImages([]);setActivePointKeys([]);setMeasurements({});setSelectedClientId(null);}}>Discard draft</button></div>
           <h3 className="text-[14px] font-semibold text-[var(--text)]">Notes</h3>
           <div className="pt-0.5">
             <Textarea
@@ -1152,7 +1150,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
                   </button>
                 </div>
 
-                <div className="w-full bg-[var(--card)] border border-[var(--card)] hover:bg-[#F1F1F1] hover:border-[#EDEDED] focus-within:!border-[var(--primary)] focus-within:ring-2 focus-within:ring-[rgba(29,73,232,0.15)] rounded-[8px] p-[2px] transition-all flex items-center">
+                <div className="w-full h-10 bg-[#F8F8F8] border border-[#EDEDED] rounded-[8px] px-3 flex items-center transition-colors focus-within:border-[#1D49E8] focus-within:ring-1 focus-within:ring-[#1D49E8]">
                   <input
                     ref={(el) => {
                       inputRefs.current[field.id] = el;
@@ -1166,9 +1164,9 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
                     onKeyDown={(e) =>
                       handleInputKeyDown(e, idx, visibleListFields.length)
                     }
-                    className="w-full bg-transparent px-2 py-1 text-[12px] font-normal text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
+                    className="w-full bg-transparent p-0 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none tabular-nums"
                   />
-                  <span className="pr-2 text-[12px] font-medium text-black select-none shrink-0">
+                  <span className="pl-2 text-[12px] font-semibold text-[#727272] select-none shrink-0 uppercase">
                     {unitLabel}
                   </span>
                 </div>
@@ -1497,22 +1495,6 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  aria-label={`Delete ${tmpl.name}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteTemplate(tmpl.id);
-                    if (dialogSelectedTemplateId === tmpl.id) {
-                      const remaining = storeTemplates.filter((t) => t.id !== tmpl.id);
-                      setDialogSelectedTemplateId(remaining[0]?.id || '');
-                    }
-                  }}
-                  title={`Delete ${tmpl.name}`}
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-[var(--paused)] hover:bg-white transition-colors cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
                 <div
                   className={cn(
                     'w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors',
@@ -1617,7 +1599,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
           <label className="block text-[11px] font-semibold text-[var(--text)] mb-1">
             Measurement Size ({unitLabel.toUpperCase()})
           </label>
-          <div className="w-full bg-[var(--card)] border border-[#EDEDED] focus-within:!border-[var(--primary)] focus-within:ring-2 focus-within:ring-[rgba(29,73,232,0.15)] rounded-[8px] p-[2px] transition-all flex items-center">
+          <div className="w-full h-11 bg-[#F8F8F8] border border-[#EDEDED] rounded-[8px] px-3 flex items-center transition-colors focus-within:border-[#1D49E8] focus-within:ring-1 focus-within:ring-[#1D49E8]">
             <input
               type="text"
               inputMode="decimal"
@@ -1628,9 +1610,9 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
                 setPointModalData({ ...pointModalData, value: e.target.value });
               }}
               autoFocus
-              className="w-full bg-transparent px-2.5 py-2 text-[14px] font-semibold text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
+              className="w-full bg-transparent p-0 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none tabular-nums"
             />
-            <span className="pr-3 text-[12px] font-semibold text-[var(--text-2)] select-none shrink-0">
+            <span className="pl-2 text-[12px] font-semibold text-[#727272] select-none shrink-0 uppercase">
               {unitLabel}
             </span>
           </div>

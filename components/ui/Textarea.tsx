@@ -39,10 +39,10 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
               : undefined
           }
           className={cn(
-            'w-full rounded-[8px] p-[8px] bg-[var(--card)] border border-[var(--card)] text-[12px] font-normal text-[var(--text)] placeholder:text-[var(--muted)] transition-all resize-none',
-            'focus:outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[rgba(29,73,232,0.15)]',
-            error && 'border-[var(--status-danger)] focus:border-[var(--status-danger)] focus:ring-[rgba(242,72,89,0.2)]',
-            disabled && 'opacity-30 cursor-not-allowed',
+            'w-full rounded-[8px] p-3 bg-[#F8F8F8] border border-[#EDEDED] text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] transition-colors resize-none',
+            'focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8]',
+            error && 'border-[var(--status-danger)] focus:border-[var(--status-danger)] focus:ring-[var(--status-danger)]',
+            disabled && 'opacity-40 cursor-not-allowed',
             className
           )}
           {...props}

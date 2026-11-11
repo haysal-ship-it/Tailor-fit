@@ -21,6 +21,7 @@ import {
   Users,
   Ruler,
   Package,
+  ArrowLeft,
 } from 'lucide-react';
 import { ToastContainer, type ToastMessage } from '@/components/ui/Toasts';
 import { AnimatedNumberMorph } from '@/components/ui/AnimatedNumberMorph';
@@ -273,15 +274,23 @@ export function ClientsScreen({
     });
   }, [clients, orders]);
 
-  const activeClientId = orderClientId || selectedClientId || (showingOrder?null:allClientList[0]?.id) || null;
+  const activeClientId = orderClientId || selectedClientId || null;
   const selectedClientProfile = useMemo(() => {
-    if (allClientList.length === 0) return null;
-    return (
-      allClientList.find((c) => c.id === activeClientId) ||
-      (showingOrder||selectedClientId?null:allClientList[0]) ||
-      null
+    if (allClientList.length === 0 || !activeClientId) return null;
+    return allClientList.find((c) => c.id === activeClientId) || null;
+  }, [allClientList, activeClientId]);
+
+  const filteredDirectoryClients = useMemo(() => {
+    const q = directorySearch.trim().toLowerCase();
+    if (!q) return allClientList;
+    return allClientList.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.phone.toLowerCase().includes(q) ||
+        c.email.toLowerCase().includes(q) ||
+        c.notes.toLowerCase().includes(q)
     );
-  }, [allClientList, activeClientId, showingOrder, selectedClientId]);
+  }, [allClientList, directorySearch]);
 
   // Client's saved snapshots from store
   const clientSnapshots = useMemo(() => {
@@ -708,7 +717,7 @@ export function ClientsScreen({
     <div className="w-full max-w-[1216px] mx-auto mt-3 lg:mt-4 px-3 sm:px-4 xl:px-0 pb-24 lg:pb-12 text-[var(--text)]">
       {/* Accessible Landmark Heading (A11, A16) */}
       <h1 className="sr-only">Client Management &amp; Measurements Atelier</h1>
-      {!selectedClientProfile && showingOrder ? (<OrderWorkspace key={orderId||'new'} orderId={orderId} clientId={orderClientId} onBack={()=>onOrderBack?.()} onSaved={(id,cid)=>onOrderSaved?.(id,cid)} onEditClient={id=>handleOpenEditProfile('edit',id)}/>) : !selectedClientProfile ? (
+      {!selectedClientProfile && showingOrder ? (<OrderWorkspace key={orderId||'new'} orderId={orderId} clientId={orderClientId} onBack={()=>onOrderBack?.()} onSaved={(id,cid)=>onOrderSaved?.(id,cid)} onEditClient={id=>handleOpenEditProfile('edit',id)}/>) : !selectedClientProfile && allClientList.length === 0 ? (
         <div className="w-full bg-[var(--surface)] p-8 sm:p-14 rounded-[12px] border border-[var(--outline)] flex flex-col items-center justify-center text-center gap-4 shadow-xs">
           <div className="w-16 h-16 rounded-full bg-[var(--chip)] border border-[var(--outline)] flex items-center justify-center text-[var(--text-2)]">
             <Users className="w-8 h-8 text-[var(--text-strong)]" />
@@ -748,6 +757,119 @@ export function ClientsScreen({
             </button>
           </div>
         </div>
+      ) : !selectedClientProfile ? (
+        /* ===================================================================
+           CLIENT DIRECTORY VIEW (Default landing view for Clients tab)
+           =================================================================== */
+        <div className="w-full bg-[var(--surface)] p-4 sm:p-6 rounded-[12px] border border-[var(--outline)] flex flex-col gap-5 shadow-xs">
+          {/* Header Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--hairline)]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center font-bold">
+                <Users className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-[20px] sm:text-[22px] font-bold text-[var(--text)]">Client Directory</h2>
+                  <span className="px-2.5 py-0.5 rounded-full bg-[var(--chip)] text-[12px] font-semibold text-[var(--text-2)] tabular-nums">
+                    {allClientList.length}
+                  </span>
+                </div>
+                <p className="text-[13px] text-[var(--muted)]">Select a client to view bespoke fittings, measurements, and order history.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleOpenEditProfile('create')}
+              className="h-10 px-5 rounded-[24px] bg-[var(--primary)] text-white text-[13px] font-semibold hover:bg-[var(--primary)]/90 transition-colors shadow-xs cursor-pointer flex items-center gap-2 self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Client</span>
+            </button>
+          </div>
+
+          {/* Search Bar */}
+          <div className="w-full flex items-center gap-2.5 bg-[#F8F8F8] border border-[#EDEDED] rounded-[8px] px-3.5 h-11 transition-colors focus-within:border-[#1D49E8] focus-within:ring-1 focus-within:ring-[#1D49E8]">
+            <Search className="w-4 h-4 text-[#8E8E8E] shrink-0" />
+            <input
+              type="text"
+              value={directorySearch}
+              onChange={(e) => setDirectorySearch(e.target.value)}
+              placeholder="Search directory by name, phone, or email..."
+              className="w-full bg-transparent p-0 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none"
+            />
+            {directorySearch && (
+              <button
+                type="button"
+                onClick={() => setDirectorySearch('')}
+                className="text-[#8E8E8E] hover:text-[#1D1D1D] transition-colors p-1 cursor-pointer"
+                title="Clear search"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Clients Cards Grid */}
+          {filteredDirectoryClients.length === 0 ? (
+            <div className="py-12 text-center flex flex-col items-center justify-center gap-2">
+              <p className="text-[14px] text-[var(--muted)]">
+                No clients match &ldquo;{directorySearch}&rdquo;
+              </p>
+              <button
+                type="button"
+                onClick={() => setDirectorySearch('')}
+                className="text-[13px] text-[var(--primary)] font-medium hover:underline cursor-pointer"
+              >
+                Clear search
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1">
+              {filteredDirectoryClients.map((client) => (
+                <div
+                  key={client.id}
+                  onClick={() => setSelectedClientId(client.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedClientId(client.id);
+                    }
+                  }}
+                  className="group bg-white rounded-[16px] border border-[#EDEDED] p-4 flex flex-col justify-between gap-4 hover:border-[#1D49E8] hover:shadow-md transition-all cursor-pointer text-left"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-full bg-[#1D1D1D] text-white flex items-center justify-center font-bold text-[14px] shrink-0 group-hover:scale-105 transition-transform">
+                        {client.initials}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-[15px] font-bold text-[#1D1D1D] truncate group-hover:text-[#1D49E8] transition-colors">
+                          {client.name}
+                        </h3>
+                        <span className="text-[12px] text-[#727272] block truncate">
+                          {client.phone || client.email || 'No contact details'}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full bg-[#F5F5F5] border border-[#EDEDED] text-[11px] font-semibold text-[#1D1D1D] shrink-0 tabular-nums">
+                      {client.totalOrdersCount} {client.totalOrdersCount === 1 ? 'order' : 'orders'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-[#F5F5F5] text-[12px] text-[#727272]">
+                    <span className="truncate">{client.email || '—'}</span>
+                    <span className="font-semibold text-[#1D49E8] shrink-0 group-hover:translate-x-0.5 transition-transform">
+                      View profile →
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       ) : (
       /* =====================================================================
           OUTER SHELL CONTAINER (2px white frame, rounded-[8px], gap-[2px])
@@ -762,6 +884,15 @@ export function ClientsScreen({
             id="clients-roster"
             className="flex items-center gap-3.5 sm:gap-4 min-w-0"
           >
+            <button
+              type="button"
+              onClick={() => setSelectedClientId(null)}
+              className="h-8 px-2.5 sm:px-3 rounded-full bg-[var(--chip)] hover:bg-[#EAEAEA] text-[12px] font-semibold text-[var(--text-2)] hover:text-[var(--text)] flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              title="Back to client directory"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Directory</span>
+            </button>
             {/* 64px Dark Charcoal Initials Circle (#595959) */}
             <button
               type="button"
@@ -1446,7 +1577,7 @@ export function ClientsScreen({
                           value={newOrderClientName}
                           onChange={(e) => setNewOrderClientName(e.target.value)}
                           placeholder="e.g. Adriana Kunle"
-                          className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-2.5 text-[11px] sm:text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[var(--primary)]"
+                          className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors"
                         />
                       </div>
 
@@ -1461,7 +1592,7 @@ export function ClientsScreen({
                             setNewOrderGarmentType(e.target.value)
                           }
                           placeholder="Bespoke African Gown"
-                          className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-2.5 text-[11px] sm:text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[var(--primary)]"
+                          className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors"
                         />
                       </div>
 
@@ -1474,7 +1605,7 @@ export function ClientsScreen({
                           value={newOrderPhone}
                           onChange={(e) => setNewOrderPhone(e.target.value)}
                           placeholder="+234 -"
-                          className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-2.5 text-[11px] sm:text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[var(--primary)] tabular-nums"
+                          className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors tabular-nums"
                         />
                       </div>
 
@@ -1487,7 +1618,7 @@ export function ClientsScreen({
                           value={newOrderEmail}
                           onChange={(e) => setNewOrderEmail(e.target.value)}
                           placeholder="name@example.com"
-                          className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-2.5 text-[11px] sm:text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[var(--primary)]"
+                          className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors"
                         />
                       </div>
                     </div>
@@ -1583,7 +1714,7 @@ export function ClientsScreen({
                           value={newOrderPrice}
                           onChange={(e) => setNewOrderPrice(e.target.value)}
                           placeholder={`${currencySymbol}0.00`}
-                          className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-2.5 text-[11px] sm:text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[var(--primary)] tabular-nums"
+                          className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors tabular-nums"
                         />
                       </div>
 
@@ -1596,7 +1727,7 @@ export function ClientsScreen({
                           value={newOrderDueDate}
                           onChange={(e) => setNewOrderDueDate(e.target.value)}
                           placeholder="09/10/2026"
-                          className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-2.5 text-[11px] sm:text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[var(--primary)] tabular-nums"
+                          className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors tabular-nums"
                         />
                       </div>
                     </div>
@@ -1614,7 +1745,7 @@ export function ClientsScreen({
                       value={newOrderNotes}
                       onChange={(e) => setNewOrderNotes(e.target.value)}
                       placeholder="e.g. hand-stitched, monogram design on wrist and gold buttons"
-                      className="w-full min-h-[96px] rounded-[8px] bg-[var(--field-on-card)] p-2.5 text-[11px] sm:text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] resize-none focus:outline-none border border-transparent focus:border-[var(--primary)]"
+                      className="w-full min-h-[96px] rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] p-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] resize-none focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors"
                     />
                   </div>
                 </div>
@@ -1764,7 +1895,7 @@ export function ClientsScreen({
                             <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                        <div className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 flex items-center">
+                        <div className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 flex items-center transition-colors focus-within:border-[#1D49E8] focus-within:ring-1 focus-within:ring-[#1D49E8]">
                           <input
                             type="text"
                             inputMode="decimal"
@@ -1774,7 +1905,7 @@ export function ClientsScreen({
                               handleFieldValueChange(field.id, e.target.value)
                             }
                             placeholder="0.0"
-                            className="w-full bg-transparent text-[12px] font-medium text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
+                            className="w-full bg-transparent p-0 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none tabular-nums"
                           />
                         </div>
                       </div>
@@ -1999,7 +2130,7 @@ export function ClientsScreen({
                       onChange={(e) => setEditName(e.target.value)}
                       placeholder="Client full name"
                       required
-                      className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 text-[12px] text-[var(--text)] focus:outline-none border border-transparent focus:border-[var(--primary)]"
+                      className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors"
                     />
                   </div>
                   <div>
@@ -2011,7 +2142,7 @@ export function ClientsScreen({
                       value={editPhone}
                       onChange={(e) => setEditPhone(e.target.value)}
                       placeholder="+234 800 000 0000"
-                      className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 text-[12px] text-[var(--text)] focus:outline-none border border-transparent focus:border-[var(--primary)] tabular-nums"
+                      className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors tabular-nums"
                     />
                   </div>
                   <div>
@@ -2023,7 +2154,7 @@ export function ClientsScreen({
                       value={editEmail}
                       onChange={(e) => setEditEmail(e.target.value)}
                       placeholder="client@example.com"
-                      className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 text-[12px] text-[var(--text)] focus:outline-none border border-transparent focus:border-[var(--primary)]"
+                      className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors"
                     />
                   </div>
                   <div>
@@ -2034,7 +2165,7 @@ export function ClientsScreen({
                       value={editNotes}
                       onChange={(e) => setEditNotes(e.target.value)}
                       placeholder="Fit preferences, fabric notes..."
-                      className="w-full min-h-[80px] rounded-[8px] bg-[var(--field-on-card)] p-3 text-[12px] text-[var(--text)] resize-none focus:outline-none border border-transparent focus:border-[var(--primary)]"
+                      className="w-full min-h-[80px] rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] p-3 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] resize-none focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors"
                     />
                   </div>
                   <div className="flex items-center justify-end gap-2 pt-2">
@@ -2183,24 +2314,6 @@ export function ClientsScreen({
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteTemplate(tmpl.id);
-                            if (dialogSelectedTemplateId === tmpl.id) {
-                              const rem = storeTemplates.filter(
-                                (t) => t.id !== tmpl.id
-                              );
-                              setDialogSelectedTemplateId(rem[0]?.id || '');
-                            }
-                          }}
-                          title={`Delete ${tmpl.name}`}
-                          aria-label={`Delete ${tmpl.name}`}
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-[var(--paused)] hover:bg-[var(--surface)] transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
                         <div
                           className={cn(
                             'w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors',
@@ -2380,7 +2493,7 @@ export function ClientsScreen({
                   <label className="block text-[11px] font-semibold text-[var(--text)] mb-1">
                     Measurement Size ({unitLabel.toUpperCase()})
                   </label>
-                  <div className="w-full bg-[var(--card)] border border-[var(--hairline)] rounded-[8px] p-2 flex items-center">
+                  <div className="w-full h-11 bg-[#F8F8F8] border border-[#EDEDED] rounded-[8px] px-3 flex items-center transition-colors focus-within:border-[#1D49E8] focus-within:ring-1 focus-within:ring-[#1D49E8]">
                     <input
                       type="text"
                       inputMode="decimal"
@@ -2394,9 +2507,9 @@ export function ClientsScreen({
                         });
                       }}
                       autoFocus
-                      className="w-full bg-transparent text-[14px] font-semibold text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
+                      className="w-full bg-transparent p-0 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none tabular-nums"
                     />
-                    <span className="pr-1 text-[12px] font-semibold text-[var(--text-2)] select-none shrink-0">
+                    <span className="pl-2 text-[12px] font-semibold text-[#727272] select-none shrink-0 uppercase">
                       {unitLabel}
                     </span>
                   </div>

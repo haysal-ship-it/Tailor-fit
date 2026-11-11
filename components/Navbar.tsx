@@ -1,12 +1,12 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useStore } from '@/lib/store';
+import { useAccount } from '@/components/auth/AccountProvider';
 import { House, UsersRound, Settings } from 'lucide-react';
 import { springSnappy } from '@/lib/motion-tokens';
-import { NotificationDropdown } from '@/components/ui/NotificationDropdown';
-import { HelpMenu } from '@/components/onboarding/HelpMenu';
 import { cn } from '@/lib/utils';
 
 export function OrigamiTailorFitLogo({ className = 'w-[44px] h-[31px]' }: { className?: string }) {
@@ -29,8 +29,9 @@ export function OrigamiTailorFitLogo({ className = 'w-[44px] h-[31px]' }: { clas
 }
 
 export function Navbar() {
-  const { activeScreen, setActiveScreen: navigate } = useStore();
+  const { activeScreen, setActiveScreen: navigate, setSelectedClientId } = useStore();
   const setActiveScreen=(screen:string)=>{if(window.dispatchEvent(new Event('tailorfit:before-navigation',{cancelable:true})))navigate(screen);};
+  const { user, signOut } = useAccount();
   const shouldReduceMotion = useReducedMotion();
 
   const isOverview =
@@ -40,6 +41,13 @@ export function Navbar() {
     activeScreen === 'edit-measurement';
   const isClients = activeScreen === 'clients' || activeScreen === 'client-profile';
   const isSettings = activeScreen === 'settings';
+
+  const handleNavClick = (id: string) => {
+    if (id === 'clients') {
+      setSelectedClientId(null);
+    }
+    setActiveScreen(id as any);
+  };
 
   const navItems = [
     {
@@ -98,7 +106,7 @@ export function Navbar() {
                   id={`nav-pill-${item.id}`}
                   data-tour={item.id === 'clients' ? 'nav-clients' : undefined}
                   aria-current={item.isActive ? 'page' : undefined}
-                  onClick={() => setActiveScreen(item.id as any)}
+                  onClick={() => handleNavClick(item.id)}
                   className={cn(
                     'relative z-10 flex items-center gap-1 text-[12px] px-3 py-2 rounded-[28px] transition-colors cursor-pointer',
                     item.isActive
@@ -119,10 +127,32 @@ export function Navbar() {
               ))}
             </nav>
 
-            {/* Right: Help & Notification */}
+            {/* Right: Auth Action Buttons */}
             <div className="flex items-center gap-1.5 sm:gap-2">
-              <HelpMenu />
-              <NotificationDropdown />
+              {user ? (
+                <button
+                  type="button"
+                  onClick={() => void signOut()}
+                  className="h-9 px-4 rounded-full border border-neutral-300 bg-white text-[13px] font-medium text-[#1D1D1D] hover:bg-neutral-100 transition-colors shadow-xs cursor-pointer"
+                >
+                  Log out
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/signin"
+                    className="h-9 px-3 flex items-center text-[13px] font-medium text-[#1D1D1D] hover:text-black transition-colors"
+                  >
+                    Log in
+                  </Link>
+                  <Link
+                    href="/signup"
+                    className="h-9 px-4 flex items-center rounded-full bg-black text-white text-[13px] font-medium hover:bg-neutral-800 transition-colors shadow-xs"
+                  >
+                    Sign up
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </header>
@@ -140,7 +170,7 @@ export function Navbar() {
               type="button"
               data-tour={item.id === 'clients' ? 'nav-clients' : undefined}
               aria-current={item.isActive ? 'page' : undefined}
-              onClick={() => setActiveScreen(item.id as any)}
+              onClick={() => handleNavClick(item.id)}
               className={cn(
                 'relative z-10 flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-[28px] text-[12px] transition-colors cursor-pointer',
                 item.isActive
