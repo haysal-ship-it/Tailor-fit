@@ -2,19 +2,13 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { readBackup } from '@/lib/data/backup';
 import { useStore } from '@/lib/store';
 import {
   Save,
   X,
   Trash2,
   Check,
-  Download,
-  Sparkles,
-  RotateCcw,
   Info,
-  AlertTriangle,
-  Upload,
 } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
@@ -27,25 +21,17 @@ import {
   resolveCanonicalKey,
 } from '@/lib/initial-data';
 import { GarmentTemplate } from '@/types';
-import { validateBackupPayload, type BackupPayload } from '@/lib/backup';
 import { useTour } from '@/components/onboarding/TourProvider';
 import { ContextualTip } from '@/components/onboarding/ContextualTip';
 import { Play, HelpCircle } from 'lucide-react';
 
 export function SettingsScreen() {
   const {
-    clients,
-    snapshots,
-    orders,
     settings,
     allHotspots,
     updateSettings,
     addTemplate,
     deleteTemplate,
-    clearAllData,
-    resetToDemoData,
-    exportDataJson,
-    restoreBackupData,
   } = useStore();
 
   // Initial values from store
@@ -165,14 +151,6 @@ export function SettingsScreen() {
   // Modals & Confirmation Dialogs
   const [showAddTemplateModal, setShowAddTemplateModal] = useState(false);
   const [showAddMeasurementModal, setShowAddMeasurementModal] = useState(false);
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [showDemoConfirm, setShowDemoConfirm] = useState(false);
-  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
-  const [restoreCandidate, setRestoreCandidate] = useState<{
-    data: BackupPayload;
-    counts: { clients: number; orders: number; snapshots: number };
-  } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Add Template Modal Form State
   const [newTemplateName, setNewTemplateName] = useState('');
@@ -200,35 +178,12 @@ export function SettingsScreen() {
       if (e.key === 'Escape') {
         setShowAddTemplateModal(false);
         setShowAddMeasurementModal(false);
-        setShowClearConfirm(false);
-        setShowDemoConfirm(false);
-        setShowRestoreConfirm(false);
-        setRestoreCandidate(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handleRestoreFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file=e.target.files?.[0];if(!file)return;
-    try{const data=await readBackup(file);setRestoreCandidate({data,counts:{clients:data.clients.length,orders:data.orders.length,snapshots:data.snapshots.length}});setShowRestoreConfirm(true);}
-    catch(error){addToast({type:'error',message:error instanceof Error?error.message:'Could not read this backup.'});}
-    finally{if(fileInputRef.current)fileInputRef.current.value='';}
-  };
-
-  const handleConfirmRestore = async () => {
-    if (!restoreCandidate) return;
-    const ok = await restoreBackupData(restoreCandidate.data);
-    if (ok) {
-      addToast({
-        type: 'velocity',
-        message: `Restored ${restoreCandidate.counts.clients} clients, ${restoreCandidate.counts.orders} orders, and ${restoreCandidate.counts.snapshots} snapshots.`,
-      });
-      setShowRestoreConfirm(false);
-      setRestoreCandidate(null);
-    }
-  };
 
   useEffect(() => {
     return () => {
@@ -364,7 +319,7 @@ export function SettingsScreen() {
               Settings
             </h1>
             <p className="text-[13px] sm:text-[14px] text-[var(--muted)] mt-1">
-              Manage measurement defaults, templates and workspace data.
+              Manage measurement defaults, currency standards, and garment templates.
             </p>
           </div>
 
@@ -687,147 +642,6 @@ export function SettingsScreen() {
           </section>
 
           {/* ===============================================================
-              SECTION 4: Atelier Data Management
-              - Delete Workspace Data with safe confirmation
-              - Demo Data Load with safe confirmation
-              - Export Backup JSON
-              - Restore Backup JSON (A20)
-              =============================================================== */}
-          <section
-            id="settings-data"
-            className="w-full bg-[#F8F8F8] p-5 sm:p-6 flex flex-col"
-          >
-            <div className="mb-5">
-              <h2 className="text-[16px] font-semibold text-black leading-tight">
-                Atelier Data Management
-              </h2>
-            </div>
-
-            {/* Hidden JSON file input for backup restore (A20) */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json,application/json"
-              className="hidden"
-              onChange={handleRestoreFileSelect}
-            />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
-              {/* Card 1: Delete Workspace Data */}
-              <div className="bg-white rounded-[8px] p-4 flex flex-col justify-between border border-[#EDEDED] hover:border-[#DCDCDC] transition-colors shadow-2xs">
-                <div>
-                  <div className="w-8 h-8 rounded-full bg-[#FFF1F1] flex items-center justify-center text-[#E53E3E] mb-2.5">
-                    <Trash2 className="w-4 h-4 stroke-[2]" />
-                  </div>
-                  <h3 className="text-[14px] font-semibold text-black leading-tight mb-1">
-                    Delete Workspace Data
-                  </h3>
-                  <p className="text-[12px] text-[var(--text-2)] leading-relaxed mb-3">
-                    Purge all clients, measurement snapshots, and studio orders to work with an empty workspace.
-                  </p>
-                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#F5F5F5] text-[11px] font-medium text-[var(--muted)] mb-4">
-                    <span>{clients.length} clients</span>
-                    <span>•</span>
-                    <span>{orders.length} orders</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowClearConfirm(true)}
-                  className="h-9 px-4 rounded-[24px] bg-[#FFF5F5] border border-[#FFD6D6] text-[#E53E3E] text-[13px] font-medium hover:bg-[#FFEBEB] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Delete All Data</span>
-                </button>
-              </div>
-
-              {/* Card 2: Load Demo Atelier Data */}
-              <div className="bg-white rounded-[8px] p-4 flex flex-col justify-between border border-[#EDEDED] hover:border-[#DCDCDC] transition-colors shadow-2xs">
-                <div>
-                  <div className="w-8 h-8 rounded-full bg-[#F0F5FF] flex items-center justify-center text-[var(--primary)] mb-2.5">
-                    <Sparkles className="w-4 h-4 stroke-[2]" />
-                  </div>
-                  <h3 className="text-[14px] font-semibold text-black leading-tight mb-1">
-                    Load Demo Atelier Data
-                  </h3>
-                  <p className="text-[12px] text-[var(--text-2)] leading-relaxed mb-3">
-                    Populate your atelier with sample clients (Chloe Dallas, etc.), measurements, snapshots, and active orders.
-                  </p>
-                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#F5F5F5] text-[11px] font-medium text-[var(--muted)] mb-4">
-                    <span>Curated demonstration dataset</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowDemoConfirm(true)}
-                  className="h-9 px-4 rounded-[24px] bg-[var(--primary)] text-white text-[13px] font-medium hover:bg-[var(--primary)]/90 transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Open Demo Workspace</span>
-                </button>
-              </div>
-
-              {/* Card 3: Export Atelier Backup */}
-              <div className="bg-white rounded-[8px] p-4 flex flex-col justify-between border border-[#EDEDED] hover:border-[#DCDCDC] transition-colors shadow-2xs">
-                <div>
-                  <div className="w-8 h-8 rounded-full bg-[#F4F4F6] flex items-center justify-center text-black mb-2.5">
-                    <Download className="w-4 h-4 stroke-[2]" />
-                  </div>
-                  <h3 className="text-[14px] font-semibold text-black leading-tight mb-1">
-                    Export Atelier Backup
-                  </h3>
-                  <p className="text-[12px] text-[var(--text-2)] leading-relaxed mb-3">
-                    Download a JSON file containing all client profiles, measurement records, and studio orders.
-                  </p>
-                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#F5F5F5] text-[11px] font-medium text-[var(--muted)] mb-4">
-                    <span>JSON backup export</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    exportDataJson();
-                    addToast({
-                      type: 'velocity',
-                      message: 'Atelier backup file exported.',
-                    });
-                  }}
-                  className="h-9 px-4 rounded-[24px] bg-[#F2F2F2] border border-[#DDDBDB] text-[var(--text-2)] text-[13px] font-medium hover:bg-[#EAEAEA] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Export JSON</span>
-                </button>
-              </div>
-
-              {/* Card 4: Restore Atelier Backup (A20) */}
-              <div className="bg-white rounded-[8px] p-4 flex flex-col justify-between border border-[#EDEDED] hover:border-[#DCDCDC] transition-colors shadow-2xs">
-                <div>
-                  <div className="w-8 h-8 rounded-full bg-[#EBF3FF] flex items-center justify-center text-[var(--primary)] mb-2.5">
-                    <Upload className="w-4 h-4 stroke-[2]" />
-                  </div>
-                  <h3 className="text-[14px] font-semibold text-black leading-tight mb-1">
-                    Restore Atelier Backup
-                  </h3>
-                  <p className="text-[12px] text-[var(--text-2)] leading-relaxed mb-3">
-                    Safely restore clients, measurements, and studio orders from a verified JSON backup file.
-                  </p>
-                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#F5F5F5] text-[11px] font-medium text-[var(--muted)] mb-4">
-                    <span>Validated restore workflow</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="h-9 px-4 rounded-[24px] bg-[#F2F2F2] border border-[#DDDBDB] text-[var(--text-2)] text-[13px] font-medium hover:bg-[#EAEAEA] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Restore Backup File</span>
-                </button>
-              </div>
-            </div>
-          </section>
-
-          {/* ===============================================================
               BOTTOM SAVE STRIP
               - Rectangular 8px Rounded Button matching Figma Screenshot
               - Floppy Disk Icon + "Save Changes"
@@ -1078,220 +892,6 @@ export function SettingsScreen() {
                   className="h-9 px-5 rounded-[24px] bg-[var(--primary)] text-white text-[13px] font-medium hover:bg-[var(--primary)]/90 cursor-pointer shadow-xs"
                 >
                   Got it
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* =====================================================================
-          CONFIRM CLEAR ALL DATA MODAL (A08 Protection)
-          ===================================================================== */}
-      <AnimatePresence>
-        {showClearConfirm && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="clear-confirm-title"
-            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[4px] flex items-center justify-center p-4"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              transition={springSnappy}
-              className="w-full max-w-[440px] rounded-[16px] bg-white border border-[var(--border)] p-6 shadow-2xl flex flex-col gap-4 select-none"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-[#FFF1F1] flex items-center justify-center text-[#E53E3E] shrink-0">
-                  <AlertTriangle className="w-5 h-5 stroke-[2]" />
-                </div>
-                <div>
-                  <h3 id="clear-confirm-title" className="text-[16px] font-bold text-black">
-                    Clear all atelier records?
-                  </h3>
-                  <p className="text-[12px] text-[var(--muted)]">
-                    Irreversible workspace reset
-                  </p>
-                </div>
-              </div>
-
-              <p className="text-[13px] text-[var(--text-2)] leading-relaxed">
-                This will permanently remove <strong>{clients.length} clients</strong>, <strong>{snapshots.length} snapshots</strong>, and <strong>{orders.length} orders</strong> saved in your online workspace.
-              </p>
-
-              <div className="pt-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowClearConfirm(false)}
-                  className="h-9 px-4 rounded-[24px] bg-[#F2F2F2] border border-[#DDDBDB] text-[var(--text-2)] text-[13px] font-medium hover:bg-[#EAEAEA] cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if(!await clearAllData())return;
-                    setShowClearConfirm(false);
-                    addToast({
-                      type: 'velocity',
-                      message: 'Atelier reset to clean slate (zero records).',
-                    });
-                  }}
-                  className="h-9 px-4 rounded-[24px] bg-[#E53E3E] text-white text-[13px] font-medium hover:bg-[#D32F2F] cursor-pointer shadow-xs"
-                >
-                  Clear All Data
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* =====================================================================
-          CONFIRM LOAD DEMO DATA MODAL (A08 Protection)
-          ===================================================================== */}
-      <AnimatePresence>
-        {showDemoConfirm && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="demo-confirm-title"
-            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[4px] flex items-center justify-center p-4"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              transition={springSnappy}
-              className="w-full max-w-[440px] rounded-[16px] bg-white border border-[var(--border)] p-6 shadow-2xl flex flex-col gap-4 select-none"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-[#F0F5FF] flex items-center justify-center text-[var(--primary)] shrink-0">
-                  <Sparkles className="w-5 h-5 stroke-[2]" />
-                </div>
-                <div>
-                  <h3 id="demo-confirm-title" className="text-[16px] font-bold text-black">
-                    Load demo atelier data?
-                  </h3>
-                  <p className="text-[12px] text-[var(--muted)]">
-                    Curated demonstration showcase
-                  </p>
-                </div>
-              </div>
-
-              <p className="text-[13px] text-[var(--text-2)] leading-relaxed">
-                This will populate sample client profiles (Chloe Dallas, Taylor Razaq), tailored fittings, snapshots, and studio orders.
-              </p>
-
-              <div className="pt-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowDemoConfirm(false)}
-                  className="h-9 px-4 rounded-[24px] bg-[#F2F2F2] border border-[#DDDBDB] text-[var(--text-2)] text-[13px] font-medium hover:bg-[#EAEAEA] cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if(!await resetToDemoData())return;
-                    setShowDemoConfirm(false);
-                    addToast({
-                      type: 'velocity',
-                      message: 'Demo atelier data loaded successfully.',
-                    });
-                  }}
-                  className="h-9 px-4 rounded-[24px] bg-[var(--primary)] text-white text-[13px] font-medium hover:bg-[var(--primary)]/90 cursor-pointer shadow-xs"
-                >
-                  Load Demo Data
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* =====================================================================
-          CONFIRM RESTORE BACKUP DATA MODAL (A20 Recovery Workflow)
-          ===================================================================== */}
-      <AnimatePresence>
-        {showRestoreConfirm && restoreCandidate && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="restore-confirm-title"
-            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[4px] flex items-center justify-center p-4"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              transition={springSnappy}
-              className="w-full max-w-[460px] rounded-[16px] bg-white border border-[var(--border)] p-6 shadow-2xl flex flex-col gap-4 select-none"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#F0F5FF] flex items-center justify-center text-[var(--primary)] shrink-0">
-                  <Upload className="w-5 h-5 stroke-[2]" />
-                </div>
-                <div>
-                  <h3 id="restore-confirm-title" className="text-[16px] font-bold text-black leading-tight">
-                    Restore Atelier Workspace
-                  </h3>
-                  <p className="text-[12px] text-[var(--text-2)] mt-0.5">
-                    Verified JSON backup ready for restoration
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-[#F8F9FA] rounded-[8px] p-3 border border-[#E9ECEF] flex flex-col gap-2">
-                <span className="text-[11px] font-semibold text-[var(--text-strong)] uppercase tracking-wider">
-                  Backup Contents:
-                </span>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="bg-white p-2.5 rounded-[6px] border border-[#EDEDED]">
-                    <div className="text-[16px] font-bold text-black tabular-nums">
-                      {restoreCandidate.counts.clients}
-                    </div>
-                    <div className="text-[10px] text-[var(--muted)]">Clients</div>
-                  </div>
-                  <div className="bg-white p-2.5 rounded-[6px] border border-[#EDEDED]">
-                    <div className="text-[16px] font-bold text-black tabular-nums">
-                      {restoreCandidate.counts.orders}
-                    </div>
-                    <div className="text-[10px] text-[var(--muted)]">Orders</div>
-                  </div>
-                  <div className="bg-white p-2.5 rounded-[6px] border border-[#EDEDED]">
-                    <div className="text-[16px] font-bold text-black tabular-nums">
-                      {restoreCandidate.counts.snapshots}
-                    </div>
-                    <div className="text-[10px] text-[var(--muted)]">Snapshots</div>
-                  </div>
-                </div>
-              </div>
-
-              <p className="text-[12px] text-[var(--text-2)] leading-relaxed">
-                Restoring will replace your current workspace records with this backup. An emergency rollback copy of your existing workspace is automatically preserved on this device.
-              </p>
-
-              <div className="pt-2 flex justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowRestoreConfirm(false);
-                    setRestoreCandidate(null);
-                  }}
-                  className="h-9 px-4 rounded-[24px] bg-[#F2F2F2] border border-[#DDDBDB] text-[var(--text-2)] text-[13px] font-medium hover:bg-[#EAEAEA] cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmRestore}
-                  className="h-9 px-5 rounded-[24px] bg-[var(--primary)] text-white text-[13px] font-medium hover:bg-[var(--primary)]/90 cursor-pointer shadow-xs"
-                >
-                  Restore Workspace
                 </button>
               </div>
             </motion.div>
