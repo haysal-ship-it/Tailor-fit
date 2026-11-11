@@ -804,14 +804,14 @@ export function ClientsScreen({
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-[8px] w-full lg:w-auto shrink-0">
               {/* Search Pill */}
-              <div className="bg-[#f1f1f1] border border-[#ededed] border-solid rounded-[32px] px-[12px] lg:px-[10px] py-[8px] flex items-center gap-[8px] w-full lg:w-[350px] transition-colors focus-within:border-[#1D49E8]">
+              <div className="bg-[#f1f1f1] border border-transparent border-solid rounded-[32px] px-[12px] lg:px-[10px] py-[8px] flex items-center gap-[8px] w-full lg:w-[350px] transition-colors focus-within:border-[#CCCCCC]">
                 <Search className="size-[16px] text-[#a3a3a3] shrink-0" />
                 <input
                   type="text"
                   value={directorySearch}
                   onChange={(e) => setDirectorySearch(e.target.value)}
                   placeholder="Search clients by name, phone number, email..."
-                  className="w-full bg-transparent p-0 text-[11px] sm:text-[12px] font-normal text-black placeholder:text-[#a3a3a3] focus:outline-none leading-normal"
+                  className="w-full bg-transparent border-0 p-0 text-[11px] sm:text-[12px] font-normal text-black placeholder:text-[#a3a3a3] focus:outline-none focus:ring-0 leading-normal"
                 />
                 {directorySearch && (
                   <button
@@ -934,84 +934,88 @@ export function ClientsScreen({
         {/* ===================================================================
             TOP CLIENT HEADER BAR (Present in all 9 Figma frames)
             =================================================================== */}
-        <div className="w-full bg-[var(--surface)] rounded-[6px] px-4 sm:px-6 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative">
-          {/* Left Identity Cluster */}
-          <div
-            id="clients-roster"
-            className="flex items-center gap-3.5 sm:gap-4 min-w-0"
+        <div className="w-full bg-[var(--surface)] rounded-[6px] px-4 sm:px-6 py-4 sm:py-5 flex flex-col gap-4 relative">
+          <button
+            type="button"
+            onClick={() => setSelectedClientId(null)}
+            className="flex items-center gap-[4px] text-[#595959] hover:text-black transition-colors cursor-pointer w-fit"
+            title="Back to client directory"
           >
-            <button
-              type="button"
-              onClick={() => setSelectedClientId(null)}
-              className="h-8 px-2.5 sm:px-3 rounded-full bg-[var(--chip)] hover:bg-[#EAEAEA] text-[12px] font-semibold text-[var(--text-2)] hover:text-[var(--text)] flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
-              title="Back to client directory"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Directory</span>
-            </button>
-            {/* 64px Dark Charcoal Initials Circle (#595959) */}
-            <button
-              type="button"
-              onClick={() => handleOpenEditProfile('switch')}
-              title="Switch or manage client"
-              aria-label={`Switch or manage client (${selectedClientProfile.name})`}
-              className="w-[56px] h-[56px] sm:w-[64px] sm:h-[64px] rounded-full bg-[var(--text-2)] flex items-center justify-center text-white text-[15px] sm:text-[16px] font-semibold shrink-0 cursor-pointer hover:opacity-95 transition-opacity"
-            >
-              {selectedClientProfile.initials}
-            </button>
+            <img
+              src="/icons/order-details/arrow-u-up-left.svg"
+              alt=""
+              width={16}
+              height={16}
+              className="w-[16px] h-[16px] shrink-0"
+            />
+            <span className="text-[12px] font-normal leading-normal">Back</span>
+          </button>
 
-            <div className="min-w-0 flex-1">
+          <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            {/* Left Identity Cluster */}
+            <div
+              id="clients-roster"
+              className="flex items-center gap-3.5 sm:gap-4 min-w-0"
+            >
+              {/* 64px Dark Charcoal Initials Circle (#595959) */}
               <button
                 type="button"
                 onClick={() => handleOpenEditProfile('switch')}
-                className="text-left group cursor-pointer block max-w-full"
+                title="Switch or manage client"
+                aria-label={`Switch or manage client (${selectedClientProfile.name})`}
+                className="w-[56px] h-[56px] sm:w-[64px] sm:h-[64px] rounded-full bg-[var(--text-2)] flex items-center justify-center text-white text-[15px] sm:text-[16px] font-semibold shrink-0 cursor-pointer hover:opacity-95 transition-opacity"
               >
-                <h1 className="text-[17px] sm:text-[18px] font-semibold text-[var(--text)] leading-tight truncate group-hover:text-[var(--primary)] transition-colors">
-                  {selectedClientProfile.name}
-                </h1>
+                {selectedClientProfile.initials}
               </button>
 
-              {/* Contact Info Row */}
-              <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 mt-1.5 text-[11px] sm:text-[12px] font-medium text-[var(--text)]">
-                <span className="inline-flex items-center gap-1.5 tabular-nums">
-                  <Phone className="w-3.5 h-3.5 fill-current text-[var(--text)] shrink-0" />
-                  <span>{selectedClientProfile.phone}</span>
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="w-3.5 h-3.5 rounded-full bg-[var(--text)] text-white inline-flex items-center justify-center shrink-0">
-                    <AtSign className="w-2.5 h-2.5 stroke-[2.5]" />
+              <div className="min-w-0 flex-1">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditProfile('switch')}
+                  className="text-left group cursor-pointer block max-w-full"
+                >
+                  <h1 className="text-[17px] sm:text-[18px] font-semibold text-[var(--text)] leading-tight truncate group-hover:text-[var(--primary)] transition-colors">
+                    {selectedClientProfile.name}
+                  </h1>
+                </button>
+
+                {/* Contact Info Row */}
+                <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 mt-1.5 text-[11px] sm:text-[12px] font-medium text-[var(--text)]">
+                  <span className="inline-flex items-center gap-1.5 tabular-nums">
+                    <Phone className="w-3.5 h-3.5 fill-current text-[var(--text)] shrink-0" />
+                    <span>{selectedClientProfile.phone}</span>
                   </span>
-                  <span>{selectedClientProfile.email}</span>
-                </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="w-3.5 h-3.5 rounded-full bg-[var(--text)] text-white inline-flex items-center justify-center shrink-0">
+                      <AtSign className="w-2.5 h-2.5 stroke-[2.5]" />
+                    </span>
+                    <span>{selectedClientProfile.email}</span>
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Right Action Cluster: `New order` pill + `⋮` Overflow Menu Button */}
-          <div
-            ref={overflowMenuRef}
-            className="flex items-center gap-2.5 w-full sm:w-auto relative"
-          >
-            <button
-              type="button"
-              onClick={() => {
-                setIsOverflowMenuOpen(false);
-                onNewOrder?.(selectedClientProfile.id);
-              }}
-              className={cn(
-                'flex-1 sm:flex-initial h-9 px-4 rounded-[24px] border text-[12px] font-medium transition-colors flex items-center justify-center cursor-pointer',
-                viewState === 'Inline_NewOrder'
-                  ? 'bg-[var(--selected-bg)] border-[var(--selected)] text-[var(--primary)]'
-                  : 'bg-[var(--chip)] border-[var(--outline)] text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[#E8E8E8]'
-              )}
+            {/* Right Action Cluster: `New order` pill + `⋮` Overflow Menu Button */}
+            <div
+              ref={overflowMenuRef}
+              className="flex items-center gap-2.5 w-full sm:w-auto relative"
             >
-              New order
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOverflowMenuOpen(false);
+                  onNewOrder?.(selectedClientProfile.id);
+                }}
+                className="flex-1 sm:flex-initial h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[#E8E8E8] transition-colors flex items-center justify-center cursor-pointer"
+              >
+                New order
+              </button>
 
-            <ChoiceMenu kind="menu" iconOnly placeholder="Client profile actions"
-              options={[{value:'edit',label:'Edit profile'},{value:'delete',label:'Delete client',destructive:true}]}
-              onChoose={value=>value==='edit'?handleOpenEditProfile('edit'):setIsDeleteConfirmOpen(true)}
-            />
+              <ChoiceMenu kind="menu" iconOnly placeholder="Client profile actions"
+                options={[{value:'edit',label:'Edit profile'},{value:'delete',label:'Delete client',destructive:true}]}
+                onChoose={value=>value==='edit'?handleOpenEditProfile('edit'):setIsDeleteConfirmOpen(true)}
+              />
+            </div>
           </div>
         </div>
 
@@ -1213,7 +1217,7 @@ export function ClientsScreen({
                                 </button>
                               </div>
 
-                              <div className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 flex items-center border border-transparent focus-within:border-[var(--primary)] transition-colors">
+                              <div className="w-full h-9 rounded-[8px] bg-[#F8F8F8] px-3 flex items-center border border-transparent focus-within:border-[#CCCCCC] transition-colors">
                                 <input
                                   type="text"
                                   inputMode="decimal"
@@ -1223,7 +1227,7 @@ export function ClientsScreen({
                                     handleFieldValueChange(field.id, e.target.value)
                                   }
                                   placeholder="0.0"
-                                  className="w-full bg-transparent text-[12px] font-medium text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
+                                  className="w-full bg-transparent border-0 text-[12px] font-medium text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-0 tabular-nums"
                                 />
                               </div>
                             </div>
@@ -1245,10 +1249,16 @@ export function ClientsScreen({
                   <button
                     type="button"
                     onClick={() => {if(showingOrder&&onOrderBack?.()===false)return;setViewState('SavedMeasurements_Default');}}
-                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--text)] transition-colors w-fit cursor-pointer"
+                    className="flex items-center gap-[4px] text-[#595959] hover:text-black transition-colors w-fit cursor-pointer"
                   >
-                    <CornerUpLeft className="w-3.5 h-3.5" />
-                    <span>Back</span>
+                    <img
+                      src="/icons/order-details/arrow-u-up-left.svg"
+                      alt=""
+                      width={16}
+                      height={16}
+                      className="w-[16px] h-[16px] shrink-0"
+                    />
+                    <span className="text-[12px] font-normal leading-normal">Back</span>
                   </button>
 
                   <ChoiceMenu className="w-[300px] max-w-full" label="Saved fitting" placeholder="No saved measurements" value={activeSnapshot?.id||''} options={clientSnapshots.map(s=>({value:s.id,label:`${s.garmentType} · ${s.date}`}))} onChoose={handleSelectSnapshot}/>
@@ -1307,7 +1317,7 @@ export function ClientsScreen({
                             value={useFlowPrice}
                             onChange={(e) => setUseFlowPrice(e.target.value)}
                             placeholder={`${currencySymbol}0.00`}
-                            className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[var(--primary)] tabular-nums"
+                            className="w-full h-9 rounded-[8px] bg-[#F8F8F8] px-3 text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[#CCCCCC] tabular-nums transition-colors"
                           />
                         </div>
                         <div>
@@ -1319,7 +1329,7 @@ export function ClientsScreen({
                             value={useFlowDueDate}
                             onChange={(e) => setUseFlowDueDate(e.target.value)}
                             placeholder="09/10/2026"
-                            className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[var(--primary)] tabular-nums"
+                            className="w-full h-9 rounded-[8px] bg-[#F8F8F8] px-3 text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[#CCCCCC] tabular-nums transition-colors"
                           />
                         </div>
                       </div>
@@ -1333,7 +1343,7 @@ export function ClientsScreen({
                           value={useFlowNotes}
                           onChange={(e) => setUseFlowNotes(e.target.value)}
                           placeholder="e.g. hand-stitched, monogram design on wrist and gold buttons"
-                          className="w-full min-h-[100px] rounded-[8px] bg-[var(--field-on-card)] p-3 text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] resize-none focus:outline-none border border-transparent focus:border-[var(--primary)]"
+                          className="w-full min-h-[100px] rounded-[8px] bg-[#F8F8F8] p-3 text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] resize-none focus:outline-none border border-transparent focus:border-[#CCCCCC] transition-colors"
                         />
                       </div>
                     </div>
@@ -1433,7 +1443,7 @@ export function ClientsScreen({
                                   <X className="w-3.5 h-3.5" />
                                 </button>
                               </div>
-                              <div className="w-full h-9 rounded-[8px] bg-[var(--field-on-card)] px-3 flex items-center">
+                              <div className="w-full h-9 rounded-[8px] bg-[#F8F8F8] border border-transparent focus-within:border-[#CCCCCC] px-3 flex items-center transition-colors">
                                 <input
                                   type="text"
                                   inputMode="decimal"
@@ -1446,7 +1456,7 @@ export function ClientsScreen({
                                     )
                                   }
                                   placeholder="0.0"
-                                  className="w-full bg-transparent text-[12px] font-medium text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
+                                  className="w-full bg-transparent border-0 text-[12px] font-medium text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-0 tabular-nums"
                                 />
                               </div>
                             </div>
@@ -1602,18 +1612,24 @@ export function ClientsScreen({
             <div className="flex flex-col lg:flex-row gap-[2px] w-full">
               {/* Left Column: New Order Form */}
               <div className="w-full lg:w-[34%] bg-[var(--card)] rounded-[6px] p-3 flex flex-col gap-2.5 shrink-0">
-                <div className="flex items-center justify-between px-0.5">
-                  <h2 className="text-[14px] sm:text-[15px] font-bold text-[var(--text)]">
-                    New Order
-                  </h2>
+                <div className="flex flex-col gap-2 px-0.5">
                   <button
                     type="button"
                     onClick={() => {if(showingOrder&&onOrderBack?.()===false)return;setViewState('SavedMeasurements_Default');}}
-                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--text)] transition-colors cursor-pointer"
+                    className="flex items-center gap-[4px] text-[#595959] hover:text-black transition-colors cursor-pointer w-fit"
                   >
-                    <CornerUpLeft className="w-3.5 h-3.5" />
-                    <span>Back</span>
+                    <img
+                      src="/icons/order-details/arrow-u-up-left.svg"
+                      alt=""
+                      width={16}
+                      height={16}
+                      className="w-[16px] h-[16px] shrink-0"
+                    />
+                    <span className="text-[12px] font-normal leading-normal">Back</span>
                   </button>
+                  <h2 className="text-[14px] sm:text-[15px] font-bold text-[var(--text)]">
+                    New Order
+                  </h2>
                 </div>
 
                 <div className="bg-[var(--surface)] rounded-[8px] p-3.5 flex flex-col gap-3.5">
@@ -1633,7 +1649,7 @@ export function ClientsScreen({
                           value={newOrderClientName}
                           onChange={(e) => setNewOrderClientName(e.target.value)}
                           placeholder="e.g. Adriana Kunle"
-                          className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors"
+                          className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-transparent px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#CCCCCC] transition-colors"
                         />
                       </div>
 
@@ -1648,7 +1664,7 @@ export function ClientsScreen({
                             setNewOrderGarmentType(e.target.value)
                           }
                           placeholder="Bespoke African Gown"
-                          className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors"
+                          className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-transparent px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#CCCCCC] transition-colors"
                         />
                       </div>
 
@@ -1661,7 +1677,7 @@ export function ClientsScreen({
                           value={newOrderPhone}
                           onChange={(e) => setNewOrderPhone(e.target.value)}
                           placeholder="+234 -"
-                          className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors tabular-nums"
+                          className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-transparent px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#CCCCCC] transition-colors tabular-nums"
                         />
                       </div>
 
@@ -1674,7 +1690,7 @@ export function ClientsScreen({
                           value={newOrderEmail}
                           onChange={(e) => setNewOrderEmail(e.target.value)}
                           placeholder="name@example.com"
-                          className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors"
+                          className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-transparent px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#CCCCCC] transition-colors"
                         />
                       </div>
                     </div>
@@ -1770,7 +1786,7 @@ export function ClientsScreen({
                           value={newOrderPrice}
                           onChange={(e) => setNewOrderPrice(e.target.value)}
                           placeholder={`${currencySymbol}0.00`}
-                          className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors tabular-nums"
+                          className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-transparent px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#CCCCCC] transition-colors tabular-nums"
                         />
                       </div>
 
@@ -1783,7 +1799,7 @@ export function ClientsScreen({
                           value={newOrderDueDate}
                           onChange={(e) => setNewOrderDueDate(e.target.value)}
                           placeholder="09/10/2026"
-                          className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors tabular-nums"
+                          className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-transparent px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#CCCCCC] transition-colors tabular-nums"
                         />
                       </div>
                     </div>
@@ -1801,7 +1817,7 @@ export function ClientsScreen({
                       value={newOrderNotes}
                       onChange={(e) => setNewOrderNotes(e.target.value)}
                       placeholder="e.g. hand-stitched, monogram design on wrist and gold buttons"
-                      className="w-full min-h-[96px] rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] p-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] resize-none focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors"
+                      className="w-full min-h-[96px] rounded-[8px] bg-[#F8F8F8] border border-transparent p-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] resize-none focus:outline-none focus:border-[#CCCCCC] transition-colors"
                     />
                   </div>
                 </div>
@@ -1951,7 +1967,7 @@ export function ClientsScreen({
                             <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                        <div className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 flex items-center transition-colors focus-within:border-[#1D49E8] focus-within:ring-1 focus-within:ring-[#1D49E8]">
+                        <div className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-transparent px-3 flex items-center transition-colors focus-within:border-[#CCCCCC]">
                           <input
                             type="text"
                             inputMode="decimal"
@@ -1961,7 +1977,7 @@ export function ClientsScreen({
                               handleFieldValueChange(field.id, e.target.value)
                             }
                             placeholder="0.0"
-                            className="w-full bg-transparent p-0 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none tabular-nums"
+                            className="w-full bg-transparent border-0 p-0 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:ring-0 tabular-nums"
                           />
                         </div>
                       </div>
@@ -2073,14 +2089,14 @@ export function ClientsScreen({
 
               {editProfileMode === 'switch' ? (
                 <div className="flex flex-col gap-3">
-                  <div className="flex items-center gap-2 bg-[var(--field-on-card)] rounded-[8px] px-3 py-2">
+                  <div className="flex items-center gap-2 bg-[#F8F8F8] border border-transparent focus-within:border-[#CCCCCC] rounded-[8px] px-3 py-2 transition-colors">
                     <Search className="w-4 h-4 text-[var(--muted)] shrink-0" />
                     <input
                       type="text"
                       value={directorySearch}
                       onChange={(e) => setDirectorySearch(e.target.value)}
                       placeholder="Search clients..."
-                      className="w-full bg-transparent text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none"
+                      className="w-full bg-transparent border-0 text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-0"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5 max-h-[280px] overflow-y-auto">
@@ -2186,7 +2202,7 @@ export function ClientsScreen({
                       onChange={(e) => setEditName(e.target.value)}
                       placeholder="Client full name"
                       required
-                      className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors"
+                      className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-transparent px-3 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#CCCCCC] transition-colors"
                     />
                   </div>
                   <div>
@@ -2198,7 +2214,7 @@ export function ClientsScreen({
                       value={editPhone}
                       onChange={(e) => setEditPhone(e.target.value)}
                       placeholder="+234 800 000 0000"
-                      className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors tabular-nums"
+                      className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-transparent px-3 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#CCCCCC] transition-colors tabular-nums"
                     />
                   </div>
                   <div>
@@ -2210,7 +2226,7 @@ export function ClientsScreen({
                       value={editEmail}
                       onChange={(e) => setEditEmail(e.target.value)}
                       placeholder="client@example.com"
-                      className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors"
+                      className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-transparent px-3 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#CCCCCC] transition-colors"
                     />
                   </div>
                   <div>
@@ -2221,7 +2237,7 @@ export function ClientsScreen({
                       value={editNotes}
                       onChange={(e) => setEditNotes(e.target.value)}
                       placeholder="Fit preferences, fabric notes..."
-                      className="w-full min-h-[80px] rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] p-3 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] resize-none focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8] transition-colors"
+                      className="w-full min-h-[80px] rounded-[8px] bg-[#F8F8F8] border border-transparent p-3 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] resize-none focus:outline-none focus:border-[#CCCCCC] transition-colors"
                     />
                   </div>
                   <div className="flex items-center justify-end gap-2 pt-2">
@@ -2549,7 +2565,7 @@ export function ClientsScreen({
                   <label className="block text-[11px] font-semibold text-[var(--text)] mb-1">
                     Measurement Size ({unitLabel.toUpperCase()})
                   </label>
-                  <div className="w-full h-11 bg-[#F8F8F8] border border-[#EDEDED] rounded-[8px] px-3 flex items-center transition-colors focus-within:border-[#1D49E8] focus-within:ring-1 focus-within:ring-[#1D49E8]">
+                  <div className="w-full h-11 bg-[#F8F8F8] border border-transparent rounded-[8px] px-3 flex items-center transition-colors focus-within:border-[#CCCCCC]">
                     <input
                       type="text"
                       inputMode="decimal"
@@ -2563,7 +2579,7 @@ export function ClientsScreen({
                         });
                       }}
                       autoFocus
-                      className="w-full bg-transparent p-0 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none tabular-nums"
+                      className="w-full bg-transparent border-0 p-0 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:ring-0 tabular-nums"
                     />
                     <span className="pl-2 text-[12px] font-semibold text-[#727272] select-none shrink-0 uppercase">
                       {unitLabel}

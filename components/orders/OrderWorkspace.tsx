@@ -230,14 +230,27 @@ export function OrderWorkspace({
     (!order || !client || (clientId && clientId !== order.clientId))
   )
     return (
-      <div className="py-8">
-        <h2 className="text-lg font-semibold">Order unavailable</h2>
-        <p className="my-3">
-          This order was removed or is not in your workspace.
-        </p>
-        <button className={button} onClick={onBack}>
-          Back to order history
+      <div className="py-8 flex flex-col gap-4 items-start">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex items-center gap-[4px] text-[#595959] hover:text-black transition-colors cursor-pointer"
+        >
+          <img
+            src="/icons/order-details/arrow-u-up-left.svg"
+            alt=""
+            width={16}
+            height={16}
+            className="w-[16px] h-[16px] shrink-0"
+          />
+          <span className="text-[12px] font-normal leading-normal">Back</span>
         </button>
+        <div>
+          <h2 className="text-lg font-semibold">Order unavailable</h2>
+          <p className="mt-2 text-sm text-[#595959]">
+            This order was removed or is not in your workspace.
+          </p>
+        </div>
       </div>
     );
   if (editing)
@@ -1212,22 +1225,39 @@ function OrderEditor({
       className="space-y-5"
       aria-label={order ? "Edit order" : "New order"}
     >
-      <div className="flex flex-wrap justify-between gap-3">
-        <h2 className="text-lg font-semibold">
-          {order ? "Edit order" : "New order"}
-        </h2>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            className={button}
-            onClick={() => void cancel()}
-            disabled={busy}
-          >
-            Cancel
-          </button>
-          <button className={primary} disabled={busy || !draft.loaded}>
-            {busy ? "Saving…" : order ? "Save changes" : "Save order"}
-          </button>
+      <div className="flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={() => void cancel()}
+          disabled={busy}
+          className="flex items-center gap-[4px] text-[#595959] hover:text-black transition-colors cursor-pointer w-fit disabled:opacity-50"
+        >
+          <img
+            src="/icons/order-details/arrow-u-up-left.svg"
+            alt=""
+            width={16}
+            height={16}
+            className="w-[16px] h-[16px] shrink-0"
+          />
+          <span className="text-[12px] font-normal leading-normal">Back</span>
+        </button>
+        <div className="flex flex-wrap justify-between gap-3">
+          <h2 className="text-lg font-semibold">
+            {order ? "Edit order" : "New order"}
+          </h2>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className={button}
+              onClick={() => void cancel()}
+              disabled={busy}
+            >
+              Cancel
+            </button>
+            <button className={primary} disabled={busy || !draft.loaded}>
+              {busy ? "Saving…" : order ? "Save changes" : "Save order"}
+            </button>
+          </div>
         </div>
       </div>
       {(error || draft.warning) && (

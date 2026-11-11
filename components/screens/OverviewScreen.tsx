@@ -972,12 +972,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
               );
               setIsTemplateModalOpen(true);
             }}
-            className={cn(
-              'w-full h-9 rounded-[24px] text-[14px] font-medium flex items-center justify-center transition-colors cursor-pointer px-3 truncate',
-              selectedTemplateName
-                ? 'bg-[var(--selected-bg)] border border-[var(--selected)] text-[var(--primary)] font-semibold'
-                : 'bg-[var(--chip)] text-[var(--text-2)] hover:bg-[#eaeaea]'
-            )}
+            className="w-full h-9 rounded-[24px] bg-[var(--chip)] text-[var(--text-2)] hover:bg-[#eaeaea] text-[14px] font-medium flex items-center justify-center transition-colors cursor-pointer px-3 truncate"
           >
             {selectedTemplateName || 'Choose Template'}
           </button>
@@ -1150,7 +1145,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
                   </button>
                 </div>
 
-                <div className="w-full h-10 bg-[#F8F8F8] border border-[#EDEDED] rounded-[8px] px-3 flex items-center transition-colors focus-within:border-[#1D49E8] focus-within:ring-1 focus-within:ring-[#1D49E8]">
+                <div className="w-full h-10 bg-[#F8F8F8] border border-transparent rounded-[8px] px-3 flex items-center transition-colors focus-within:border-[#CCCCCC]">
                   <input
                     ref={(el) => {
                       inputRefs.current[field.id] = el;
@@ -1164,7 +1159,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
                     onKeyDown={(e) =>
                       handleInputKeyDown(e, idx, visibleListFields.length)
                     }
-                    className="w-full bg-transparent p-0 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none tabular-nums"
+                    className="w-full bg-transparent border-0 p-0 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:ring-0 tabular-nums"
                   />
                   <span className="pl-2 text-[12px] font-semibold text-[#727272] select-none shrink-0 uppercase">
                     {unitLabel}
@@ -1599,7 +1594,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
           <label className="block text-[11px] font-semibold text-[var(--text)] mb-1">
             Measurement Size ({unitLabel.toUpperCase()})
           </label>
-          <div className="w-full h-11 bg-[#F8F8F8] border border-[#EDEDED] rounded-[8px] px-3 flex items-center transition-colors focus-within:border-[#1D49E8] focus-within:ring-1 focus-within:ring-[#1D49E8]">
+          <div className="w-full h-11 bg-[#F8F8F8] border border-transparent rounded-[8px] px-3 flex items-center transition-colors focus-within:border-[#CCCCCC]">
             <input
               type="text"
               inputMode="decimal"
@@ -1610,7 +1605,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
                 setPointModalData({ ...pointModalData, value: e.target.value });
               }}
               autoFocus
-              className="w-full bg-transparent p-0 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none tabular-nums"
+              className="w-full bg-transparent border-0 p-0 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:ring-0 tabular-nums"
             />
             <span className="pl-2 text-[12px] font-semibold text-[#727272] select-none shrink-0 uppercase">
               {unitLabel}

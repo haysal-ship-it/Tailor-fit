@@ -61,11 +61,11 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
                 : undefined
             }
             className={cn(
-              'w-full h-10 sm:h-11 rounded-[8px] bg-[#F8F8F8] border border-[#EDEDED] px-3 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] transition-colors',
+              'w-full h-10 sm:h-11 rounded-[8px] bg-[#F8F8F8] border border-transparent px-3 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] transition-colors',
               leftAddon ? 'pl-9' : 'pl-3',
               rightAddon ? 'pr-9' : 'pr-3',
-              'focus:outline-none focus:border-[#1D49E8] focus:ring-1 focus:ring-[#1D49E8]',
-              error && 'border-[var(--status-danger)] focus:border-[var(--status-danger)] focus:ring-[var(--status-danger)]',
+              'focus:outline-none focus:border-[#CCCCCC]',
+              error && 'border-[var(--status-danger)] focus:border-[var(--status-danger)]',
               disabled && 'opacity-40 cursor-not-allowed',
               className
             )}
