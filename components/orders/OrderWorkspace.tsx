@@ -20,6 +20,10 @@ import { invoiceMoney } from "@/lib/invoices/model";
 import { downloadBlob } from "@/lib/data/backup";
 import { sendInvoice } from "@/lib/invoices/actions";
 import { formatDate, getOrderStatusPresentation } from "@/lib/status";
+import {
+  encodeOrderPreviewPayload,
+  type OrderPreviewPayload,
+} from "@/lib/orders/preview-link";
 import { cn } from "@/lib/utils";
 import type { Client, MeasurementSnapshot, Order, OrderStatus } from "@/types";
 
@@ -87,16 +91,20 @@ const SELECTABLE_STATUSES: {
 type Props = {
   orderId?: string;
   clientId?: string;
-  onBack: () => void;
-  onSaved: (id: string, clientId: string) => void;
-  onEditClient: (clientId: string) => void;
+  onBack?: () => void;
+  onSaved?: (id: string, clientId: string) => void;
+  onEditClient?: (clientId: string) => void;
+  isClientPreview?: boolean;
+  previewData?: OrderPreviewPayload | null;
 };
 export function OrderWorkspace({
   orderId,
   clientId,
-  onBack,
-  onSaved,
-  onEditClient,
+  onBack = () => {},
+  onSaved = () => {},
+  onEditClient = () => {},
+  isClientPreview = false,
+  previewData = null,
 }: Props) {
   const {
     orders,
@@ -107,13 +115,33 @@ export function OrderWorkspace({
     deleteOrder,
     updateOrderStatus,
   } = useStore();
-  const order = orders.find((o) => o.id === orderId);
-  const client = clients.find((c) => c.id === (order?.clientId || clientId));
-  const snapshot =
+  const storeOrder = orders.find((o) => o.id === orderId);
+  const order = storeOrder || previewData?.order;
+  const storeClient = clients.find(
+    (c) => c.id === (order?.clientId || clientId),
+  );
+  const client =
+    storeClient ||
+    (previewData?.client
+      ? ({
+          ...previewData.client,
+          notes: "",
+          createdAt: "",
+        } as Client)
+      : undefined);
+  const storeSnapshot =
     snapshots.find(
       (s) => s.id === order?.measurementSnapshotId && s.clientId === client?.id,
     ) || snapshots.find((s) => s.clientId === client?.id);
-  const [editing, setEditing] = useState(!orderId),
+  const snapshot =
+    storeSnapshot ||
+    (previewData?.snapshot
+      ? ({
+          ...previewData.snapshot,
+          notes: "",
+        } as MeasurementSnapshot)
+      : undefined);
+  const [editing, setEditing] = useState(!orderId && !isClientPreview),
     [display, setDisplay] = useState<"diagram" | "list">("diagram");
   const [dialog, setDialog] = useState<"email" | "delete" | "status" | null>(
       null,
@@ -224,27 +252,29 @@ export function OrderWorkspace({
       setBusy(false);
     }
   }
-  if (!isHydrated) return <p role="status">Loading order…</p>;
+  if (!isHydrated && !previewData) return <p role="status">Loading order…</p>;
   if (
     orderId &&
     (!order || !client || (clientId && clientId !== order.clientId))
   )
     return (
       <div className="py-8 flex flex-col gap-4 items-start">
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex items-center gap-[4px] text-[#595959] hover:text-black transition-colors cursor-pointer"
-        >
-          <img
-            src="/icons/order-details/arrow-u-up-left.svg"
-            alt=""
-            width={16}
-            height={16}
-            className="w-[16px] h-[16px] shrink-0"
-          />
-          <span className="text-[12px] font-normal leading-normal">Back</span>
-        </button>
+        {!isClientPreview && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex items-center gap-[4px] text-[#595959] hover:text-black transition-colors cursor-pointer"
+          >
+            <img
+              src="/icons/order-details/arrow-u-up-left.svg"
+              alt=""
+              width={16}
+              height={16}
+              className="w-[16px] h-[16px] shrink-0"
+            />
+            <span className="text-[12px] font-normal leading-normal">Back</span>
+          </button>
+        )}
         <div>
           <h2 className="text-lg font-semibold">Order unavailable</h2>
           <p className="mt-2 text-sm text-[#595959]">
@@ -291,20 +321,22 @@ export function OrderWorkspace({
       {/* Top Header: Back + Order Details */}
       <div className="w-full p-[16px] flex items-center justify-between">
         <div className="flex flex-col gap-[16px] items-start min-w-0 flex-1">
-          <button
-            type="button"
-            onClick={onBack}
-            className="flex items-center gap-[4px] text-[#595959] hover:text-black transition-colors cursor-pointer"
-          >
-            <img
-              src="/icons/order-details/arrow-u-up-left.svg"
-              alt=""
-              width={16}
-              height={16}
-              className="w-[16px] h-[16px] shrink-0"
-            />
-            <span className="text-[12px] font-normal leading-normal">Back</span>
-          </button>
+          {!isClientPreview && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="flex items-center gap-[4px] text-[#595959] hover:text-black transition-colors cursor-pointer"
+            >
+              <img
+                src="/icons/order-details/arrow-u-up-left.svg"
+                alt=""
+                width={16}
+                height={16}
+                className="w-[16px] h-[16px] shrink-0"
+              />
+              <span className="text-[12px] font-normal leading-normal">Back</span>
+            </button>
+          )}
           <h2 className="text-[16px] font-semibold leading-normal text-black">
             Order Details
           </h2>
@@ -312,7 +344,7 @@ export function OrderWorkspace({
       </div>
 
       {/* Status/Error/Busy Notices */}
-      {(error && !dialog) || notice || (busy && !dialog) ? (
+      {!isClientPreview && ((error && !dialog) || notice || (busy && !dialog)) ? (
         <div className="px-[16px] pb-2 flex flex-col gap-1">
           {error && !dialog && (
             <p role="alert" className="text-[12px] text-[#f83437] font-medium">
@@ -335,7 +367,7 @@ export function OrderWorkspace({
       {/* Main Content Wrapper */}
       <div className="w-full p-[2px] flex flex-col gap-[2px] rounded-[8px]">
         {/* Garment Title Bar with 3-dots Option Dropdown */}
-        <div className="bg-[#f8f8f8] rounded-[8px] px-[16px] py-[8px] flex items-center justify-between gap-[16px] w-full">
+        <div className="bg-[#f8f8f8] rounded-[8px] px-[16px] py-[8px] flex items-center justify-between gap-[16px] w-full min-h-[56px]">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <p className="text-[14px] font-medium leading-normal text-black truncate">
               {order.garmentType}
@@ -348,128 +380,146 @@ export function OrderWorkspace({
             </span>
           </div>
 
-          <div ref={menuRef} className="relative flex items-center shrink-0">
-            <button
-              type="button"
-              aria-label="Order options"
-              aria-haspopup="menu"
-              aria-expanded={isMenuOpen}
-              disabled={busy}
-              onClick={() => setIsMenuOpen((prev) => !prev)}
-              className="bg-[#f2f2f2] hover:bg-[#e8e8e8] rounded-[32px] size-[40px] p-[4px] flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
-            >
-              <img
-                src="/icons/order-details/dots-vertical.svg"
-                alt=""
-                width={24}
-                height={24}
-                className="w-[24px] h-[24px]"
-              />
-            </button>
-
-            {isMenuOpen && (
-              <div
-                role="menu"
+          {!isClientPreview && (
+            <div ref={menuRef} className="relative flex items-center shrink-0">
+              <button
+                type="button"
                 aria-label="Order options"
-                className="absolute right-0 top-[calc(100%+6px)] z-50 w-[157px] bg-white border border-[#eeecec] rounded-[8px] p-[2px] shadow-lg flex flex-col items-start"
+                aria-haspopup="menu"
+                aria-expanded={isMenuOpen}
+                disabled={busy}
+                onClick={() => setIsMenuOpen((prev) => !prev)}
+                className="bg-[#f2f2f2] hover:bg-[#e8e8e8] rounded-[32px] size-[40px] p-[4px] flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
               >
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    setError("");
-                    setNotice("");
-                    setDialog("email");
-                    void pdf();
-                  }}
-                  className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#f8f8f8] transition-colors cursor-pointer text-left"
-                >
-                  <img
-                    src="/icons/order-details/share.svg"
-                    alt=""
-                    width={16}
-                    height={16}
-                    className="w-[16px] h-[16px] shrink-0"
-                  />
-                  <span className="font-medium text-[12px] text-[#595959] whitespace-nowrap">
-                    Share to email
-                  </span>
-                </button>
+                <img
+                  src="/icons/order-details/dots-vertical.svg"
+                  alt=""
+                  width={24}
+                  height={24}
+                  className="w-[24px] h-[24px]"
+                />
+              </button>
 
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    setError("");
-                    setNotice("");
-                    void pdf(true);
-                  }}
-                  className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#f8f8f8] transition-colors cursor-pointer text-left"
+              {isMenuOpen && (
+                <div
+                  role="menu"
+                  aria-label="Order options"
+                  className="absolute right-0 top-[calc(100%+6px)] z-50 w-[157px] bg-white border border-[#eeecec] rounded-[8px] p-[2px] shadow-lg flex flex-col items-start"
                 >
-                  <img
-                    src="/icons/order-details/download.svg"
-                    alt=""
-                    width={16}
-                    height={16}
-                    className="w-[16px] h-[16px] shrink-0"
-                  />
-                  <span className="font-medium text-[12px] text-[#595959] whitespace-nowrap">
-                    Download PDF
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={async () => {
+                      setIsMenuOpen(false);
+                      setError("");
+                      setNotice("");
+                      const encoded = encodeOrderPreviewPayload({
+                        order,
+                        client,
+                        snapshot: snapshot || null,
+                        currency: order.currency || settings.currency,
+                      });
+                      const shareUrl = `${window.location.origin}/preview/order/${encodeURIComponent(order.id)}${encoded ? `?d=${encoded}` : ""}`;
+                      try {
+                        await navigator.clipboard.writeText(shareUrl);
+                        setNotice("Order preview link copied to clipboard.");
+                        window.dispatchEvent(
+                          new CustomEvent("tailorfit:notice", {
+                            detail: "Order preview link copied to clipboard.",
+                          }),
+                        );
+                      } catch {
+                        setError("Could not copy link automatically.");
+                      }
+                    }}
+                    className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#f8f8f8] transition-colors cursor-pointer text-left"
+                  >
+                    <img
+                      src="/icons/order-details/link.svg"
+                      alt=""
+                      width={16}
+                      height={16}
+                      className="w-[16px] h-[16px] shrink-0"
+                    />
+                    <span className="font-medium text-[12px] text-[#595959] whitespace-nowrap">
+                      Copy link
+                    </span>
+                  </button>
 
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    setError("");
-                    setNotice("");
-                    setSelectedStatus(normalizeSelectableStatus(order.status));
-                    setDialog("status");
-                  }}
-                  className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#f8f8f8] transition-colors cursor-pointer text-left"
-                >
-                  <img
-                    src="/icons/order-details/download.svg"
-                    alt=""
-                    width={16}
-                    height={16}
-                    className="w-[16px] h-[16px] shrink-0"
-                  />
-                  <span className="font-medium text-[12px] text-[#595959] whitespace-nowrap">
-                    Update status
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      setError("");
+                      setNotice("");
+                      void pdf(true);
+                    }}
+                    className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#f8f8f8] transition-colors cursor-pointer text-left"
+                  >
+                    <img
+                      src="/icons/order-details/download.svg"
+                      alt=""
+                      width={16}
+                      height={16}
+                      className="w-[16px] h-[16px] shrink-0"
+                    />
+                    <span className="font-medium text-[12px] text-[#595959] whitespace-nowrap">
+                      Download PDF
+                    </span>
+                  </button>
 
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    setError("");
-                    setNotice("");
-                    deleteVersion.current = order.version;
-                    setDialog("delete");
-                  }}
-                  className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#fff5f5] transition-colors cursor-pointer text-left"
-                >
-                  <img
-                    src="/icons/order-details/trash.svg"
-                    alt=""
-                    width={16}
-                    height={16}
-                    className="w-[16px] h-[16px] shrink-0"
-                  />
-                  <span className="font-medium text-[12px] text-[#f83437] whitespace-nowrap">
-                    Delete order
-                  </span>
-                </button>
-              </div>
-            )}
-          </div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      setError("");
+                      setNotice("");
+                      setSelectedStatus(normalizeSelectableStatus(order.status));
+                      setDialog("status");
+                    }}
+                    className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#f8f8f8] transition-colors cursor-pointer text-left"
+                  >
+                    <img
+                      src="/icons/order-details/download.svg"
+                      alt=""
+                      width={16}
+                      height={16}
+                      className="w-[16px] h-[16px] shrink-0"
+                    />
+                    <span className="font-medium text-[12px] text-[#595959] whitespace-nowrap">
+                      Update status
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      setError("");
+                      setNotice("");
+                      deleteVersion.current = order.version;
+                      setDialog("delete");
+                    }}
+                    className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#fff5f5] transition-colors cursor-pointer text-left"
+                  >
+                    <img
+                      src="/icons/order-details/trash.svg"
+                      alt=""
+                      width={16}
+                      height={16}
+                      className="w-[16px] h-[16px] shrink-0"
+                    />
+                    <span className="font-medium text-[12px] text-[#f83437] whitespace-nowrap">
+                      Delete order
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Two-Column Split: Left Order Metadata + Right Saved Measurements */}
@@ -577,7 +627,7 @@ export function OrderWorkspace({
           </div>
 
           {/* Right Column: Saved Measurements (Mannequin view / List view) */}
-          <div className="w-full lg:w-[709px] bg-[#f8f8f8] rounded-[6px] p-[12px] flex flex-col gap-[25px] self-stretch shrink-0">
+          <div className="w-full lg:w-[709px] bg-[#f8f8f8] rounded-[6px] p-[12px] flex flex-col gap-[25px] self-stretch shrink-0 overflow-hidden">
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-[8px]">
                 <span className="text-[14px] font-bold text-black leading-normal whitespace-nowrap">
@@ -635,13 +685,15 @@ export function OrderWorkspace({
                 </p>
               </div>
             ) : display === "diagram" ? (
-              <div className="flex-1 flex items-center justify-center py-2">
+              <div className="flex-1 flex items-center justify-center py-2 overflow-hidden">
                 <RotatableMannequin
                   gender={snapshot.mannequinGender || "female"}
                   measurements={numericMeasurements}
                   activePointKeys={Object.keys(numericMeasurements)}
                   unit={snapshot.unit}
                   readOnly
+                  showControls={false}
+                  alwaysShowCallouts={true}
                 />
               </div>
             ) : (

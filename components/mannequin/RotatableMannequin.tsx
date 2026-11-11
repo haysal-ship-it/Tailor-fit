@@ -39,6 +39,35 @@ function shortestAngleDiff(from: number, to: number): number {
   return diff;
 }
 
+/**
+ * Wraps long landmark labels into at most 2 compact lines so callouts never
+ * shoot outside the horizontal bounds of the Saved Measurements container.
+ */
+function wrapCalloutLabel(label: string, maxCharsPerLine = 12): string[] {
+  const trimmed = label.trim();
+  if (trimmed.length <= maxCharsPerLine || !trimmed.includes(' ')) {
+    return [trimmed];
+  }
+  const words = trimmed.split(/\s+/);
+  const lines: string[] = [];
+  let current = '';
+  for (const word of words) {
+    if (!current) {
+      current = word;
+    } else if ((current + ' ' + word).length <= maxCharsPerLine) {
+      current += ' ' + word;
+    } else {
+      lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  if (lines.length > 2) {
+    return [lines[0], lines.slice(1).join(' ')];
+  }
+  return lines;
+}
+
 export interface RotatableMannequinProps {
   gender?: MannequinGender;
   onGenderChange?: (gender: MannequinGender) => void;
@@ -60,6 +89,8 @@ export interface RotatableMannequinProps {
   onSelectPoint?: (key: string, label: string) => void;
   readOnly?: boolean;
   showControls?: boolean;
+  /** When true (default), dotted callout lines, point names, and sizes are always visible without requiring hover/click */
+  alwaysShowCallouts?: boolean;
   compact?: boolean;
   className?: string;
 }
@@ -78,6 +109,7 @@ export function RotatableMannequin({
   onSelectPoint,
   readOnly = false,
   showControls = true,
+  alwaysShowCallouts = true,
   compact = false,
   className = '',
 }: RotatableMannequinProps) {
@@ -400,10 +432,139 @@ export function RotatableMannequin({
 
   const resolvedSelectedKey = selectedPointKey ? resolveCanonicalKey(selectedPointKey) : null;
 
+  // Compute non-overlapping, container-bounded callout positions for all visible landmarks
+  const positionedLandmarks = useMemo(() => {
+    const LEFT_ANCHOR_X = 132;
+    const RIGHT_ANCHOR_X = 504;
+    const MIN_Y = 30;
+    const MAX_Y = 700;
+
+    type Item = {
+      lm: (typeof visibleLandmarks)[number];
+      projX: number;
+      projY: number;
+      isLeft: boolean;
+      labelAnchorX: number;
+      naturalY: number;
+      resolvedY: number;
+      lines: string[];
+      formattedVal: string;
+      hasValue: boolean;
+      boxHeight: number;
+    };
+
+    const rawItems: Item[] = visibleLandmarks.map((lm) => {
+      const x3d = gender === 'female' ? lm.x3dFemale : lm.x3dMale;
+      const z3d = gender === 'female' ? lm.z3dFemale : lm.z3dMale;
+      const projX = 318 + x3d * Math.cos(rad) - z3d * Math.sin(rad);
+      const projY = lm.y;
+
+      const side = lm.sideByView[cardinalAngle];
+      const isLeft = side === 'left';
+      const labelAnchorX = isLeft ? LEFT_ANCHOR_X : RIGHT_ANCHOR_X;
+
+      const displayLabel = gender === 'male' && lm.maleLabel ? lm.maleLabel : lm.label;
+      const lines = wrapCalloutLabel(displayLabel, 12);
+      const rawVal = canonicalMeasurements[lm.key];
+      const hasValue = rawVal !== undefined && rawVal !== '' && Number(rawVal) > 0;
+      const numVal = hasValue ? Number(rawVal) : 0;
+      const formattedVal = hasValue
+        ? `${Number.isInteger(numVal) ? numVal : numVal.toFixed(1)} ${unit}`
+        : '';
+
+      const totalLines = lines.length + (hasValue ? 1 : 0);
+      const boxHeight = totalLines * 14 + 8;
+
+      let yOff = lm.labelYOffset ?? 0;
+      // Push wide arm landmarks vertically clear of the arm touchpoint dot
+      if (isLeft && projX < LEFT_ANCHOR_X + 35 && Math.abs(yOff) < 28) {
+        yOff = yOff >= 0 ? 34 : -34;
+      } else if (!isLeft && projX > RIGHT_ANCHOR_X - 35 && Math.abs(yOff) < 28) {
+        yOff = yOff >= 0 ? 34 : -34;
+      }
+
+      const naturalY = Math.max(
+        MIN_Y + boxHeight / 2,
+        Math.min(MAX_Y - boxHeight / 2, projY + yOff)
+      );
+
+      return {
+        lm,
+        projX,
+        projY,
+        isLeft,
+        labelAnchorX,
+        naturalY,
+        resolvedY: naturalY,
+        lines,
+        formattedVal,
+        hasValue,
+        boxHeight,
+      };
+    });
+
+    const solveSide = (group: Item[]) => {
+      if (group.length <= 1) return;
+      group.sort((a, b) => a.naturalY - b.naturalY || a.projY - b.projY);
+
+      const totalBoxHeight = group.reduce((acc, it) => acc + it.boxHeight, 0);
+      const availableSpan = MAX_Y - MIN_Y;
+      const gap =
+        totalBoxHeight + (group.length - 1) * 7 <= availableSpan
+          ? 7
+          : Math.max(2, (availableSpan - totalBoxHeight) / Math.max(1, group.length - 1));
+
+      // Forward pass: push down any overlapping callouts
+      for (let i = 0; i < group.length; i++) {
+        const half = group[i].boxHeight / 2;
+        if (i === 0) {
+          group[i].resolvedY = Math.max(MIN_Y + half, group[i].naturalY);
+        } else {
+          const prevBottom = group[i - 1].resolvedY + group[i - 1].boxHeight / 2;
+          const minCenter = prevBottom + gap + half;
+          group[i].resolvedY = Math.max(minCenter, group[i].naturalY);
+        }
+      }
+
+      // Backward pass: pull up if bottom-most callout exceeded MAX_Y
+      const last = group[group.length - 1];
+      const lastHalf = last.boxHeight / 2;
+      if (last.resolvedY + lastHalf > MAX_Y) {
+        last.resolvedY = MAX_Y - lastHalf;
+        for (let i = group.length - 2; i >= 0; i--) {
+          const nextTop = group[i + 1].resolvedY - group[i + 1].boxHeight / 2;
+          const maxCenter = nextTop - gap - group[i].boxHeight / 2;
+          if (group[i].resolvedY > maxCenter) {
+            group[i].resolvedY = maxCenter;
+          }
+        }
+      }
+
+      // Final clamp pass from top if backward pass pushed first item above MIN_Y
+      if (group[0].resolvedY - group[0].boxHeight / 2 < MIN_Y) {
+        group[0].resolvedY = MIN_Y + group[0].boxHeight / 2;
+        for (let i = 1; i < group.length; i++) {
+          const prevBottom = group[i - 1].resolvedY + group[i - 1].boxHeight / 2;
+          const minCenter = prevBottom + gap + group[i].boxHeight / 2;
+          if (group[i].resolvedY < minCenter) {
+            group[i].resolvedY = minCenter;
+          }
+        }
+      }
+    };
+
+    const leftGroup = rawItems.filter((it) => it.isLeft);
+    const rightGroup = rawItems.filter((it) => !it.isLeft);
+    solveSide(leftGroup);
+    solveSide(rightGroup);
+
+    return rawItems;
+  }, [visibleLandmarks, gender, rad, cardinalAngle, canonicalMeasurements, unit]);
+
   return (
     <div
       className={cn(
-        'w-full flex flex-col items-center justify-center select-none relative outline-none',
+        'w-full flex flex-col items-center justify-center select-none relative outline-none overflow-hidden',
         className
       )}
       tabIndex={0}
@@ -417,15 +578,15 @@ export function RotatableMannequin({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         className={cn(
-          'relative w-full flex items-center justify-center touch-pan-y',
+          'relative w-full flex items-center justify-center touch-pan-y overflow-hidden',
           isDragging ? 'cursor-grabbing' : 'cursor-grab',
-          compact ? 'max-w-[340px]' : 'max-w-[440px]'
+          compact ? 'max-w-[380px]' : 'max-w-[520px]'
         )}
       >
         <svg
           viewBox="0 0 636 730"
           className={cn(
-            'w-full h-auto select-none overflow-visible',
+            'w-full h-auto select-none overflow-hidden',
             compact ? 'max-h-[430px]' : 'max-h-[540px]'
           )}
           preserveAspectRatio="xMidYMid meet"
@@ -475,46 +636,46 @@ export function RotatableMannequin({
             );
           })}
 
-          {/* Requirement C & D: Active Touchpoints Only by Default; Leader Line & Label ONLY on Hover/Focus */}
-          {visibleLandmarks.map((lm) => {
-            const x3d = gender === 'female' ? lm.x3dFemale : lm.x3dMale;
-            const z3d = gender === 'female' ? lm.z3dFemale : lm.z3dMale;
+          {/* Touchpoints + Persistent Non-Overlapping Dotted Callout Lines & Sizes */}
+          {positionedLandmarks.map((item) => {
+            const {
+              lm,
+              projX,
+              projY,
+              isLeft,
+              labelAnchorX,
+              resolvedY: labelAnchorY,
+              lines,
+              formattedVal,
+              hasValue,
+            } = item;
 
-            // Orthographic 3D projection around spine axis X = 318
-            const projX = 318 + x3d * Math.cos(rad) - z3d * Math.sin(rad);
-            const projY = lm.y;
-
-            const side = lm.sideByView[cardinalAngle];
-            const isLeft = side === 'left';
-            const yOff = lm.labelYOffset ?? 0;
-
-            // Outer label anchor coordinates in 636x730 viewBox
-            const labelAnchorX = isLeft ? 88 : 548;
-            const labelAnchorY = Math.max(42, Math.min(685, projY + yOff));
-
+            const dy = labelAnchorY - projY;
             let polyPoints: string;
-            if (Math.abs(yOff) > 2) {
+            if (Math.abs(dy) > 3) {
+              const kinkSpan = Math.min(28, Math.max(10, Math.abs(dy) * 0.45));
               const kinkX = isLeft
-                ? Math.max(labelAnchorX + 12, projX - Math.abs(yOff))
-                : Math.min(labelAnchorX - 12, projX + Math.abs(yOff));
+                ? Math.max(labelAnchorX + 10, projX - kinkSpan)
+                : Math.min(labelAnchorX - 10, projX + kinkSpan);
               polyPoints = `${projX.toFixed(1)},${projY.toFixed(1)} ${kinkX.toFixed(1)},${labelAnchorY.toFixed(1)} ${labelAnchorX.toFixed(1)},${labelAnchorY.toFixed(1)}`;
             } else {
               polyPoints = `${projX.toFixed(1)},${projY.toFixed(1)} ${labelAnchorX.toFixed(1)},${labelAnchorY.toFixed(1)}`;
             }
 
             const displayLabel = gender === 'male' && lm.maleLabel ? lm.maleLabel : lm.label;
-            const rawVal = canonicalMeasurements[lm.key];
-            const hasValue = rawVal !== undefined && rawVal !== '' && Number(rawVal) > 0;
-            const formattedVal = hasValue ? `${Number(rawVal).toFixed(1)} ${unit}` : '';
-
-            // Requirement C: Leader line & label ONLY visible on hover or when its modal is open
             const isHoveredOrActive = hoveredKey === lm.key || resolvedSelectedKey === lm.key;
+            const showCallout = alwaysShowCallouts || isHoveredOrActive;
 
             const handlePointClick = (e: React.MouseEvent) => {
               e.stopPropagation();
               if (readOnly || !onSelectPoint) return;
               onSelectPoint(lm.key, displayLabel);
             };
+
+            const textX = isLeft ? labelAnchorX - 7 : labelAnchorX + 7;
+            const totalTextLines = lines.length + (hasValue ? 1 : 0);
+            const lineStep = 13.5;
+            const startY = labelAnchorY - ((totalTextLines - 1) * lineStep) / 2;
 
             return (
               <g
@@ -527,57 +688,61 @@ export function RotatableMannequin({
                 onClick={handlePointClick}
                 className={cn(
                   'transition-opacity duration-150',
-                  isDragging ? 'opacity-50' : 'opacity-100',
+                  isDragging ? 'opacity-60' : 'opacity-100',
                   readOnly ? 'pointer-events-none' : 'cursor-pointer'
                 )}
               >
-                {/* Hover-Only Trailing Dotted Leader Line & Description Badge (Requirement C) */}
+                {/* Dotted Leader Line, Wrapped Point Name & Measurement Size */}
                 <g
                   className={cn(
                     'pointer-events-none transition-opacity duration-150',
-                    isHoveredOrActive && !isDragging ? 'opacity-100' : 'opacity-0'
+                    showCallout && !isDragging ? 'opacity-100' : 'opacity-0'
                   )}
                 >
                   <polyline
                     points={polyPoints}
                     fill="none"
                     stroke="#079BF8"
-                    strokeWidth="1.75"
-                    strokeDasharray="4.5 4.5"
+                    strokeWidth={isHoveredOrActive ? '2' : '1.5'}
+                    strokeDasharray="4 4"
                   />
 
                   {/* Small terminal anchor tick at the end of the dotted line */}
                   <circle cx={labelAnchorX} cy={labelAnchorY} r="2.5" fill="#079BF8" />
 
-                  {/* Point Name & Current Size Pill Background for crisp legibility */}
-                  <text
-                    x={isLeft ? labelAnchorX - 8 : labelAnchorX + 8}
-                    y={hasValue ? labelAnchorY - 8 : labelAnchorY}
-                    textAnchor={isLeft ? 'end' : 'start'}
-                    dominantBaseline="central"
-                    fontFamily="var(--font-manrope), sans-serif"
-                    fontSize="18"
-                    fontWeight="600"
-                    fill="#000000"
-                    stroke="#FFFFFF"
-                    strokeWidth="4"
-                    paintOrder="stroke"
-                    className="select-none"
-                  >
-                    {displayLabel}
-                  </text>
-
-                  {hasValue && (
+                  {/* Wrapped Point Name Lines */}
+                  {lines.map((lineText, lineIdx) => (
                     <text
-                      x={isLeft ? labelAnchorX - 8 : labelAnchorX + 8}
-                      y={labelAnchorY + 12}
+                      key={lineIdx}
+                      x={textX}
+                      y={startY + lineIdx * lineStep}
                       textAnchor={isLeft ? 'end' : 'start'}
                       dominantBaseline="central"
                       fontFamily="var(--font-manrope), sans-serif"
-                      fontSize="15"
+                      fontSize="12"
+                      fontWeight="600"
+                      fill="#1D1D1D"
+                      stroke="#F8F8F8"
+                      strokeWidth="3.5"
+                      paintOrder="stroke"
+                      className="select-none"
+                    >
+                      {lineText}
+                    </text>
+                  ))}
+
+                  {/* Measurement Size Line */}
+                  {hasValue && (
+                    <text
+                      x={textX}
+                      y={startY + lines.length * lineStep}
+                      textAnchor={isLeft ? 'end' : 'start'}
+                      dominantBaseline="central"
+                      fontFamily="var(--font-manrope), sans-serif"
+                      fontSize="12.5"
                       fontWeight="700"
                       fill="#079BF8"
-                      stroke="#FFFFFF"
+                      stroke="#F8F8F8"
                       strokeWidth="3.5"
                       paintOrder="stroke"
                       className="select-none tabular-nums"
@@ -588,13 +753,13 @@ export function RotatableMannequin({
                 </g>
 
                 {/* Generous 44px+ Equivalent Invisible Hit Target for Touch & Mouse */}
-                <circle cx={projX} cy={projY} r="26" fill="transparent" />
+                <circle cx={projX} cy={projY} r="24" fill="transparent" />
 
-                {/* Active Touchpoint Ring & Center Dot (Always visible for active points) */}
+                {/* Active Touchpoint Ring & Center Dot */}
                 <circle
                   cx={projX}
                   cy={projY}
-                  r={isHoveredOrActive ? '10.5' : '8'}
+                  r={isHoveredOrActive ? '9.5' : '7.5'}
                   fill={
                     isHoveredOrActive
                       ? 'rgba(7, 155, 248, 0.32)'
@@ -603,13 +768,13 @@ export function RotatableMannequin({
                       : 'rgba(7, 155, 248, 0.14)'
                   }
                   stroke="#079BF8"
-                  strokeWidth={isHoveredOrActive ? '2' : '1.6'}
+                  strokeWidth={isHoveredOrActive ? '2' : '1.5'}
                   className="transition-all duration-150"
                 />
                 <circle
                   cx={projX}
                   cy={projY}
-                  r={isHoveredOrActive ? '4.2' : '3.4'}
+                  r={isHoveredOrActive ? '4' : '3.2'}
                   fill="#079BF8"
                   className="transition-all duration-150"
                 />
