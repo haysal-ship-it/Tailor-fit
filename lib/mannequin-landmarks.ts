@@ -228,13 +228,13 @@ export const MANNEQUIN_LANDMARKS_3D: RotatableLandmark3D[] = [
     label: 'Wrist circumference',
     zone: 'Upper Limb',
     y: 186,
-    x3dFemale: 228,
-    x3dMale: 242,
+    x3dFemale: -228,
+    x3dMale: -242,
     z3dFemale: 4,
     z3dMale: 4,
     visibleViews: [0, 180],
-    sideByView: { 0: 'right', 90: 'right', 180: 'left', 270: 'left' },
-    labelYOffset: 52,
+    sideByView: { 0: 'left', 90: 'left', 180: 'right', 270: 'right' },
+    labelYOffset: 0,
   },
 
   // =========================================================================

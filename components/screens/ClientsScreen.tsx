@@ -35,6 +35,7 @@ import {
   normalizeMeasurementsRecord,
   parseDueDateToISO,
 } from '@/lib/initial-data';
+import { formatPriceInput, parsePriceInput, formatDateInput } from '@/lib/smart-inputs';
 import { springSmooth, springSnappy } from '@/lib/motion-tokens';
 import { cn } from '@/lib/utils';
 import { convertMeasurement } from '@/lib/units';
@@ -671,8 +672,7 @@ export function ClientsScreen({
   // Create Order from Use Measurement Flow (Desktop Frame 3 / Mobile Frame 1)
   const handleCreateOrderFromUseFlow = async () => {
     if (!selectedClientProfile) return;
-    const raw = parseFloat(useFlowPrice.replace(/[^0-9.]/g, ''));
-    const parsedPrice = isNaN(raw) ? 0 : raw;
+    const parsedPrice = parsePriceInput(useFlowPrice);
     const refImgs =
       useFlowImages.length > 0
         ? useFlowImages.map((url, idx) => ({
@@ -712,8 +712,7 @@ export function ClientsScreen({
   const handleSaveInlineNewOrder = async () => {
     const typedName=newOrderClientName.trim();
     const selected=selectedClientProfile && (!typedName||typedName===selectedClientProfile.name)?selectedClientProfile:undefined;
-    const raw = parseFloat(newOrderPrice.replace(/[^0-9.]/g, ''));
-    const parsedPrice = isNaN(raw) ? 0 : raw;
+    const parsedPrice = parsePriceInput(newOrderPrice);
     const refImgs =
       newOrderImages.length > 0
         ? newOrderImages.map((url, idx) => ({
@@ -1391,7 +1390,7 @@ export function ClientsScreen({
                             type="text"
                             inputMode="decimal"
                             value={useFlowPrice}
-                            onChange={(e) => setUseFlowPrice(e.target.value)}
+                            onChange={(e) => setUseFlowPrice(formatPriceInput(e.target.value))}
                             placeholder={`${currencySymbol}0.00`}
                             className="w-full h-9 rounded-[8px] bg-[#F8F8F8] px-3 text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[#CCCCCC] tabular-nums transition-colors"
                           />
@@ -1403,7 +1402,7 @@ export function ClientsScreen({
                           <input
                             type="text"
                             value={useFlowDueDate}
-                            onChange={(e) => setUseFlowDueDate(e.target.value)}
+                            onChange={(e) => setUseFlowDueDate(formatDateInput(e.target.value, useFlowDueDate))}
                             placeholder="09/10/2026"
                             className="w-full h-9 rounded-[8px] bg-[#F8F8F8] px-3 text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none border border-transparent focus:border-[#CCCCCC] tabular-nums transition-colors"
                           />
@@ -1860,7 +1859,7 @@ export function ClientsScreen({
                           type="text"
                           inputMode="decimal"
                           value={newOrderPrice}
-                          onChange={(e) => setNewOrderPrice(e.target.value)}
+                          onChange={(e) => setNewOrderPrice(formatPriceInput(e.target.value))}
                           placeholder={`${currencySymbol}0.00`}
                           className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-transparent px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#CCCCCC] transition-colors tabular-nums"
                         />
@@ -1873,7 +1872,7 @@ export function ClientsScreen({
                         <input
                           type="text"
                           value={newOrderDueDate}
-                          onChange={(e) => setNewOrderDueDate(e.target.value)}
+                          onChange={(e) => setNewOrderDueDate(formatDateInput(e.target.value, newOrderDueDate))}
                           placeholder="09/10/2026"
                           className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-transparent px-3 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#CCCCCC] transition-colors tabular-nums"
                         />

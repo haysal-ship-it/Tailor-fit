@@ -27,6 +27,7 @@ import {
   parseDueDateToISO,
   formatISOToDMY,
 } from '@/lib/initial-data';
+import { formatPriceInput, parsePriceInput, formatDateInput } from '@/lib/smart-inputs';
 import { cn } from '@/lib/utils';
 
 interface OrderFormModalProps {
@@ -223,7 +224,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
     existingOrder?.status || 'In Progress'
   );
   const [price, setPrice] = useState<string>(
-    existingOrder?.price ? String(existingOrder.price) : ''
+    existingOrder?.price ? formatPriceInput(existingOrder.price) : ''
   );
   const [dueDate, setDueDate] = useState<string>(
     existingOrder?.pickupDateTime ? formatISOToDMY(existingOrder.pickupDateTime) : ''
@@ -583,15 +584,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
 
     {
       // Price parsing with strict non-negative validation (A03)
-      let rawPrice = 0;
-      const trimmedPrice = price.trim();
-      if (trimmedPrice) {
-        const sanitized = trimmedPrice.replace(/[^\d.-]/g, '');
-        const num = parseFloat(sanitized);
-        if (!isNaN(num) && num >= 0) {
-          rawPrice = Math.round(num * 100) / 100;
-        }
-      }
+      const rawPrice = parsePriceInput(price);
 
       const measurementObj: Record<string, number> = {};
       fields.forEach((f) => {
@@ -1066,7 +1059,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                           type="text"
                           value={price}
                           onChange={(e) => {
-                            setPrice(e.target.value);
+                            setPrice(formatPriceInput(e.target.value));
                             setHasFormEdited(true);
                           }}
                           placeholder={`${currencySymbol}0.00`}
@@ -1084,7 +1077,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                           type="text"
                           value={dueDate}
                           onChange={(e) => {
-                            setDueDate(e.target.value);
+                            setDueDate(formatDateInput(e.target.value, dueDate));
                             setHasFormEdited(true);
                           }}
                           placeholder="09/10/2026"
@@ -1519,7 +1512,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                       <input
                         type="text"
                         value={price}
-                        onChange={(e) => setPrice(e.target.value)}
+                        onChange={(e) => setPrice(formatPriceInput(e.target.value))}
                         placeholder={`${currencySymbol}0.00`}
                         className="w-full bg-transparent text-[16px] text-black placeholder:text-[var(--muted)] focus:outline-none tabular-nums"
                       />
@@ -1535,7 +1528,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                         type="text"
                         value={dueDate}
                         onChange={(e) => {
-                          setDueDate(e.target.value);
+                          setDueDate(formatDateInput(e.target.value, dueDate));
                           setHasFormEdited(true);
                         }}
                         placeholder="09/10/2026"

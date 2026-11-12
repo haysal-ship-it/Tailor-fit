@@ -434,10 +434,10 @@ export function RotatableMannequin({
 
   // Compute non-overlapping, container-bounded callout positions for all visible landmarks
   const positionedLandmarks = useMemo(() => {
-    const LEFT_ANCHOR_X = 132;
-    const RIGHT_ANCHOR_X = 504;
-    const MIN_Y = 30;
-    const MAX_Y = 700;
+    const LEFT_ANCHOR_X = 64;
+    const RIGHT_ANCHOR_X = 572;
+    const MIN_Y = 44;
+    const MAX_Y = 686;
 
     type Item = {
       lm: (typeof visibleLandmarks)[number];
@@ -445,7 +445,6 @@ export function RotatableMannequin({
       projY: number;
       isLeft: boolean;
       labelAnchorX: number;
-      naturalY: number;
       resolvedY: number;
       lines: string[];
       formattedVal: string;
@@ -473,20 +472,7 @@ export function RotatableMannequin({
         : '';
 
       const totalLines = lines.length + (hasValue ? 1 : 0);
-      const boxHeight = totalLines * 14 + 8;
-
-      let yOff = lm.labelYOffset ?? 0;
-      // Push wide arm landmarks vertically clear of the arm touchpoint dot
-      if (isLeft && projX < LEFT_ANCHOR_X + 35 && Math.abs(yOff) < 28) {
-        yOff = yOff >= 0 ? 34 : -34;
-      } else if (!isLeft && projX > RIGHT_ANCHOR_X - 35 && Math.abs(yOff) < 28) {
-        yOff = yOff >= 0 ? 34 : -34;
-      }
-
-      const naturalY = Math.max(
-        MIN_Y + boxHeight / 2,
-        Math.min(MAX_Y - boxHeight / 2, projY + yOff)
-      );
+      const boxHeight = totalLines * 13 + 6;
 
       return {
         lm,
@@ -494,8 +480,7 @@ export function RotatableMannequin({
         projY,
         isLeft,
         labelAnchorX,
-        naturalY,
-        resolvedY: naturalY,
+        resolvedY: projY,
         lines,
         formattedVal,
         hasValue,
@@ -505,24 +490,28 @@ export function RotatableMannequin({
 
     const solveSide = (group: Item[]) => {
       if (group.length <= 1) return;
-      group.sort((a, b) => a.naturalY - b.naturalY || a.projY - b.projY);
+      // Strict Monotonicity: sort strictly by projY so leader lines never cross
+      group.sort((a, b) => a.projY - b.projY || Math.abs(a.projX - 318) - Math.abs(b.projX - 318));
 
       const totalBoxHeight = group.reduce((acc, it) => acc + it.boxHeight, 0);
       const availableSpan = MAX_Y - MIN_Y;
-      const gap =
-        totalBoxHeight + (group.length - 1) * 7 <= availableSpan
-          ? 7
-          : Math.max(2, (availableSpan - totalBoxHeight) / Math.max(1, group.length - 1));
+      const remainingSpace = availableSpan - totalBoxHeight;
+      const gap = Math.min(22, Math.max(12, remainingSpace / Math.max(1, group.length + 1)));
 
-      // Forward pass: push down any overlapping callouts
+      // Initialize resolvedY to touchpoint projY
+      for (let i = 0; i < group.length; i++) {
+        group[i].resolvedY = Math.max(MIN_Y + group[i].boxHeight / 2, Math.min(MAX_Y - group[i].boxHeight / 2, group[i].projY));
+      }
+
+      // Forward pass: ensure minimum gap between consecutive callouts
       for (let i = 0; i < group.length; i++) {
         const half = group[i].boxHeight / 2;
         if (i === 0) {
-          group[i].resolvedY = Math.max(MIN_Y + half, group[i].naturalY);
+          group[i].resolvedY = Math.max(MIN_Y + half, group[i].resolvedY);
         } else {
           const prevBottom = group[i - 1].resolvedY + group[i - 1].boxHeight / 2;
           const minCenter = prevBottom + gap + half;
-          group[i].resolvedY = Math.max(minCenter, group[i].naturalY);
+          group[i].resolvedY = Math.max(minCenter, group[i].resolvedY);
         }
       }
 
@@ -580,11 +569,11 @@ export function RotatableMannequin({
         className={cn(
           'relative w-full flex items-center justify-center touch-pan-y overflow-hidden',
           isDragging ? 'cursor-grabbing' : 'cursor-grab',
-          compact ? 'max-w-[380px]' : 'max-w-[520px]'
+          compact ? 'max-w-[400px]' : 'max-w-[540px]'
         )}
       >
         <svg
-          viewBox="0 0 636 730"
+          viewBox="-40 0 716 730"
           className={cn(
             'w-full h-auto select-none overflow-hidden',
             compact ? 'max-h-[430px]' : 'max-h-[540px]'
@@ -650,17 +639,9 @@ export function RotatableMannequin({
               hasValue,
             } = item;
 
-            const dy = labelAnchorY - projY;
-            let polyPoints: string;
-            if (Math.abs(dy) > 3) {
-              const kinkSpan = Math.min(28, Math.max(10, Math.abs(dy) * 0.45));
-              const kinkX = isLeft
-                ? Math.max(labelAnchorX + 10, projX - kinkSpan)
-                : Math.min(labelAnchorX - 10, projX + kinkSpan);
-              polyPoints = `${projX.toFixed(1)},${projY.toFixed(1)} ${kinkX.toFixed(1)},${labelAnchorY.toFixed(1)} ${labelAnchorX.toFixed(1)},${labelAnchorY.toFixed(1)}`;
-            } else {
-              polyPoints = `${projX.toFixed(1)},${projY.toFixed(1)} ${labelAnchorX.toFixed(1)},${labelAnchorY.toFixed(1)}`;
-            }
+            const shelfWidth = 12;
+            const shelfX = isLeft ? labelAnchorX + shelfWidth : labelAnchorX - shelfWidth;
+            const polyPoints = `${projX.toFixed(1)},${projY.toFixed(1)} ${shelfX.toFixed(1)},${labelAnchorY.toFixed(1)} ${labelAnchorX.toFixed(1)},${labelAnchorY.toFixed(1)}`;
 
             const displayLabel = gender === 'male' && lm.maleLabel ? lm.maleLabel : lm.label;
             const isHoveredOrActive = hoveredKey === lm.key || resolvedSelectedKey === lm.key;
@@ -674,7 +655,7 @@ export function RotatableMannequin({
 
             const textX = isLeft ? labelAnchorX - 7 : labelAnchorX + 7;
             const totalTextLines = lines.length + (hasValue ? 1 : 0);
-            const lineStep = 13.5;
+            const lineStep = 13;
             const startY = labelAnchorY - ((totalTextLines - 1) * lineStep) / 2;
 
             return (
@@ -704,7 +685,7 @@ export function RotatableMannequin({
                     fill="none"
                     stroke="#079BF8"
                     strokeWidth={isHoveredOrActive ? '2' : '1.5'}
-                    strokeDasharray="4 4"
+                    strokeDasharray="3 3"
                   />
 
                   {/* Small terminal anchor tick at the end of the dotted line */}
@@ -719,10 +700,10 @@ export function RotatableMannequin({
                       textAnchor={isLeft ? 'end' : 'start'}
                       dominantBaseline="central"
                       fontFamily="var(--font-manrope), sans-serif"
-                      fontSize="12"
+                      fontSize="11"
                       fontWeight="600"
                       fill="#1D1D1D"
-                      stroke="#F8F8F8"
+                      stroke="#FFFFFF"
                       strokeWidth="3.5"
                       paintOrder="stroke"
                       className="select-none"
@@ -739,10 +720,10 @@ export function RotatableMannequin({
                       textAnchor={isLeft ? 'end' : 'start'}
                       dominantBaseline="central"
                       fontFamily="var(--font-manrope), sans-serif"
-                      fontSize="12.5"
+                      fontSize="11.5"
                       fontWeight="700"
                       fill="#079BF8"
-                      stroke="#F8F8F8"
+                      stroke="#FFFFFF"
                       strokeWidth="3.5"
                       paintOrder="stroke"
                       className="select-none tabular-nums"
@@ -753,28 +734,22 @@ export function RotatableMannequin({
                 </g>
 
                 {/* Generous 44px+ Equivalent Invisible Hit Target for Touch & Mouse */}
-                <circle cx={projX} cy={projY} r="24" fill="transparent" />
+                <circle cx={projX} cy={projY} r="22" fill="transparent" />
 
                 {/* Active Touchpoint Ring & Center Dot */}
                 <circle
                   cx={projX}
                   cy={projY}
-                  r={isHoveredOrActive ? '9.5' : '7.5'}
-                  fill={
-                    isHoveredOrActive
-                      ? 'rgba(7, 155, 248, 0.32)'
-                      : hasValue
-                      ? 'rgba(7, 155, 248, 0.24)'
-                      : 'rgba(7, 155, 248, 0.14)'
-                  }
+                  r="7"
+                  fill="#FFFFFF"
                   stroke="#079BF8"
-                  strokeWidth={isHoveredOrActive ? '2' : '1.5'}
+                  strokeWidth={isHoveredOrActive ? '2.5' : '1.8'}
                   className="transition-all duration-150"
                 />
                 <circle
                   cx={projX}
                   cy={projY}
-                  r={isHoveredOrActive ? '4' : '3.2'}
+                  r="3.5"
                   fill="#079BF8"
                   className="transition-all duration-150"
                 />

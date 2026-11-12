@@ -25,6 +25,7 @@ import {
   encodeOrderPreviewPayload,
   type OrderPreviewPayload,
 } from "@/lib/orders/preview-link";
+import { formatPriceInput, parsePriceInput } from "@/lib/smart-inputs";
 import { cn } from "@/lib/utils";
 import type { Client, MeasurementSnapshot, Order, OrderStatus } from "@/types";
 
@@ -1073,7 +1074,7 @@ function OrderEditor({
   );
   const client = store.clients.find((c) => c.id === chosenClient);
   const [garment, setGarment] = useState(order?.garmentType || ""),
-    [price, setPrice] = useState(String(order?.price ?? "")),
+    [price, setPrice] = useState(formatPriceInput(order?.price)),
     [due, setDue] = useState(order?.pickupDateTime?.slice(0, 10) || ""),
     [notes, setNotes] = useState(order?.notes || "");
   const [status, setStatus] = useState<OrderStatus>(
@@ -1171,12 +1172,13 @@ function OrderEditor({
     e.preventDefault();
     if (busy || !draft.loaded) return;
     setError("");
+    const parsedPrice = parsePriceInput(price);
     if (
       !client ||
       !garment.trim() ||
       price.trim() === "" ||
-      !Number.isFinite(Number(price)) ||
-      Number(price) < 0
+      !Number.isFinite(parsedPrice) ||
+      parsedPrice < 0
     ) {
       setError(
         "Choose a client, enter a garment, and provide a price of zero or more.",
@@ -1216,7 +1218,7 @@ function OrderEditor({
             ? linked?.id
             : undefined,
           referenceImages: images,
-          price: Number(price),
+          price: parsedPrice,
           currency,
           status,
           pickupDateTime: due ? `${due}T12:00:00Z` : "",
@@ -1326,11 +1328,11 @@ function OrderEditor({
           <div className="grid gap-4 sm:grid-cols-2">
             <Input
               label={`Price (${currency || "currency not set"})`}
-              type="number"
-              min="0"
-              step="0.01"
+              type="text"
+              inputMode="decimal"
               value={price}
-              onChange={(e) => setPrice(e.target.value)}
+              onChange={(e) => setPrice(formatPriceInput(e.target.value))}
+              placeholder="0.00"
               required
             />
             <Input

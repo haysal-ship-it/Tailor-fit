@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useStore } from '@/lib/store';
 import { useAccount } from '@/components/auth/AccountProvider';
@@ -85,18 +86,22 @@ export function Navbar() {
         <header className="w-full p-[2px] rounded-[8px] bg-[var(--surface)]">
           {/* Inner --card bar (radius 6, padding 4px 24px) */}
           <div className="w-full rounded-[6px] bg-[var(--card)] px-4 sm:px-6 py-1 flex items-center justify-between min-h-[56px]">
-            {/* Left: logo mark (about 44x31) and TailorFit wordmark, 8px apart */}
+            {/* Left: Brand Logo */}
             <button
               type="button"
               onClick={() => setActiveScreen('overview')}
               aria-label="TailorFit — Go to Overview"
-              className="flex items-center gap-2 cursor-pointer text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] rounded-[6px]"
+              className="flex items-center cursor-pointer text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] rounded-[6px] py-0.5"
               id="brand-logo-button"
             >
-              <OrigamiTailorFitLogo className="w-[44px] h-[31px] text-black" />
-              <span className="text-[20px] sm:text-[24px] font-bold text-black tracking-[-0.02em]">
-                TailorFit
-              </span>
+              <Image
+                src="/assets/branding/tailorfit-navbar-logo.png"
+                alt="TailorFit"
+                width={134}
+                height={30}
+                priority
+                className="h-[26px] sm:h-[30px] w-auto object-contain"
+              />
             </button>
 
             {/* Center: black nav capsule (radius 32, 4px padding, 4px gaps) */}

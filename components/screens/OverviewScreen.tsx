@@ -29,6 +29,7 @@ import {
   resolveCanonicalKey,
   parseDueDateToISO,
 } from '@/lib/initial-data';
+import { formatPriceInput, parsePriceInput, formatDateInput } from '@/lib/smart-inputs';
 import { cn } from '@/lib/utils';
 import { getOrderStatusPresentation, type OrderStatusPresentation } from '@/lib/status';
 import { useTour } from '@/components/onboarding/TourProvider';
@@ -536,8 +537,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
     const trimmedPhone = clientPhone.trim();
     const trimmedEmail = clientEmail.trim();
     const trimmedGarment = clientGarment.trim() || selectedTemplateName;
-    const rawPrice = parseFloat(clientPrice.replace(/[^0-9.]/g, ''));
-    const priceNum = isNaN(rawPrice) ? 0 : rawPrice;
+    const priceNum = parsePriceInput(clientPrice);
 
     const errors: { name?: string; phone?: string; email?: string; garment?: string } = {};
     const missing: string[] = [];
@@ -768,7 +768,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
               inputMode="decimal"
               placeholder={`${currencySymbol}0.00`}
               value={clientPrice}
-              onChange={(e) => setClientPrice(e.target.value)}
+              onChange={(e) => setClientPrice(formatPriceInput(e.target.value))}
               className="tabular-nums"
             />
             <div className="relative" ref={dueDatePickerRef}>
@@ -777,7 +777,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
                 type="text"
                 placeholder="DD/MM/YYYY"
                 value={clientDueDate}
-                onChange={(e) => setClientDueDate(e.target.value)}
+                onChange={(e) => setClientDueDate(formatDateInput(e.target.value, clientDueDate))}
                 className={cn(
                   'tabular-nums',
                   clientDueDate

@@ -653,7 +653,7 @@ export function SettingsScreen() {
               whileTap={{ scale: 0.98 }}
               transition={springSnappy}
               className={cn(
-                'inline-flex items-center justify-center gap-2 h-10 px-5 rounded-[8px] font-medium text-[14px] text-white transition-all shadow-xs cursor-pointer select-none',
+                'inline-flex items-center justify-center gap-2 h-10 px-6 rounded-full font-medium text-[14px] text-white transition-all shadow-xs cursor-pointer select-none',
                 saveStatus === 'success'
                   ? 'bg-[var(--completed)]'
                   : 'bg-[var(--primary)] hover:bg-[var(--primary)]/90',
