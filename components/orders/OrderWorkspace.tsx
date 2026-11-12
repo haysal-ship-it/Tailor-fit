@@ -8,6 +8,7 @@ import {
   PersonStanding,
   X,
 } from "lucide-react";
+import { ArrowsClockwise } from "@phosphor-icons/react";
 import { useStore } from "@/lib/store";
 import { useDraft } from "@/lib/drafts/use-draft";
 import { RotatableMannequin } from "@/components/mannequin/RotatableMannequin";
@@ -453,40 +454,15 @@ export function OrderWorkspace({
                       setIsMenuOpen(false);
                       setError("");
                       setNotice("");
-                      void pdf(true);
-                    }}
-                    className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#f8f8f8] transition-colors cursor-pointer text-left"
-                  >
-                    <img
-                      src="/icons/order-details/download.svg"
-                      alt=""
-                      width={16}
-                      height={16}
-                      className="w-[16px] h-[16px] shrink-0"
-                    />
-                    <span className="font-medium text-[12px] text-[#595959] whitespace-nowrap">
-                      Download PDF
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      setError("");
-                      setNotice("");
                       setSelectedStatus(normalizeSelectableStatus(order.status));
                       setDialog("status");
                     }}
                     className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#f8f8f8] transition-colors cursor-pointer text-left"
                   >
-                    <img
-                      src="/icons/order-details/download.svg"
-                      alt=""
-                      width={16}
-                      height={16}
-                      className="w-[16px] h-[16px] shrink-0"
+                    <ArrowsClockwise
+                      size={16}
+                      weight="regular"
+                      className="w-[16px] h-[16px] shrink-0 text-[#595959]"
                     />
                     <span className="font-medium text-[12px] text-[#595959] whitespace-nowrap">
                       Update status

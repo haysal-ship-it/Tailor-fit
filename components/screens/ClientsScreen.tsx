@@ -38,6 +38,7 @@ import {
 import { springSmooth, springSnappy } from '@/lib/motion-tokens';
 import { cn } from '@/lib/utils';
 import { convertMeasurement } from '@/lib/units';
+import { PencilSimple } from '@phosphor-icons/react';
 import { getOrderStatusPresentation, formatDate } from '@/lib/status';
 import { ContextualTip } from '@/components/onboarding/ContextualTip';
 
@@ -47,6 +48,7 @@ interface ClientsScreenProps {
   onNewMeasurement?: (clientId: string) => void;
   onNewOrder?: (clientId: string) => void;
   onEditOrder?: (orderId: string) => void;
+  onBackToDirectory?: () => void;
 }
 
 type ClientsViewState =
@@ -84,6 +86,7 @@ export function ClientsScreen({
   onNewMeasurement,
   onNewOrder,
   onEditOrder, orderId, newOrder, orderClientId, onOrderBack, onOrderSaved,
+  onBackToDirectory,
 }: ClientsScreenProps) {
   const {
     clients,
@@ -105,6 +108,19 @@ export function ClientsScreen({
     resetToDemoData,
   } = useStore();
 
+  const handleBackToDirectory = () => {
+    setSelectedClientId(null);
+    onBackToDirectory?.();
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('client') || url.searchParams.has('order')) {
+        url.searchParams.delete('client');
+        url.searchParams.delete('order');
+        window.history.replaceState({}, '', url.toString());
+      }
+    }
+  };
+
   const showingOrder=!!(orderId||newOrder);
   const unitLabel = settings?.defaultUnit || 'cm';
   const currencySymbol = settings?.currency || '₦';
@@ -120,7 +136,7 @@ export function ClientsScreen({
   );
 
   // Header overflow `⋮` menu & Snapshot dropdown states
-  const [, setIsOverflowMenuOpen] = useState(false);
+  const [isOverflowMenuOpen, setIsOverflowMenuOpen] = useState(false);
   const [isSnapshotDropdownOpen, setIsSnapshotDropdownOpen] = useState(false);
   const [isNewOrderTemplateDropdownOpen, setIsNewOrderTemplateDropdownOpen] = useState(false);
 
@@ -643,6 +659,7 @@ export function ClientsScreen({
     const name = selectedClientProfile.name;
     if(!await deleteClient(selectedClientProfile.id))return;
     setIsDeleteConfirmOpen(false);
+    handleBackToDirectory();
     showToast({
       type: 'success',
       title: 'Client Deleted',
@@ -937,7 +954,7 @@ export function ClientsScreen({
         <div className="w-full bg-[var(--surface)] rounded-[6px] px-4 sm:px-6 py-4 sm:py-5 flex flex-col gap-4 relative">
           <button
             type="button"
-            onClick={() => setSelectedClientId(null)}
+            onClick={handleBackToDirectory}
             className="flex items-center gap-[4px] text-[#595959] hover:text-black transition-colors cursor-pointer w-fit"
             title="Back to client directory"
           >
@@ -996,10 +1013,7 @@ export function ClientsScreen({
             </div>
 
             {/* Right Action Cluster: `New order` pill + `⋮` Overflow Menu Button */}
-            <div
-              ref={overflowMenuRef}
-              className="flex items-center gap-2.5 w-full sm:w-auto relative"
-            >
+            <div className="flex items-center gap-2.5 w-full sm:w-auto relative">
               <button
                 type="button"
                 onClick={() => {
@@ -1011,10 +1025,72 @@ export function ClientsScreen({
                 New order
               </button>
 
-              <ChoiceMenu kind="menu" iconOnly placeholder="Client profile actions"
-                options={[{value:'edit',label:'Edit profile'},{value:'delete',label:'Delete client',destructive:true}]}
-                onChoose={value=>value==='edit'?handleOpenEditProfile('edit'):setIsDeleteConfirmOpen(true)}
-              />
+              <div ref={overflowMenuRef} className="relative flex items-center shrink-0">
+                <button
+                  type="button"
+                  aria-label="Client profile actions"
+                  aria-haspopup="menu"
+                  aria-expanded={isOverflowMenuOpen}
+                  onClick={() => setIsOverflowMenuOpen((prev) => !prev)}
+                  className="bg-[#f2f2f2] hover:bg-[#e8e8e8] rounded-[32px] size-[40px] p-[4px] flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <img
+                    src="/icons/order-details/dots-vertical.svg"
+                    alt=""
+                    width={24}
+                    height={24}
+                    className="w-[24px] h-[24px]"
+                  />
+                </button>
+
+                {isOverflowMenuOpen && (
+                  <div
+                    role="menu"
+                    aria-label="Client profile actions"
+                    className="absolute right-0 top-[calc(100%+6px)] z-50 w-[157px] bg-white border border-[#eeecec] rounded-[8px] p-[2px] shadow-lg flex flex-col items-start"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setIsOverflowMenuOpen(false);
+                        handleOpenEditProfile('edit');
+                      }}
+                      className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#f8f8f8] transition-colors cursor-pointer text-left"
+                    >
+                      <PencilSimple
+                        size={16}
+                        weight="regular"
+                        className="w-[16px] h-[16px] shrink-0 text-[#595959]"
+                      />
+                      <span className="font-medium text-[12px] text-[#595959] whitespace-nowrap">
+                        Edit profile
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setIsOverflowMenuOpen(false);
+                        setIsDeleteConfirmOpen(true);
+                      }}
+                      className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#fff5f5] transition-colors cursor-pointer text-left"
+                    >
+                      <img
+                        src="/icons/order-details/trash.svg"
+                        alt=""
+                        width={16}
+                        height={16}
+                        className="w-[16px] h-[16px] shrink-0"
+                      />
+                      <span className="font-medium text-[12px] text-[#f83437] whitespace-nowrap">
+                        Delete client
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

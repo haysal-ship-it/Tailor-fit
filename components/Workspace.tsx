@@ -123,6 +123,12 @@ function TailorFitApp() {
     setActiveScreen("clients");
   };
 
+  const handleBackToClientDirectory = () => {
+    if (!canLeave()) return;
+    routeOrder(undefined, undefined, true);
+    setSelectedClientId(null);
+  };
+
   const handleOpenNewOrder = (clientId?: string) => {
     if (!requireAccount() || !canLeave()) return;
     historyScroll.current = window.scrollY;
@@ -206,6 +212,7 @@ function TailorFitApp() {
             }
             onOrderBack={backToHistory}
             onOrderSaved={(id, cid) => routeOrder(id, cid, true)}
+            onBackToDirectory={handleBackToClientDirectory}
           />
         )}
 
