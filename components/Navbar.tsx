@@ -164,7 +164,7 @@ export function Navbar() {
       </div>
 
       {/* Global Mobile/Tablet Floating Bottom Nav Dock (< 1024px) */}
-      <div className="lg:hidden fixed bottom-[max(1rem,env(safe-area-inset-bottom))] inset-x-0 z-40 flex justify-center px-4 pointer-events-none select-none">
+      <div className="hidden max-lg:flex fixed bottom-[max(1rem,env(safe-area-inset-bottom))] inset-x-0 z-40 justify-center px-4 pointer-events-none select-none">
         <nav
           aria-label="Mobile Navigation"
           className="pointer-events-auto bg-black rounded-[32px] p-1.5 flex items-center gap-1 shadow-xl border border-white/10"

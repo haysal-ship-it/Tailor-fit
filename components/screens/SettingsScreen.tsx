@@ -199,12 +199,12 @@ export function SettingsScreen() {
     }));
   };
 
-  // Currency Options matching the Figma screenshot: NGN (₦), US Dollar ($), Euro (), Pounds ()
+  // Currency Options matching the Figma screenshot: NGN (₦), US Dollar ($), Euro (€), Pounds (£)
   const currencyOptions = [
     { label: 'NGN (₦)', symbol: '₦' },
     { label: 'US Dollar ($)', symbol: '$' },
-    { label: 'Euro ()', symbol: '€' },
-    { label: 'Pounds ()', symbol: '£' },
+    { label: 'Euro (€)', symbol: '€' },
+    { label: 'Pounds (£)', symbol: '£' },
   ];
 
   // Save changes handler
@@ -357,7 +357,7 @@ export function SettingsScreen() {
                       : 'text-[var(--text-2)] hover:text-black'
                   )}
                 >
-                  Centimeteres (cm)
+                  Centimeters (cm)
                 </button>
 
                 <button

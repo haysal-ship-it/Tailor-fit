@@ -1,7 +1,7 @@
 'use client';
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import type { Client, MeasurementSnapshot, Order, AppSettings, OrderStatus, HotspotDefinition, GarmentTemplate } from '@/types';
-import { DEFAULT_SETTINGS, DEFAULT_HOTSPOTS, normalizeMeasurementsRecord } from './initial-data';
+import { DEFAULT_SETTINGS, DEFAULT_HOTSPOTS, normalizeMeasurementsRecord, SAMPLE_CLIENTS, SAMPLE_SNAPSHOTS, SAMPLE_ORDERS } from './initial-data';
 import { useAccount } from '@/components/auth/AccountProvider';
 import { commitRecords, importWorkspace } from './data/actions';
 import { readWorkspace, stageImages } from './data/repository';
@@ -84,9 +84,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const account = useAccount();
   const owner = account.user?.id;
   const [isHydrated,setIsHydrated] = useState(!owner);
-  const [clients,setClients] = useState<Client[]>([]);
-  const [snapshots,setSnapshots] = useState<MeasurementSnapshot[]>([]);
-  const [orders,setOrders] = useState<Order[]>([]);
+  const [clients,setClients] = useState<Client[]>(() => owner ? [] : SAMPLE_CLIENTS);
+  const [snapshots,setSnapshots] = useState<MeasurementSnapshot[]>(() => owner ? [] : SAMPLE_SNAPSHOTS);
+  const [orders,setOrders] = useState<Order[]>(() => owner ? [] : SAMPLE_ORDERS);
   const [settings,setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [saveStatus,setSaveStatus] = useState<'idle'|'saving'|'saved'|'error'>('idle');
   const [error,setError] = useState('');
@@ -141,23 +141,59 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return ok?{...record,version:expected+1}:null;
   };
   const remove=(kind:Operation['kind'],record?:{id:string;version?:number})=>record?execute([{kind,action:'delete',id:record.id,expected:record.version||1}]):Promise.resolve(false);
-  const addClient=async(data:Omit<Client,'id'|'createdAt'>)=>put('clients',{...data,id:await stableUuid(`${owner}:client:${JSON.stringify(data)}`),createdAt:new Date().toISOString()},0);
-  const updateClient=async(id:string,updates:Partial<Client>)=>{const c=clients.find(c=>c.id===id);return !!c&&!!await put('clients',{...c,...updates,id},c.version||1);};
-  const deleteClient=(id:string)=>remove('clients',clients.find(c=>c.id===id));
-  const addSnapshot=async(data:Omit<MeasurementSnapshot,'id'>)=>put('measurement_snapshots',{...data,date:normalizeDate(data.date),measurements:normalizeMeasurementsRecord(data.measurements),id:await stableUuid(`${owner}:snapshot:${JSON.stringify(data)}`)},0);
-  const updateSnapshot=async(id:string,updates:Partial<MeasurementSnapshot>)=>{const s=snapshots.find(s=>s.id===id);return !!s&&!!await put('measurement_snapshots',{...s,...updates,id,date:normalizeDate(updates.date||s.date)},s.version||1);};
-  const deleteSnapshot=(id:string)=>remove('measurement_snapshots',snapshots.find(s=>s.id===id));
-  const addOrder=async(data:Omit<Order,'id'|'createdAt'>)=>put('orders',{...data,id:await stableUuid(`${owner}:order:${JSON.stringify(data)}`),createdAt:new Date().toISOString()},0);
-  const updateOrder=async(id:string,updates:Partial<Order>)=>{const o=orders.find(o=>o.id===id);return !!o&&!!await put('orders',{...o,...updates,id},o.version||1);};
+  const addClient=async(data:Omit<Client,'id'|'createdAt'>)=>{
+    const id=crypto.randomUUID?crypto.randomUUID():`c-${Date.now()}`;
+    const newClient:Client={...data,id,createdAt:new Date().toISOString()};
+    if(!owner){setClients(prev=>[newClient,...prev]);return newClient;}
+    const res=await put('clients',{...data,id:await stableUuid(`${owner}:client:${JSON.stringify(data)}`),createdAt:new Date().toISOString()},0);
+    return res as Client|null;
+  };
+  const updateClient=async(id:string,updates:Partial<Client>)=>{
+    if(!owner){setClients(prev=>prev.map(c=>c.id===id?{...c,...updates}:c));return true;}
+    const c=clients.find(c=>c.id===id);return !!c&&!!await put('clients',{...c,...updates,id},c.version||1);
+  };
+  const deleteClient=async(id:string)=>{
+    if(!owner){setClients(prev=>prev.filter(c=>c.id!==id));return true;}
+    return remove('clients',clients.find(c=>c.id===id));
+  };
+  const addSnapshot=async(data:Omit<MeasurementSnapshot,'id'>)=>{
+    const id=crypto.randomUUID?crypto.randomUUID():`ms-${Date.now()}`;
+    const snap:MeasurementSnapshot={...data,date:normalizeDate(data.date),measurements:normalizeMeasurementsRecord(data.measurements),id};
+    if(!owner){setSnapshots(prev=>[snap,...prev]);return snap;}
+    const res=await put('measurement_snapshots',{...snap,id:await stableUuid(`${owner}:snapshot:${JSON.stringify(data)}`)},0);
+    return res as MeasurementSnapshot|null;
+  };
+  const updateSnapshot=async(id:string,updates:Partial<MeasurementSnapshot>)=>{
+    if(!owner){setSnapshots(prev=>prev.map(s=>s.id===id?{...s,...updates,date:normalizeDate(updates.date||s.date)}:s));return true;}
+    const s=snapshots.find(s=>s.id===id);return !!s&&!!await put('measurement_snapshots',{...s,...updates,id,date:normalizeDate(updates.date||s.date)},s.version||1);
+  };
+  const deleteSnapshot=async(id:string)=>{
+    if(!owner){setSnapshots(prev=>prev.filter(s=>s.id!==id));return true;}
+    return remove('measurement_snapshots',snapshots.find(s=>s.id===id));
+  };
+  const addOrder=async(data:Omit<Order,'id'|'createdAt'>)=>{
+    const id=crypto.randomUUID?crypto.randomUUID():`ord-${Date.now()}`;
+    const ord:Order={...data,id,createdAt:new Date().toISOString()};
+    if(!owner){setOrders(prev=>[ord,...prev]);return ord;}
+    const res=await put('orders',{...data,id:await stableUuid(`${owner}:order:${JSON.stringify(data)}`),createdAt:new Date().toISOString()},0);
+    return res as Order|null;
+  };
+  const updateOrder=async(id:string,updates:Partial<Order>)=>{
+    if(!owner){setOrders(prev=>prev.map(o=>o.id===id?{...o,...updates}:o));return true;}
+    const o=orders.find(o=>o.id===id);return !!o&&!!await put('orders',{...o,...updates,id},o.version||1);
+  };
   const updateOrderStatus=(id:string,status:OrderStatus)=>updateOrder(id,{status});
-  const deleteOrder=(id:string,expectedVersion?:number)=>{const order=orders.find(o=>o.id===id);return remove('orders',order?{...order,version:expectedVersion??order.version}:undefined);};
-  const updateSettings=async(updates:Partial<AppSettings>)=>!!owner?!!await put('studio_settings',{...settings,...updates,id:owner},settings.version||0):(account.requireAccount(),false);
+  const deleteOrder=(id:string,expectedVersion?:number)=>{
+    if(!owner){setOrders(prev=>prev.filter(o=>o.id!==id));return Promise.resolve(true);}
+    const order=orders.find(o=>o.id===id);return remove('orders',order?{...order,version:expectedVersion??order.version}:undefined);
+  };
+  const updateSettings=async(updates:Partial<AppSettings>)=>!!owner?!!await put('studio_settings',{...settings,...updates,id:owner},settings.version||0):(setSettings(prev=>({...prev,...updates})),true);
   const addCustomField=(field:HotspotDefinition)=>updateSettings({customFields:[...settings.customFields.filter(f=>f.key!==field.key),field]});
   const deleteCustomField=(key:string)=>updateSettings({customFields:settings.customFields.filter(f=>f.key!==key)});
   const addTemplate=(template:GarmentTemplate)=>updateSettings({templates:[...settings.templates.filter(t=>t.id!==template.id),template]});
   const updateTemplate=(id:string,updates:Partial<GarmentTemplate>)=>updateSettings({templates:settings.templates.map(t=>t.id===id?{...t,...updates}:t)});
   const deleteTemplate=(id:string)=>updateSettings({templates:settings.templates.filter(t=>t.id!==id)});
-  const resetToDemoData=async()=>fail(new Error('Demo data is separate from your private workspace.'));
+  const resetToDemoData=async()=>{setClients(SAMPLE_CLIENTS);setSnapshots(SAMPLE_SNAPSHOTS);setOrders(SAMPLE_ORDERS);return true;};
   const payload=():BackupPayload=>({version:'3.0',clients,snapshots,orders,settings});
   const exportDataJson=async()=>{if(!account.requireAccount())return false;try{await exportBackup(payload());return true;}catch(e){return fail(e);}};
   const importData=async(data:BackupPayload,replace:boolean)=>{

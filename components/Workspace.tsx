@@ -187,7 +187,7 @@ function TailorFitApp() {
       <Navbar />
 
       {/* Main Content Area */}
-      <main id="main-content" className="flex-1 w-full">
+      <main id="main-content" className="flex-1 w-full max-lg:pb-24">
         {(activeScreen === "overview" ||
           activeScreen === "dashboard" ||
           activeScreen === "new-measurement" ||
