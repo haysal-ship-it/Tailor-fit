@@ -62,7 +62,7 @@ export function TestimonialsSection() {
               transform: reduced ? "rotate(0deg)" : `rotate(${item.angle}deg)`,
             }}
             whileInView={{ transform: "rotate(0deg)" }}
-            viewport={{ amount: 0.45, once: false }}
+            viewport={{ amount: 0.25, once: true }}
             transition={{
               duration: reduced ? 0 : 0.65,
               ease: [0.23, 1, 0.32, 1],

@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Loader2, AlertCircle, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { springSnappy, springMorph } from '@/lib/motion-tokens';
+import { springSnappy } from '@/lib/motion-tokens';
 
 export type MorphingButtonStatus = 'idle' | 'loading' | 'success' | 'error';
 
@@ -60,6 +60,7 @@ export function MorphingSaveButton({
       type="button"
       data-tour={dataTour}
       disabled={disabled || status === 'loading'}
+      aria-busy={status === 'loading' || undefined}
       onClick={handleClick}
       whileTap={disabled || status === 'loading' || shouldReduceMotion ? undefined : { scale: 0.97 }}
       transition={springSnappy}
@@ -81,10 +82,10 @@ export function MorphingSaveButton({
         {status === 'idle' && (
           <motion.span
             key="idle"
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={springMorph}
+            initial={shouldReduceMotion ? false : { opacity: 0, transform: "translateY(4px)" }}
+            animate={{ opacity: 1, transform: "translateY(0px)" }}
+            exit={{ opacity: 0, transform: shouldReduceMotion ? "none" : "translateY(-4px)" }}
+            transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
             className="inline-flex items-center gap-1.5 text-[13px] font-medium"
           >
             <Save className="w-4 h-4 shrink-0" />
@@ -95,13 +96,13 @@ export function MorphingSaveButton({
         {status === 'loading' && (
           <motion.span
             key="loading"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={springMorph}
+            initial={shouldReduceMotion ? false : { opacity: 0, transform: "scale(0.98)" }}
+            animate={{ opacity: 1, transform: "scale(1)" }}
+            exit={{ opacity: 0, transform: shouldReduceMotion ? "none" : "scale(0.98)" }}
+            transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
             className="inline-flex items-center gap-2 text-[13px] font-medium"
           >
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 aria-hidden="true" className="w-4 h-4 motion-safe:animate-spin" />
             <span>Saving...</span>
           </motion.span>
         )}
@@ -109,10 +110,10 @@ export function MorphingSaveButton({
         {status === 'success' && (
           <motion.span
             key="success"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={springMorph}
+            initial={shouldReduceMotion ? false : { opacity: 0, transform: "scale(0.98)" }}
+            animate={{ opacity: 1, transform: "scale(1)" }}
+            exit={{ opacity: 0, transform: shouldReduceMotion ? "none" : "scale(0.98)" }}
+            transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
             className="inline-flex items-center gap-1.5 text-[13px] font-medium"
           >
             <svg
@@ -141,10 +142,10 @@ export function MorphingSaveButton({
         {status === 'error' && (
           <motion.span
             key="error"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={springMorph}
+            initial={shouldReduceMotion ? false : { opacity: 0, transform: "scale(0.98)" }}
+            animate={{ opacity: 1, transform: "scale(1)" }}
+            exit={{ opacity: 0, transform: shouldReduceMotion ? "none" : "scale(0.98)" }}
+            transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
             className="inline-flex items-center gap-1.5 text-[13px] font-medium"
           >
             <AlertCircle className="w-4 h-4" />

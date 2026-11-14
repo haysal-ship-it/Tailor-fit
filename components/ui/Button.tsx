@@ -34,7 +34,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const shouldReduceMotion = useReducedMotion();
 
     const baseStyles =
-      'inline-flex items-center justify-center font-medium rounded-[24px] cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] select-none disabled:cursor-not-allowed disabled:opacity-30';
+      'relative inline-flex items-center justify-center font-medium rounded-[24px] cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] select-none disabled:cursor-not-allowed disabled:opacity-30';
 
     const variantStyles = {
       // Primary button: --primary fill, white 14px/500 text, radius 24px
@@ -64,6 +64,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <motion.button
         ref={ref}
         disabled={disabled || isLoading}
+        aria-busy={isLoading || undefined}
         whileTap={disabled || isLoading || shouldReduceMotion ? undefined : { scale: 0.97 }}
         transition={springSnappy}
         className={cn(
@@ -71,19 +72,20 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           variantStyles[variant],
           sizeStyles[size],
           fullWidth && 'w-full',
+          isLoading && 'disabled:opacity-100 disabled:cursor-wait',
           className
         )}
         {...(props as any)}
       >
-        {isLoading ? (
-          <Loader2 className="w-4 h-4 animate-spin text-current" />
-        ) : (
-          <>
-            {leftIcon && <span className="inline-flex shrink-0">{leftIcon}</span>}
-            {children}
-            {rightIcon && <span className="inline-flex shrink-0">{rightIcon}</span>}
-          </>
-        )}
+        <span className={cn('inline-flex items-center justify-center gap-[inherit]', isLoading && 'invisible')}>
+          {leftIcon && <span className="inline-flex shrink-0">{leftIcon}</span>}
+          {children}
+          {rightIcon && <span className="inline-flex shrink-0">{rightIcon}</span>}
+        </span>
+        {isLoading && <span className="absolute inset-0 inline-flex items-center justify-center">
+          <Loader2 aria-hidden="true" className="w-4 h-4 motion-safe:animate-spin text-current" />
+          <span className="sr-only">{typeof children === 'string' ? `${children} in progress` : 'Working'}</span>
+        </span>}
       </motion.button>
     );
   }

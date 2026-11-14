@@ -8,7 +8,7 @@ import { FeaturesSection } from './FeaturesSection';
 import { PricingSection } from './PricingSection';
 import { TestimonialsSection } from './TestimonialsSection';
 import { WorkflowSection } from './WorkflowSection';
-import { Reveal } from './LandingMotion';
+import { SolvaReveal as Reveal } from './SolvaReveal';
 import { SolvaReveal } from './SolvaReveal';
 import { FAQ_ITEMS } from './faq';
 import styles from './landing.module.css';
@@ -36,13 +36,13 @@ export function LandingPage() {
         <Image src="/assets/landing/revision/d42be.png" alt="" fill priority sizes="100vw" className={styles.heroSky} />
         <div className={styles.heroOverlay} aria-hidden="true" />
         <div className={`${styles.container} ${styles.heroCopy}`}>
-          <SolvaReveal delay={50}><h1 id="hero-heading" className={styles.heroTitle}>
+          <SolvaReveal><h1 id="hero-heading" className={styles.heroTitle}>
             <span>Made to measure. </span><span className={styles.serif}>Built to keep you organized.</span>
           </h1></SolvaReveal>
-          <SolvaReveal delay={400}><p className={styles.body}>Capture measurements with an interactive mannequin, save client details, and keep track of what&apos;s due.</p></SolvaReveal>
-          <SolvaReveal delay={500}><Link href="/app?tab=overview" className={styles.button}>Open TailorFit</Link></SolvaReveal>
+          <SolvaReveal><p className={styles.body}>Capture measurements with an interactive mannequin, save client details, and keep track of what&apos;s due.</p></SolvaReveal>
+          <SolvaReveal><Link href="/app?tab=overview" className={styles.button}>Open TailorFit</Link></SolvaReveal>
         </div>
-        <SolvaReveal delay={600} className={styles.heroPreview}>
+        <SolvaReveal hero delay={120} className={styles.heroPreview}>
           <picture>
             <source media="(max-width: 639px)" srcSet="/assets/landing/mannequin-preview.webp" width={960} height={1212} />
             {/* Art direction preserves the original screenshot at both sizes. */}

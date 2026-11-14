@@ -11,6 +11,8 @@
 .page :is(h1, h2, h3) { text-wrap: balance; }
 .page p { text-wrap: pretty; }
 .page :is(section[id], article[id], main) { scroll-margin-top: 8rem; }
+/* Anchor destinations retain focus for reading order without framing whole sections. */
+.page :is(section[id], article[id], main)[tabindex="-1"]:focus { outline: none; }
 .container { width: min(100% - 40px, 1280px); margin-inline: auto; }
 .section { padding-block: 64px; }
 .heading { font-size: clamp(1.875rem, 2.6vw, 2.5rem); line-height: 1.15; font-weight: 600; letter-spacing: -0.025em; }
@@ -33,9 +35,9 @@
 .button:active { transform: scale(0.98); }
 .smallButton { min-height: 44px; padding: 10px 16px; }
 .mobileActions .smallButton { font-size: 0.875rem; padding-inline: 12px; }
-.mobileMenu { margin-top: 8px; padding: 16px 20px; border-radius: 24px; background: white; box-shadow: 0 12px 30px rgb(0 0 0 / 12%); display: flex; flex-direction: column; max-height: calc(100dvh - 108px); overflow-y: auto; }
-.mobileMenu > a { border-bottom: 1px solid #ededed; padding-block: 12px; }
-.menuActions { display: flex; gap: 16px; flex-wrap: wrap; justify-content: space-between; padding-top: 12px; }
+.mobileMenu { margin-top: 8px; padding: 16px 20px; border-radius: 24px; background: white; box-shadow: 0 12px 30px rgb(0 0 0 / 12%); display: flex; flex-direction: column; max-height: calc(100dvh - 108px - env(safe-area-inset-bottom, 0px)); overflow-y: auto; overscroll-behavior: contain; }
+.mobileMenu > a { flex-shrink: 0; border-bottom: 1px solid #ededed; padding-block: 12px; }
+.menuActions { flex-shrink: 0; display: flex; gap: 16px; flex-wrap: wrap; justify-content: space-between; padding-top: 12px; }
 .hero { position: relative; overflow: hidden; background: #0867d4; padding-top: 120px; }
 .heroSky, .heroOverlay { position: absolute; inset: 0; pointer-events: none; }
 .heroSky { object-fit: cover; object-position: top; }
@@ -137,7 +139,7 @@
 .pricingGrid { display: grid; gap: 24px; align-items: stretch; }
 .pricingCard { background: #eee; padding: 4px; border-radius: 32px; display: flex; flex-direction: column; min-width: 0; }
 .pricingCard > h3 { padding: 16px; font-size: 18px; font-weight: 700; }
-.featuredPlan { border: 1px solid #1d49e8; background: #1d49e8 url('/assets/landing/revision/3f8d1.png') center / cover; }
+.featuredPlan { border: 1px solid #1d49e8; background: #1d49e8 url('/assets/landing/revision/pricing-background.webp') center / cover; }
 .featuredPlan > h3 { color: white; }
 .pricingSurface { background: white; padding: 16px; border-radius: 30px; display: flex; flex-direction: column; gap: 16px; flex: 1; }
 .pricingSurface > p { min-height: 3em; font-size: 16px; line-height: 1.44; }
@@ -188,6 +190,7 @@
 @media (min-width: 640px) {
   .container { width: min(100% - 64px, 1280px); }
   .header { top: 32px; }
+  .mobileMenu { max-height: calc(100dvh - 120px - env(safe-area-inset-bottom, 0px)); }
   .hero { padding-top: 148px; }
   .heroPreview { margin-top: 48px; padding: 10px; }
   .body { font-size: 1.125rem; }
@@ -232,4 +235,9 @@
 @media (prefers-reduced-motion: reduce) {
   .page *, .page *::before, .page *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   .button:active { transform: none; }
+}
+
+@media (max-width: 639px) {
+  .testimonialGrid { padding-inline: 12px; }
+  .testimonialCard { padding: 20px; }
 }

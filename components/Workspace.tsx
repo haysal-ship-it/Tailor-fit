@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
+import { WorkspaceLoading } from "@/components/workspace/WorkspaceLoading";
+import loadingStyles from "@/components/workspace/workspace-loading.module.css";
 import { useAccount } from "@/components/auth/AccountProvider";
 import { StoreProvider, useStore } from "@/lib/store";
 import { TourProvider } from "@/components/onboarding/TourProvider";
@@ -13,6 +15,7 @@ import { ToastContainer, type ToastMessage } from "@/components/ui/Toasts";
 function TailorFitApp() {
   const {
     activeScreen,
+    isHydrated,
     orders,
     setActiveScreen,
     setSelectedClientId,
@@ -187,7 +190,8 @@ function TailorFitApp() {
       <Navbar />
 
       {/* Main Content Area */}
-      <main id="main-content" className="flex-1 w-full max-lg:pb-24">
+      <main id="main-content" aria-busy={!isHydrated || !routeReady} className="flex-1 w-full max-lg:pb-24">
+        {!isHydrated || !routeReady ? <WorkspaceLoading embedded screen={activeScreen} stage="records" /> : <div className={loadingStyles.ready}>
         {(activeScreen === "overview" ||
           activeScreen === "dashboard" ||
           activeScreen === "new-measurement" ||
@@ -217,6 +221,7 @@ function TailorFitApp() {
         )}
 
         {activeScreen === "settings" && <SettingsScreen />}
+        </div>}
       </main>
 
       {/* Floating System Toasts */}
@@ -225,14 +230,9 @@ function TailorFitApp() {
   );
 }
 
-export default function Workspace() {
+export default function Workspace({ initialScreen = 'overview' }: { initialScreen?: string }) {
   const { user, ready } = useAccount();
-  if (!ready)
-    return (
-      <p role="status" className="p-8 text-center">
-        Opening your workspace…
-      </p>
-    );
+  if (!ready) return <WorkspaceLoading screen={initialScreen} />;
   return (
     <StoreProvider key={user?.id || "guest"}>
       <TourProvider>
