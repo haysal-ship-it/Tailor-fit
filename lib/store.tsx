@@ -1,7 +1,7 @@
 'use client';
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import type { Client, MeasurementSnapshot, Order, AppSettings, OrderStatus, HotspotDefinition, GarmentTemplate } from '@/types';
-import { DEFAULT_SETTINGS, DEFAULT_HOTSPOTS, normalizeMeasurementsRecord, SAMPLE_CLIENTS, SAMPLE_SNAPSHOTS, SAMPLE_ORDERS } from './initial-data';
+import { DEFAULT_SETTINGS, DEFAULT_HOTSPOTS, normalizeMeasurementsRecord } from './initial-data';
 import { useAccount } from '@/components/auth/AccountProvider';
 import { commitRecords, importWorkspace } from './data/actions';
 import { readWorkspace, stageImages } from './data/repository';
@@ -57,7 +57,6 @@ interface StoreContextType {
   updateTemplate: (id: string, updates: Partial<GarmentTemplate>) => Promise<boolean>;
   deleteTemplate: (id: string) => Promise<boolean>;
 
-  resetToDemoData: () => Promise<boolean>;
   clearAllData: () => Promise<boolean>;
   exportDataJson: () => Promise<boolean>;
   restoreBackupData: (payload: import('./backup').BackupPayload) => Promise<boolean>;
@@ -84,9 +83,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const account = useAccount();
   const owner = account.user?.id;
   const [isHydrated,setIsHydrated] = useState(!owner);
-  const [clients,setClients] = useState<Client[]>(() => owner ? [] : SAMPLE_CLIENTS);
-  const [snapshots,setSnapshots] = useState<MeasurementSnapshot[]>(() => owner ? [] : SAMPLE_SNAPSHOTS);
-  const [orders,setOrders] = useState<Order[]>(() => owner ? [] : SAMPLE_ORDERS);
+  const [clients,setClients] = useState<Client[]>([]);
+  const [snapshots,setSnapshots] = useState<MeasurementSnapshot[]>([]);
+  const [orders,setOrders] = useState<Order[]>([]);
   const [settings,setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [saveStatus,setSaveStatus] = useState<'idle'|'saving'|'saved'|'error'>('idle');
   const [error,setError] = useState('');
@@ -193,7 +192,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const addTemplate=(template:GarmentTemplate)=>updateSettings({templates:[...settings.templates.filter(t=>t.id!==template.id),template]});
   const updateTemplate=(id:string,updates:Partial<GarmentTemplate>)=>updateSettings({templates:settings.templates.map(t=>t.id===id?{...t,...updates}:t)});
   const deleteTemplate=(id:string)=>updateSettings({templates:settings.templates.filter(t=>t.id!==id)});
-  const resetToDemoData=async()=>{setClients(SAMPLE_CLIENTS);setSnapshots(SAMPLE_SNAPSHOTS);setOrders(SAMPLE_ORDERS);return true;};
   const payload=():BackupPayload=>({version:'3.0',clients,snapshots,orders,settings});
   const exportDataJson=async()=>{if(!account.requireAccount())return false;try{await exportBackup(payload());return true;}catch(e){return fail(e);}};
   const importData=async(data:BackupPayload,replace:boolean)=>{
@@ -352,7 +350,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         updateTemplate,
         deleteTemplate,
 
-        resetToDemoData,
         clearAllData,
         exportDataJson,
         restoreBackupData,

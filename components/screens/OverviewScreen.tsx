@@ -930,8 +930,6 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
                         activePointKeys.length === 1 ? 'point' : 'points'
                       }`}
                 </span>
-                <span className="w-1 h-1 rounded-full bg-[var(--muted)]" />
-                <span>{gender === 'female' ? 'Feminine Form' : 'Masculine Form'}</span>
               </>
             ) : (
               <span>Fast keyboard entry for active garment fields</span>
@@ -956,11 +954,11 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
       </div>
 
       {/* Toolbar: white pill container */}
-      <div className="w-full rounded-[32px] bg-white p-2 flex flex-wrap items-center gap-2">
+      <div className={cn('w-full rounded-[32px] bg-white p-2 flex gap-2', isMobile ? 'flex-col' : 'flex-wrap items-center')}>
         {/* 1. Choose Template */}
         <div
           id="overview-blueprints"
-          className="flex-1 min-w-[120px] flex items-center gap-1"
+          className={cn('min-w-0 flex items-center gap-1', isMobile ? 'w-full' : 'flex-1 min-w-[120px]')}
         >
           <button
             ref={triggerRef}
@@ -978,6 +976,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
           </button>
         </div>
 
+        <div className={isMobile ? 'w-full flex items-center justify-between gap-2' : 'contents'}>
         {/* 2. M / F toggle group */}
         <div className="h-9 bg-[var(--chip)] rounded-[24px] px-2 py-1.5 flex items-center gap-1 shrink-0">
           <button
@@ -1056,6 +1055,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
           >
             Add Point
           </button>
+        </div>
         </div>
       </div>
 
@@ -1828,7 +1828,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
                     : { y: '100%', transition: { duration: 0.2 } }
                 }
                 transition={{ type: 'spring', stiffness: 320, damping: 32, mass: 0.9 }}
-                className="fixed left-0 right-0 bottom-0 z-50 mx-auto w-full max-w-[640px] bg-white rounded-t-[16px] p-5 shadow-2xl flex flex-col gap-4 max-h-[85dvh] overflow-y-auto"
+                className="fixed left-0 right-0 bottom-0 z-50 mx-auto w-full max-w-[640px] bg-white rounded-t-[16px] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl flex flex-col gap-4 max-h-[85dvh] overflow-y-auto overscroll-contain"
               >
                 <div className="w-10 h-1 rounded-full bg-[#D9D8D8] mx-auto -mt-1 mb-1 shrink-0" />
                 <div className="flex items-center justify-between shrink-0">
@@ -1974,7 +1974,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
                     : { y: '100%', transition: { duration: 0.2 } }
                 }
                 transition={{ type: 'spring', stiffness: 320, damping: 32, mass: 0.9 }}
-                className="fixed left-0 right-0 bottom-0 z-50 mx-auto w-full max-w-[640px] bg-white rounded-t-[16px] p-5 shadow-2xl flex flex-col gap-4 max-h-[85dvh] overflow-y-auto"
+                className="fixed left-0 right-0 bottom-0 z-50 mx-auto w-full max-w-[640px] bg-white rounded-t-[16px] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl flex flex-col gap-4 max-h-[85dvh] overflow-y-auto overscroll-contain"
               >
                 <div className="w-10 h-1 rounded-full bg-[#D9D8D8] mx-auto -mt-1 mb-1 shrink-0" />
                 <div className="flex items-center justify-between shrink-0">

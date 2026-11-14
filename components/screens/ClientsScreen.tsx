@@ -106,7 +106,6 @@ export function ClientsScreen({
     deleteTemplate,
     getClientSnapshots,
     getClientOrders,
-    resetToDemoData,
   } = useStore();
 
   const handleBackToDirectory = () => {
@@ -786,19 +785,6 @@ export function ClientsScreen({
             >
               <Plus className="w-4 h-4" />
               <span>Add First Client</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                resetToDemoData();
-                showToast({
-                  type: 'velocity',
-                  message: 'Sample demo atelier data loaded successfully.',
-                });
-              }}
-              className="h-10 px-5 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[var(--text-2)] text-[13px] font-medium hover:text-[var(--text)] hover:bg-[#EAEAEA] transition-colors cursor-pointer"
-            >
-              Explore with Demo Data
             </button>
           </div>
         </div>
