@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import Image from 'next/image';
 import { motion, useScroll, useMotionValueEvent, useReducedMotion, type MotionValue } from 'framer-motion';
-import { FeatureBackdrop } from './LandingMotion';
+import { Reveal } from './LandingMotion';
 import styles from './landing.module.css';
 
 type FeatureId = 'measurements' | 'clients' | 'orders';
@@ -14,29 +14,8 @@ const FEATURES: { id: FeatureId; title: string; body: string }[] = [
 ];
 
 function FeatureVisual({ id }: { id: FeatureId }) {
-  return <div className={styles.featureVisual}>
-    <FeatureBackdrop />
-    {id === 'measurements' && <div className={`${styles.productSurface} ${styles.mannequinSurface}`}>
-      <Image src="/assets/landing/mannequin-preview.webp" alt="Original TailorFit mannequin with garment template, form and measurement-view controls"
-        width={960} height={1212} sizes="(min-width: 640px) 380px, calc(100vw - 72px)" />
-    </div>}
-    {id === 'clients' && <div className={styles.productSurface} role="img" aria-label="Example client record: Adriana Kunle, bust 94 cm, waist 72 cm, hips 102 cm, with four saved garments">
-      <div className={styles.previewHeader}>
-        <div><p className={styles.previewName}>Adriana Kunle</p><p className={styles.previewMuted}>Last fitting: 14 Oct 2026</p></div>
-        <span className={styles.badge}>Active client</span>
-      </div>
-      <div className={styles.measurements}>
-        {[['Bust', '94 cm'], ['Waist', '72 cm'], ['Hips', '102 cm']].map(([label, value]) =>
-          <div key={label} className={styles.measurement}><span className={styles.previewMuted}>{label}</span><strong>{value}</strong></div>)}
-      </div>
-      <div className={styles.previewFooter}><span>4 garments created</span><span>Saved measurements</span></div>
-    </div>}
-    {id === 'orders' && <div className={styles.productSurface} role="img" aria-label="Example garment order: Silk Evening Gown for Chloe Dallas, 140,000 naira, pickup 9 November 2026">
-      <div className={styles.previewHeader}><span className={styles.previewName}>Order #ORD-2026-09</span><span className={`${styles.badge} ${styles.dueBadge}`}>Due in 4 days</span></div>
-      <div className={styles.orderDetails}><p className={styles.previewName}>Silk Evening Gown</p><p className={styles.previewMuted}>Client: Chloe Dallas</p><strong>₦140,000</strong></div>
-      <div className={styles.pickup}><span className={styles.previewMuted}>Pickup scheduled</span><strong>9 Nov 2026</strong></div>
-    </div>}
-  </div>;
+  const assets={measurements:'fbfcc.png',clients:'4bc0a.png',orders:'7050f.png'};
+  return <div className={styles.featureVisual} data-feature={id}><Image src={`/assets/landing/revision/${assets[id]}`} alt={id==='measurements'?'TailorFit measurements workspace with original mannequin':id==='clients'?'TailorFit client records and saved fitting cards':'TailorFit garment orders and pickup dates'} fill sizes="(min-width: 1024px) 660px, 100vw" className={styles.featureScreenshot}/></div>;
 }
 
 function ProgressItem({ title, progress, active, reduced, onSelect }: {
@@ -79,8 +58,8 @@ export function FeaturesSection() {
   return <section id="features" tabIndex={-1} aria-labelledby="features-heading" className={`${styles.section} ${styles.container}`}>
     <div className={styles.featureGrid}>
       <div className={styles.featureIntro}>
-        <div><h2 id="features-heading" className={styles.heading}>The details behind every garment, together.</h2>
-          <p className={styles.body}>Move between measurements, client records and orders without piecing together scattered notes.</p></div>
+        <Reveal><h2 id="features-heading" className={styles.heading}>The details behind every garment, together.</h2>
+          <p className={styles.body}>Move between measurements, client records and orders without piecing together scattered notes.</p></Reveal>
         <nav className={styles.featureNav} aria-label="Feature sections">
           {FEATURES.map(f => <ProgressItem key={f.id} title={f.title} progress={progress[f.id]} active={activeFeature === f.id} reduced={!!reduceMotion} onSelect={() => scrollToFeature(f.id)} />)}
         </nav>
@@ -88,7 +67,7 @@ export function FeaturesSection() {
       <div className={styles.featureList}>
         {FEATURES.map(f => <article key={f.id} id={`feature-${f.id}`} tabIndex={-1} ref={refs[f.id]} className={styles.feature} aria-labelledby={`title-${f.id}`}>
           <div><h3 id={`title-${f.id}`} className={styles.featureTitle}>{f.title}</h3><p className={styles.body}>{f.body}</p></div>
-          <FeatureVisual id={f.id} />
+          <Reveal><FeatureVisual id={f.id} /></Reveal>
         </article>)}
       </div>
     </div>

@@ -33,9 +33,11 @@
     "**/*.ts",
     "**/*.tsx",
     ".next-cloud-test/types/**/*.ts",
+    ".next-landing-revision/types/**/*.ts",
+    ".next-order-test/types/**/*.ts",
     ".next/types/**/*.ts",
     "next-env.d.ts",
-    ".next-order-test/types/**/*.ts"
+    ".next-landing-revision-build/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

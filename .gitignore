@@ -3,6 +3,8 @@ node_modules/
 .next-landing/
 .next-cloud-test/
 .next-order-test/
+.next-landing-revision/
+.next-landing-revision-build/
 scripts/.test-invoices.mjs
 coverage/
 .DS_Store

@@ -1,11 +1,11 @@
 import Image from 'next/image';
-import { Reveal } from './LandingMotion';
+import { SolvaReveal as Reveal } from './SolvaReveal';
 import styles from './landing.module.css';
 
 export function WorkflowSection() { return (
       <section id="how-it-works" tabIndex={-1} aria-labelledby="workflow-heading" className={`${styles.container} ${styles.section}`}>
         {/* Section Header */}
-        <div className={styles.sectionIntro}>
+        <Reveal className={styles.sectionIntro}>
           <div className="max-w-[480px]">
             <h2 id="workflow-heading" className={styles.heading}>
               From client details to the next fitting.
@@ -16,7 +16,7 @@ export function WorkflowSection() { return (
               Capture measurements with an interactive mannequin, save client details, and keep track of what&apos;s due.
             </p>
           </div>
-        </div>
+        </Reveal>
 
         {/* 3 Step Cards Grid */}
         <div className={styles.workflow}>
@@ -24,24 +24,8 @@ export function WorkflowSection() { return (
           <div className="min-w-0">
             <Reveal className={styles.workflowVisual} delay={0}>
               {/* Noisy Gradient Backgrounds */}
-              <div className="absolute inset-0 pointer-events-none opacity-85">
-                <Image
-                  src="/assets/landing/noisy-gradient-1.webp"
-                  alt=""
-                  fill
-                  sizes="(min-width: 1024px) 400px, 100vw"
-                  className="object-cover"
-                />
-              </div>
-              <div className="absolute inset-0 pointer-events-none opacity-90 mix-blend-overlay">
-                <Image
-                  src="/assets/landing/noisy-gradient-2.webp"
-                  alt=""
-                  fill
-                  sizes="(min-width: 1024px) 400px, 100vw"
-                  className="object-cover"
-                />
-              </div>
+
+
 
               {/* Floating Miniature "Basic Information" Form Card */}
               <div className="relative w-full max-w-[320px] bg-white rounded-[16px] p-5 shadow-xl border border-neutral-100 flex flex-col gap-3">
@@ -147,7 +131,7 @@ export function WorkflowSection() { return (
               {/* Noisy Gradient Background */}
               <div className="absolute inset-0 pointer-events-none opacity-90">
                 <Image
-                  src="/assets/landing/noisy-gradient-1.webp"
+                  src="/assets/landing/revision/e6240.png"
                   alt=""
                   fill
                   sizes="(min-width: 1024px) 400px, 100vw"
@@ -204,6 +188,7 @@ export function WorkflowSection() { return (
               </p>
             </div>
           </div>
+          <div className={styles.workflowWide}><Reveal className={styles.workflowVisual}><Image src="/assets/landing/revision/36f19.png" alt="TailorFit order details with measurements and reference images" fill sizes="(min-width:1024px) 620px, 100vw" className="object-contain" /></Reveal><div><h3>Share order details with clients</h3><p className={styles.body}>Add style references, price and a due date. Return to the client’s record when you need them.</p></div></div>
         </div>
       </section>
 
