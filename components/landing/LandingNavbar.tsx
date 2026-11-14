@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, type MouseEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Menu, X, ArrowRight } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import styles from './landing.module.css';
 
@@ -62,7 +62,6 @@ export function LandingNavbar({ onLandingPage = false }: { onLandingPage?: boole
           <Link href="/signup" className={`${styles.button} ${styles.smallButton}`}>Sign up</Link>
         </div>
         <div className={styles.mobileActions}>
-          <Link href="/signup" className={`${styles.button} ${styles.smallButton}`}>Sign up</Link>
           <button ref={menuButton} type="button" className={styles.menuButton}
             aria-label={mobileMenuOpen ? 'Close navigation' : 'Open navigation'}
             aria-expanded={mobileMenuOpen} aria-controls="landing-mobile-menu" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
@@ -77,8 +76,8 @@ export function LandingNavbar({ onLandingPage = false }: { onLandingPage?: boole
           exit={{ opacity: 0, y: reduceMotion ? 0 : -6, transition: { duration: reduceMotion ? 0 : 0.12 } }}>
           {NAV_LINKS.map(([href, label]) => <a key={href} href={onLandingPage ? href : `/${href}`} className={`${styles.navLink} ${styles.sectionNavLink}`} onClick={navigateSection}><span className={styles.navLabel}>{label}</span></a>)}
           <div className={styles.menuActions}>
+            <Link href="/signup" className={`${styles.button} ${styles.smallButton}`} onClick={() => setMobileMenuOpen(false)}>Sign up</Link>
             <Link href="/signin" className={styles.navLink} onClick={() => setMobileMenuOpen(false)}>Log in</Link>
-            <Link href="/app?tab=overview" className={styles.navLink} onClick={() => setMobileMenuOpen(false)}>Open Studio <ArrowRight size={16} aria-hidden="true" /></Link>
           </div>
         </motion.nav>}
       </AnimatePresence>

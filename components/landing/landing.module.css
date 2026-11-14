@@ -34,10 +34,10 @@
 .button { display: inline-flex; justify-content: center; align-items: center; gap: 8px; min-height: 48px; padding: 12px 24px; border-radius: 100px; background: #080808; color: white; font-size: 1rem; font-weight: 600; text-align: center; white-space: nowrap; transition: transform 120ms var(--landing-ease), background-color 150ms ease; }
 .button:active { transform: scale(0.98); }
 .smallButton { min-height: 44px; padding: 10px 16px; }
-.mobileActions .smallButton { font-size: 0.875rem; padding-inline: 12px; }
 .mobileMenu { margin-top: 8px; padding: 16px 20px; border-radius: 24px; background: white; box-shadow: 0 12px 30px rgb(0 0 0 / 12%); display: flex; flex-direction: column; max-height: calc(100dvh - 108px - env(safe-area-inset-bottom, 0px)); overflow-y: auto; overscroll-behavior: contain; }
 .mobileMenu > a { flex-shrink: 0; border-bottom: 1px solid #ededed; padding-block: 12px; }
-.menuActions { flex-shrink: 0; display: flex; gap: 16px; flex-wrap: wrap; justify-content: space-between; padding-top: 12px; }
+.menuActions { flex-shrink: 0; display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding-top: 12px; }
+.menuActions > a { min-height: 44px; display: flex; align-items: center; justify-content: center; }
 .hero { position: relative; overflow: hidden; background: #0867d4; padding-top: 120px; }
 .heroSky, .heroOverlay { position: absolute; inset: 0; pointer-events: none; }
 .heroSky { object-fit: cover; object-position: top; }
@@ -128,6 +128,10 @@
 .workflowVisual { border: 0.5px solid #1d49e8; border-radius: 32px; background: #f8f8f8; }
 .workflowOrder { padding: 0; }
 .workflowWide { display: grid; gap: 32px; align-items: center; }
+@media (max-width: 1023px) {
+  .workflowWide { gap: 16px; }
+  .workflowWide h3 { margin-top: 0; }
+}
 .featureVisual { border: .5px solid #1d49e8; border-radius: 32px; padding: 0; aspect-ratio: 660 / 400; min-height: 0; }
 .featureScreenshot { object-fit: cover; }
 .featureVisual[data-feature="measurements"] { background: #e4cece; }
