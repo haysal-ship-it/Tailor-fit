@@ -1,5 +1,5 @@
 import type {Metadata, Viewport} from 'next';
-import {Manrope} from 'next/font/google';
+import { manrope, instrumentSerif } from './fonts';
 import './globals.css';
 import { AccountProvider } from '@/components/auth/AccountProvider';
 
@@ -9,13 +9,6 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
   interactiveWidget: 'resizes-content',
 };
-
-const manrope = Manrope({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-manrope',
-  display: 'swap',
-});
 
 export const metadata: Metadata = {
   title: 'TailorFit — Studio Management & Body Measurements',
@@ -34,7 +27,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="en" className={manrope.variable}>
+    <html lang="en" className={`${manrope.variable} ${instrumentSerif.variable}`}>
       <body className="font-sans antialiased bg-[var(--page)] text-[var(--text)] min-h-screen selection:bg-[var(--primary)]/15 selection:text-[var(--primary)]">
         <AccountProvider>{children}</AccountProvider>
       </body>

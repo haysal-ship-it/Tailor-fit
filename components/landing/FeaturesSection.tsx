@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import Image from 'next/image';
+import { LandingFauxUI, type SceneId } from './faux-ui/Scenes';
 import { motion, useScroll, useMotionValueEvent, useReducedMotion, type MotionValue } from 'framer-motion';
 import { Reveal } from './LandingMotion';
 import styles from './landing.module.css';
@@ -14,8 +14,8 @@ const FEATURES: { id: FeatureId; title: string; body: string }[] = [
 ];
 
 function FeatureVisual({ id }: { id: FeatureId }) {
-  const assets={measurements:'fbfcc.png',clients:'4bc0a.png',orders:'7050f.png'};
-  return <div className={styles.featureVisual} data-feature={id}><Image src={`/assets/landing/revision/${assets[id]}`} alt={id==='measurements'?'TailorFit measurements workspace with original mannequin':id==='clients'?'TailorFit client records and saved fitting cards':'TailorFit garment orders and pickup dates'} fill sizes="(min-width: 1024px) 660px, 100vw" className={styles.featureScreenshot}/></div>;
+  const scenes: Record<FeatureId,SceneId>={measurements:'measurements',clients:'records',orders:'schedule'};
+  return <div className={styles.featureVisual} data-feature={id}><LandingFauxUI kind={scenes[id]}/></div>;
 }
 
 function ProgressItem({ title, progress, active, reduced, onSelect }: {

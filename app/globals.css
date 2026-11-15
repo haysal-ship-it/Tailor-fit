@@ -1,9 +1,8 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
 
 @theme {
   --font-sans: var(--font-manrope), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-serif: "Instrument Serif", Georgia, serif;
+  --font-serif: var(--font-landing-serif), Georgia, serif;
   --font-mono: var(--font-manrope), monospace;
 
   --color-page: var(--page);
@@ -40,7 +39,6 @@
 }
 
 :root {
-  --font-manrope: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
   /* Target Design Color Tokens */
   --hairline: #EDEDED;

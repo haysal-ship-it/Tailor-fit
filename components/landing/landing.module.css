@@ -245,3 +245,7 @@
   .testimonialGrid { padding-inline: 12px; }
   .testimonialCard { padding: 20px; }
 }
+/* Authored product illustrations own their responsive height and crop. */
+.workflowVisual { display:block; padding:0; aspect-ratio:auto; min-height:0; max-height:none; background:#f0f2f7; border:1px solid #e3e7ef; }
+.featureVisual { display:block; padding:0; aspect-ratio:auto; min-height:0; background:#f0f2f7; border:1px solid #e3e7ef; }
+.featureVisual[data-feature="measurements"] { background:#f0f2f7; }

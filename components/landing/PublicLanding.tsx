@@ -1,11 +1,5 @@
 import type { Metadata } from 'next';
-import { Instrument_Serif } from 'next/font/google';
 import { LandingPage } from '@/components/landing/LandingPage';
-
-const instrumentSerif = Instrument_Serif({
-  subsets: ['latin'], weight: '400', style: 'italic',
-  variable: '--font-landing-serif', display: 'swap',
-});
 
 export const metadata: Metadata = {
   title: 'TailorFit — Made to Measure. Built to Keep You Organized.',
@@ -20,5 +14,5 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <div className={instrumentSerif.variable}><LandingPage /></div>;
+  return <LandingPage />;
 }
