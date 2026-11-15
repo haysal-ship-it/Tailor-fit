@@ -384,7 +384,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
 
     setSelectedTemplateId(tmpl.id);
     setSelectedTemplateName(tmpl.name);
-    if (!clientGarment.trim()) {
+    if (!clientGarment.trim() || clientGarment === selectedTemplateName) {
       setClientGarment(tmpl.name);
     }
     setActivePointKeys(canonicalKeys);
@@ -954,11 +954,11 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
       </div>
 
       {/* Toolbar: white pill container */}
-      <div className={cn('w-full rounded-[32px] bg-white p-2 flex gap-2', isMobile ? 'flex-col' : 'flex-wrap items-center')}>
-        {/* 1. Choose Template */}
+      <div className={cn('w-full rounded-[32px] bg-white p-2 flex flex-nowrap items-center', isMobile ? 'gap-1' : 'gap-2')}>
+        {/* 1. Template */}
         <div
           id="overview-blueprints"
-          className={cn('min-w-0 flex items-center gap-1', isMobile ? 'w-full' : 'flex-1 min-w-[120px]')}
+          className="min-w-0 flex-1 flex items-center"
         >
           <button
             ref={triggerRef}
@@ -970,15 +970,15 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
               );
               setIsTemplateModalOpen(true);
             }}
-            className="w-full h-9 rounded-[24px] bg-[var(--chip)] text-[var(--text-2)] hover:bg-[#eaeaea] text-[14px] font-medium flex items-center justify-center transition-colors cursor-pointer px-3 truncate"
+            className={cn('w-full h-9 rounded-[24px] bg-[var(--chip)] text-[var(--text-2)] hover:bg-[#eaeaea] font-medium flex items-center justify-center transition-colors cursor-pointer', isMobile ? 'px-1.5 text-[12px]' : 'px-3 text-[14px]')}
           >
-            {selectedTemplateName || 'Choose Template'}
+            Template
           </button>
         </div>
 
-        <div className={isMobile ? 'w-full flex items-center justify-between gap-2' : 'contents'}>
+        <div className="contents">
         {/* 2. M / F toggle group */}
-        <div className="h-9 bg-[var(--chip)] rounded-[24px] px-2 py-1.5 flex items-center gap-1 shrink-0">
+        <div className={cn('h-9 bg-[var(--chip)] rounded-[24px] py-1.5 flex items-center shrink-0', isMobile ? 'px-0.5 gap-0' : 'px-2 gap-1')}>
           <button
             type="button"
             aria-label="Masculine form"
@@ -1010,7 +1010,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
         </div>
 
         {/* 3. View toggle group */}
-        <div className="h-9 bg-[var(--chip)] rounded-[24px] px-2 py-1.5 flex items-center gap-1 shrink-0">
+        <div className={cn('h-9 bg-[var(--chip)] rounded-[24px] py-1.5 flex items-center shrink-0', isMobile ? 'px-0.5 gap-0' : 'px-2 gap-1')}>
           <button
             type="button"
             aria-label="Diagram view"
@@ -1051,7 +1051,7 @@ export function OverviewScreen({ onOpenClient }: OverviewScreenProps) {
           <button
             type="button"
             onClick={handleOpenAddPoint}
-            className="h-9 px-3.5 bg-[var(--chip)] border border-[var(--outline)] text-[var(--text-2)] text-[14px] font-medium rounded-[24px] hover:bg-[#eaeaea] transition-colors cursor-pointer shrink-0"
+            className={cn('h-9 bg-[var(--chip)] border border-[var(--outline)] text-[var(--text-2)] font-medium rounded-[24px] hover:bg-[#eaeaea] transition-colors cursor-pointer shrink-0', isMobile ? 'px-1.5 text-[12px]' : 'px-3.5 text-[14px]')}
           >
             Add Point
           </button>
