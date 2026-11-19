@@ -1,94 +1,14 @@
-export type TourStepId = 'client' | 'template' | 'measure' | 'save' | 'reuse';
-export type TourTargetKey =
-  | 'client-basics'
-  | 'choose-template'
-  | 'mannequin-viewer'
-  | 'save-order'
-  | 'nav-clients';
-
-export interface TourStepDefinition {
-  id: TourStepId;
-  targetKey: TourTargetKey;
-  stepNumber: number;
-  totalSteps: number;
-  title: string;
-  body: string;
-  exampleId: 'client-fields' | 'template-picker' | 'mannequin-rotation' | 'order-summary' | 'client-reuse';
-  preferredPlacement?: 'bottom' | 'top' | 'left' | 'right';
-}
-
-export const TOTAL_TOUR_STEPS = 5;
-
-export const TOUR_STEPS: TourStepDefinition[] = [
-  {
-    id: 'client',
-    targetKey: 'client-basics',
-    stepNumber: 1,
-    totalSteps: TOTAL_TOUR_STEPS,
-    title: 'Start with your client.',
-    body: "Add your client's details and the garment you're making. Their measurements and orders stay together.",
-    exampleId: 'client-fields',
-    preferredPlacement: 'right',
-  },
-  {
-    id: 'template',
-    targetKey: 'choose-template',
-    stepNumber: 2,
-    totalSteps: TOTAL_TOUR_STEPS,
-    title: 'Choose the measurements you need.',
-    body: 'Choose a garment template to show its measurement points. Use Add a measurement for extra measurements.',
-    exampleId: 'template-picker',
-    preferredPlacement: 'bottom',
-  },
-  {
-    id: 'measure',
-    targetKey: 'mannequin-viewer',
-    stepNumber: 3,
-    totalSteps: TOTAL_TOUR_STEPS,
-    title: 'Measure from every angle.',
-    body: 'Drag the mannequin to rotate it. Select a measurement point to enter a value, or edit sizes in the measurement list.',
-    exampleId: 'mannequin-rotation',
-    preferredPlacement: 'right',
-  },
-  {
-    id: 'save',
-    targetKey: 'save-order',
-    stepNumber: 4,
-    totalSteps: TOTAL_TOUR_STEPS,
-    title: 'Bring the order together.',
-    body: 'Add reference images, price and a due date, then save. Your order stays linked to the client\'s measurements.',
-    exampleId: 'order-summary',
-    preferredPlacement: 'top',
-  },
-  {
-    id: 'reuse',
-    targetKey: 'nav-clients',
-    stepNumber: 5,
-    totalSteps: TOTAL_TOUR_STEPS,
-    title: 'Find the fitting again.',
-    body: 'Open Clients to review saved measurements and order history. Reuse a fitting when the client returns.',
-    exampleId: 'client-reuse',
-    preferredPlacement: 'bottom',
-  },
+export type TourStepId = 'analytics' | 'chart' | 'calendar' | 'add-client' | 'new-order';
+export type TourTargetKey = `overview-${TourStepId}`;
+export interface TourStepDefinition { id:TourStepId;targetKey:TourTargetKey;stepNumber:number;totalSteps:number;title:string;body:string;preferredPlacement?:'bottom'|'top'|'left'|'right'; }
+export const TOTAL_TOUR_STEPS=5;
+export const TOUR_STEPS:TourStepDefinition[]=[
+{id:'analytics',targetKey:'overview-analytics',stepNumber:1,totalSteps:5,title:'Your studio at a glance',body:'See total orders, active orders and recorded outstanding balances. Select a card to view its related orders.',preferredPlacement:'bottom'},
+{id:'chart',targetKey:'overview-chart',stepNumber:2,totalSteps:5,title:'Track your studio activity',body:'Change the period to see orders created over time and compare with the previous period.',preferredPlacement:'right'},
+{id:'calendar',targetKey:'overview-calendar',stepNumber:3,totalSteps:5,title:'Keep track of pickups',body:'Browse pickup dates and select a marked day to see its scheduled orders.',preferredPlacement:'left'},
+{id:'add-client',targetKey:'overview-add-client',stepNumber:4,totalSteps:5,title:'Add a client',body:'Save contact details first. Add their measurements and orders from the client profile when ready.',preferredPlacement:'bottom'},
+{id:'new-order',targetKey:'overview-new-order',stepNumber:5,totalSteps:5,title:'Create a new order',body:'Open the order workspace to enter garment details, references, measurements, price and due date.',preferredPlacement:'bottom'}
 ];
-
-export function getTourStep(id: TourStepId): TourStepDefinition {
-  const step = TOUR_STEPS.find((s) => s.id === id);
-  return step || TOUR_STEPS[0];
-}
-
-export function getNextStepId(currentId: TourStepId): TourStepId | null {
-  const idx = TOUR_STEPS.findIndex((s) => s.id === currentId);
-  if (idx >= 0 && idx < TOUR_STEPS.length - 1) {
-    return TOUR_STEPS[idx + 1].id;
-  }
-  return null;
-}
-
-export function getPrevStepId(currentId: TourStepId): TourStepId | null {
-  const idx = TOUR_STEPS.findIndex((s) => s.id === currentId);
-  if (idx > 0) {
-    return TOUR_STEPS[idx - 1].id;
-  }
-  return null;
-}
+export function getTourStep(id:TourStepId):TourStepDefinition{return TOUR_STEPS.find(s=>s.id===id)||TOUR_STEPS[0]}
+export function getNextStepId(id:TourStepId):TourStepId|null{const i=TOUR_STEPS.findIndex(s=>s.id===id);return i>=0?TOUR_STEPS[i+1]?.id||null:null}
+export function getPrevStepId(id:TourStepId):TourStepId|null{const i=TOUR_STEPS.findIndex(s=>s.id===id);return i>0?TOUR_STEPS[i-1].id:null}

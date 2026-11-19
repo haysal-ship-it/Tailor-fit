@@ -1,7 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { X, ArrowRight, ArrowLeft, Check } from 'lucide-react';
 import { TourStepDefinition } from '@/lib/onboarding/steps';
-import { TourExample } from './TourExamples';
 import { cn } from '@/lib/utils';
 
 interface TourCardProps {
@@ -109,12 +108,12 @@ export function TourCard({
     >
       {/* Header: Visual Example + Close Button */}
       <div className="relative w-full">
-        <TourExample exampleId={step.exampleId} />
+        <p className="pr-8 text-xs font-medium text-[var(--primary)]">Overview guide</p>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close tour"
-          className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center text-[var(--muted)] hover:text-black hover:bg-white shadow-2xs transition-colors cursor-pointer"
+          className="absolute -top-1 right-0 w-7 h-7 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center text-[var(--muted)] hover:text-black hover:bg-white shadow-2xs transition-colors cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>

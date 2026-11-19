@@ -31,7 +31,7 @@ export function TourInvitation({
             Get to know TailorFit
           </h3>
           <p className="text-[12px] text-[var(--text-2)] mt-0.5 leading-normal">
-            See how client details, measurements and orders work together.
+            Explore your analytics, chart, calendar and studio actions.
           </p>
         </div>
       </div>

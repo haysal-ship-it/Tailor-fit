@@ -4,7 +4,7 @@ export type TourStatus = 'unseen' | 'interrupted' | 'dismissed' | 'completed';
 export type TourRuntimeState = 'closed' | 'preparing' | 'running';
 
 export interface OnboardingPreferences {
-  version: 1;
+  version: 2;
   status: TourStatus;
   lastStepId: TourStepId | null;
   contextualTipsEnabled: boolean;
@@ -12,7 +12,7 @@ export interface OnboardingPreferences {
 }
 
 export const DEFAULT_ONBOARDING_PREFERENCES: OnboardingPreferences = {
-  version: 1,
+  version: 2,
   status: 'unseen',
   lastStepId: null,
   contextualTipsEnabled: true,
@@ -20,11 +20,11 @@ export const DEFAULT_ONBOARDING_PREFERENCES: OnboardingPreferences = {
 };
 
 const VALID_STEP_IDS: Set<string> = new Set<TourStepId>([
-  'client',
-  'template',
-  'measure',
-  'save',
-  'reuse',
+  'analytics',
+  'chart',
+  'calendar',
+  'add-client',
+  'new-order',
 ]);
 
 const VALID_STATUSES: Set<string> = new Set<TourStatus>([
@@ -36,7 +36,7 @@ const VALID_STATUSES: Set<string> = new Set<TourStatus>([
 
 /**
  * Validates and normalizes raw JSON/object into valid OnboardingPreferences.
- * If corrupt, missing, or future/past unsupported version, returns safe defaults.
+ * The previous tour resets its progress; unsupported versions return safe defaults.
  */
 export function validateAndNormalizePreferences(raw: unknown): OnboardingPreferences {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -45,20 +45,20 @@ export function validateAndNormalizePreferences(raw: unknown): OnboardingPrefere
 
   const obj = raw as Record<string, unknown>;
 
-  // Check version (must be 1 for current release)
-  if (obj.version !== 1) {
+  // Migrate the previous tour while retaining contextual-tip preferences.
+  if (obj.version !== 1 && obj.version !== 2) {
     return { ...DEFAULT_ONBOARDING_PREFERENCES };
   }
 
   // Validate status
   const status: TourStatus =
-    typeof obj.status === 'string' && VALID_STATUSES.has(obj.status)
+    obj.version === 2 && typeof obj.status === 'string' && VALID_STATUSES.has(obj.status)
       ? (obj.status as TourStatus)
       : 'unseen';
 
   // Validate lastStepId
   const lastStepId: TourStepId | null =
-    typeof obj.lastStepId === 'string' && VALID_STEP_IDS.has(obj.lastStepId)
+    obj.version === 2 && typeof obj.lastStepId === 'string' && VALID_STEP_IDS.has(obj.lastStepId)
       ? (obj.lastStepId as TourStepId)
       : null;
 
@@ -74,7 +74,7 @@ export function validateAndNormalizePreferences(raw: unknown): OnboardingPrefere
     : [];
 
   return {
-    version: 1,
+    version: 2,
     status,
     lastStepId,
     contextualTipsEnabled,
@@ -83,7 +83,7 @@ export function validateAndNormalizePreferences(raw: unknown): OnboardingPrefere
 }
 
 /**
- * Pure transition: start tour from beginning ('client')
+ * Pure transition: start tour from beginning ('analytics')
  */
 export function transitionStartTour(
   prefs: OnboardingPreferences
@@ -92,21 +92,21 @@ export function transitionStartTour(
     preferences: {
       ...prefs,
       status: 'interrupted',
-      lastStepId: 'client',
+      lastStepId: 'analytics',
     },
-    currentStepId: 'client',
+    currentStepId: 'analytics',
   };
 }
 
 /**
- * Pure transition: resume interrupted tour at saved step (or 'client')
+ * Pure transition: resume interrupted tour at saved step (or 'analytics')
  */
 export function transitionResumeTour(
   prefs: OnboardingPreferences
 ): { preferences: OnboardingPreferences; currentStepId: TourStepId } {
   const stepToResume: TourStepId = prefs.lastStepId && VALID_STEP_IDS.has(prefs.lastStepId)
     ? prefs.lastStepId
-    : 'client';
+    : 'analytics';
 
   return {
     preferences: {
@@ -131,7 +131,7 @@ export function transitionNextStep(
       preferences: {
         ...prefs,
         status: 'completed',
-        lastStepId: 'reuse',
+        lastStepId: 'new-order',
       },
       nextStepId: null,
       finished: true,
@@ -156,7 +156,7 @@ export function transitionPrevStep(
   prefs: OnboardingPreferences,
   currentStepId: TourStepId
 ): { preferences: OnboardingPreferences; prevStepId: TourStepId } {
-  const prevId = getPrevStepId(currentStepId) || 'client';
+  const prevId = getPrevStepId(currentStepId) || 'analytics';
   return {
     preferences: {
       ...prefs,
@@ -188,7 +188,7 @@ export function transitionFinishTour(
   return {
     ...prefs,
     status: 'completed',
-    lastStepId: 'reuse',
+    lastStepId: 'new-order',
   };
 }
 

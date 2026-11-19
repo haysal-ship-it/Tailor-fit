@@ -1,4 +1,5 @@
 'use client';
+import {BackButton} from '@/components/ui/BackButton';
 import {SelectMenu} from '@/components/ui/SelectMenu';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -1260,14 +1261,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
               </div>
             ) : (
               <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setMobileSubScreen('form')}
-                  className="w-11 h-11 rounded-full bg-[#F2F2F2] flex items-center justify-center text-black shrink-0 cursor-pointer"
-                  aria-label="Back to form"
-                >
-                  <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
-                </button>
+                <BackButton onClick={()=>setMobileSubScreen('form')} aria-label="Back to form"/>
                 <div className="min-w-0 flex-1">
                   <h3 className="text-[16px] font-bold text-black leading-tight truncate">
                     Mannequin

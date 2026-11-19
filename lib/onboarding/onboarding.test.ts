@@ -30,31 +30,31 @@ test('Onboarding steps: exactly 5 linear steps with required IDs and copy', () =
   assert.equal(TOTAL_TOUR_STEPS, 5);
 
   const ids = TOUR_STEPS.map((s) => s.id);
-  assert.deepEqual(ids, ['client', 'template', 'measure', 'save', 'reuse']);
+  assert.deepEqual(ids, ['analytics', 'chart', 'calendar', 'add-client', 'new-order']);
 
   const targets = TOUR_STEPS.map((s) => s.targetKey);
   assert.deepEqual(targets, [
-    'client-basics',
-    'choose-template',
-    'mannequin-viewer',
-    'save-order',
-    'nav-clients',
+    'overview-analytics',
+    'overview-chart',
+    'overview-calendar',
+    'overview-add-client',
+    'overview-new-order',
   ]);
 
   // Step 1
-  const s1 = getTourStep('client');
-  assert.equal(s1.title, 'Start with your client.');
-  assert.match(s1.body, /client's details/);
+  const s1 = getTourStep('analytics');
+  assert.equal(s1.title, 'Your studio at a glance');
+  assert.match(s1.body, /total orders/);
 
   // Step 3 (mannequin)
-  const s3 = getTourStep('measure');
-  assert.equal(s3.title, 'Measure from every angle.');
-  assert.match(s3.body, /Drag the mannequin to rotate it/);
+  const s3 = getTourStep('calendar');
+  assert.equal(s3.title, 'Keep track of pickups');
+  assert.match(s3.body, /Browse pickup dates/);
 
   // Step 5 (reuse)
-  const s5 = getTourStep('reuse');
-  assert.equal(s5.title, 'Find the fitting again.');
-  assert.match(s5.body, /Open Clients to review saved measurements/);
+  const s5 = getTourStep('new-order');
+  assert.equal(s5.title, 'Create a new order');
+  assert.match(s5.body, /Open the order workspace/);
 });
 
 test('Preference validation: normalizes missing, corrupt or invalid values safely', () => {
@@ -72,14 +72,14 @@ test('Preference validation: normalizes missing, corrupt or invalid values safel
 
   // Unknown status -> safe fallback to 'unseen'
   const malformedStatus = validateAndNormalizePreferences({
-    version: 1,
+    version: 2,
     status: 'corrupted-status',
   });
   assert.equal(malformedStatus.status, 'unseen');
 
   // Unknown step ID -> safe fallback to null
   const malformedStep = validateAndNormalizePreferences({
-    version: 1,
+    version: 2,
     status: 'interrupted',
     lastStepId: 'unknown-step',
   });
@@ -87,9 +87,9 @@ test('Preference validation: normalizes missing, corrupt or invalid values safel
 
   // Valid preferences preserved exactly
   const valid: OnboardingPreferences = {
-    version: 1,
+    version: 2,
     status: 'completed',
-    lastStepId: 'reuse',
+    lastStepId: 'new-order',
     contextualTipsEnabled: false,
     acknowledgedTipIds: ['template-fields', 'viewer-rotate'],
   };
@@ -101,62 +101,62 @@ test('State transitions: start, complete full 5-step sequence, finish', () => {
 
   // 1. Start tour
   const started = transitionStartTour(prefs);
-  assert.equal(started.currentStepId, 'client');
+  assert.equal(started.currentStepId, 'analytics');
   assert.equal(started.preferences.status, 'interrupted');
-  assert.equal(started.preferences.lastStepId, 'client');
+  assert.equal(started.preferences.lastStepId, 'analytics');
   prefs = started.preferences;
 
   // 2. Next: client -> template (step 2)
-  const step2 = transitionNextStep(prefs, 'client');
-  assert.equal(step2.nextStepId, 'template');
+  const step2 = transitionNextStep(prefs, 'analytics');
+  assert.equal(step2.nextStepId, 'chart');
   assert.equal(step2.finished, false);
-  assert.equal(step2.preferences.lastStepId, 'template');
+  assert.equal(step2.preferences.lastStepId, 'chart');
   prefs = step2.preferences;
 
   // 3. Next: template -> measure (step 3)
-  const step3 = transitionNextStep(prefs, 'template');
-  assert.equal(step3.nextStepId, 'measure');
+  const step3 = transitionNextStep(prefs, 'chart');
+  assert.equal(step3.nextStepId, 'calendar');
   assert.equal(step3.finished, false);
-  assert.equal(step3.preferences.lastStepId, 'measure');
+  assert.equal(step3.preferences.lastStepId, 'calendar');
   prefs = step3.preferences;
 
   // 4. Back: measure -> template (step 2)
-  const back = transitionPrevStep(prefs, 'measure');
-  assert.equal(back.prevStepId, 'template');
-  assert.equal(back.preferences.lastStepId, 'template');
+  const back = transitionPrevStep(prefs, 'calendar');
+  assert.equal(back.prevStepId, 'chart');
+  assert.equal(back.preferences.lastStepId, 'chart');
   prefs = back.preferences;
 
   // Forward again to save (step 4)
-  const step3b = transitionNextStep(prefs, 'template');
-  const step4 = transitionNextStep(step3b.preferences, 'measure');
-  assert.equal(step4.nextStepId, 'save');
+  const step3b = transitionNextStep(prefs, 'chart');
+  const step4 = transitionNextStep(step3b.preferences, 'calendar');
+  assert.equal(step4.nextStepId, 'add-client');
   prefs = step4.preferences;
 
   // Forward to reuse (step 5)
-  const step5 = transitionNextStep(prefs, 'save');
-  assert.equal(step5.nextStepId, 'reuse');
+  const step5 = transitionNextStep(prefs, 'add-client');
+  assert.equal(step5.nextStepId, 'new-order');
   assert.equal(step5.finished, false);
   prefs = step5.preferences;
 
   // 5. Next on step 5 (finish)
-  const finished = transitionNextStep(prefs, 'reuse');
+  const finished = transitionNextStep(prefs, 'new-order');
   assert.equal(finished.nextStepId, null);
   assert.equal(finished.finished, true);
   assert.equal(finished.preferences.status, 'completed');
-  assert.equal(finished.preferences.lastStepId, 'reuse');
+  assert.equal(finished.preferences.lastStepId, 'new-order');
 });
 
 test('State transitions: resume interrupted tour', () => {
   const interruptedPrefs: OnboardingPreferences = {
-    version: 1,
+    version: 2,
     status: 'interrupted',
-    lastStepId: 'measure',
+    lastStepId: 'calendar',
     contextualTipsEnabled: true,
     acknowledgedTipIds: [],
   };
 
   const resumed = transitionResumeTour(interruptedPrefs);
-  assert.equal(resumed.currentStepId, 'measure');
+  assert.equal(resumed.currentStepId, 'calendar');
   assert.equal(resumed.preferences.status, 'interrupted');
 });
 
@@ -214,11 +214,11 @@ test('Data preservation contract: tour progress strictly isolated from business 
   // Exercise full tour lifecycle
   let prefs = { ...DEFAULT_ONBOARDING_PREFERENCES };
   const s = transitionStartTour(prefs);
-  const n1 = transitionNextStep(s.preferences, 'client');
-  const n2 = transitionNextStep(n1.preferences, 'template');
-  const n3 = transitionNextStep(n2.preferences, 'measure');
-  const n4 = transitionNextStep(n3.preferences, 'save');
-  const n5 = transitionNextStep(n4.preferences, 'reuse');
+  const n1 = transitionNextStep(s.preferences, 'analytics');
+  const n2 = transitionNextStep(n1.preferences, 'chart');
+  const n3 = transitionNextStep(n2.preferences, 'calendar');
+  const n4 = transitionNextStep(n3.preferences, 'add-client');
+  const n5 = transitionNextStep(n4.preferences, 'new-order');
   const finished = transitionFinishTour(n5.preferences);
 
   assert.equal(finished.status, 'completed');
@@ -227,3 +227,5 @@ test('Data preservation contract: tour progress strictly isolated from business 
   assert.deepEqual(clientStore, originalClientSnapshot);
   assert.deepEqual(orderStore, originalOrderSnapshot);
 });
+
+test('Legacy tour migration preserves tips and offers the Overview guide once',()=>{const migrated=validateAndNormalizePreferences({version:1,status:'completed',lastStepId:'reuse',contextualTipsEnabled:false,acknowledgedTipIds:['viewer-rotate']});assert.equal(migrated.version,2);assert.equal(migrated.status,'unseen');assert.equal(migrated.lastStepId,null);assert.equal(migrated.contextualTipsEnabled,false);assert.deepEqual(migrated.acknowledgedTipIds,['viewer-rotate']);const dismissed=transitionDismissTour(migrated);assert.deepEqual(validateAndNormalizePreferences(dismissed),dismissed);});

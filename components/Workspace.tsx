@@ -173,7 +173,12 @@ function TailorFitApp() {
     routeOrder("new", undefined);
     return true;
   };
-  React.useEffect(()=>{const start=(event:Event)=>{if(handleOpenNewOrder()){if((event as CustomEvent<{resume:boolean}>).detail?.resume)tour.resumeTour();else tour.startTour();}};window.addEventListener('tailorfit:request-tour',start);return()=>window.removeEventListener('tailorfit:request-tour',start);});
+  const startOverviewTour=(resume:boolean)=>{
+    if(!canLeave(()=>startOverviewTour(resume)))return;
+    const url=new URL(location.href);url.search='?tab=overview';history.pushState({},'',url);currentUrl.current=url.toString();setOrderRoute({});setList(null);setSelectedClientId(null);setActiveScreen('overview');
+    requestAnimationFrame(()=>{if(resume)tour.resumeTour();else tour.startTour();});
+  };
+  React.useEffect(()=>{const start=(event:Event)=>startOverviewTour(!!(event as CustomEvent<{resume:boolean}>).detail?.resume);window.addEventListener('tailorfit:request-tour',start);return()=>window.removeEventListener('tailorfit:request-tour',start);});
   const handleReuseFitting=(clientId:string,fittingId:string)=>{if(!requireAccount()||!canLeave(()=>handleReuseFitting(clientId,fittingId)))return;rememberOrigin();routeOrder('new',clientId,false,fittingId);};
   const handleEditOrder = (orderId: string) => {
     if (!canLeave(()=>handleEditOrder(orderId))) return;
@@ -247,7 +252,7 @@ function TailorFitApp() {
           />
         )}
 
-        {activeScreen === "settings" && <SettingsScreen onStartTour={resume=>{if(handleOpenNewOrder()){if(resume)tour.resumeTour();else tour.startTour();}}} />}
+        {activeScreen === "settings" && <SettingsScreen onStartTour={startOverviewTour} />}
         </div>}
       </main>
 

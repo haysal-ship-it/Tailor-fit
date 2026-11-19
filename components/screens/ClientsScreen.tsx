@@ -1,4 +1,7 @@
 'use client';
+import {workspaceLayout} from '@/components/workspace/layout';
+import {WorkspaceActions,workspaceSecondaryAction} from '@/components/workspace/WorkspaceActions';
+import {BackButton} from '@/components/ui/BackButton';
 import {LegacyDialog} from '@/components/ui/LegacyDialog';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -732,7 +735,7 @@ export function ClientsScreen({
   };
 
   return (
-    <div className="w-full max-w-[1216px] mx-auto mt-3 lg:mt-4 px-3 sm:px-4 xl:px-0 pb-24 lg:pb-12 text-[var(--text)]">
+    <div className={workspaceLayout.shell}>
       {/* Accessible Landmark Heading (A11, A16) */}
       <h1 className="sr-only">Client Management &amp; Measurements Atelier</h1>
       {Boolean(orderId) || newOrder || (!selectedClientProfile && showingOrder) ? (<OrderWorkspace key={orderId||'new'} orderId={orderId} clientId={orderClientId} reuseSnapshotId={reuseSnapshotId} onBack={()=>onOrderBack?.()} onSaved={(id,cid)=>onOrderSaved?.(id,cid)} onEditClient={id=>handleOpenEditClient(id)}/>) : !selectedClientProfile && allClientList.length === 0 ? (
@@ -748,10 +751,7 @@ export function ClientsScreen({
                 <h3 className="text-[15px] font-semibold text-[var(--text)]">No clients yet</h3>
                 <p className="mt-1.5 max-w-sm text-[12px] leading-relaxed text-[var(--muted)]">Add a client to keep their contact details, measurements and orders together.</p>
               </div>
-              <div className="mt-2 flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-                <button type="button" onClick={handleOpenCreateClient} className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[24px] bg-[var(--primary)] px-5 text-[13px] font-medium text-white transition-opacity hover:opacity-95 sm:w-auto"><Plus className="h-3.5 w-3.5" aria-hidden="true"/>Add first client</button>
-                <button type="button" onClick={()=>onNewOrder?.('')} className="min-h-11 w-full rounded-[24px] border border-[var(--outline)] bg-[var(--surface)] px-5 text-[13px] font-medium transition-colors hover:bg-[var(--chip)] sm:w-auto">New order</button>
-              </div>
+              <div className="mt-2 w-full sm:w-auto"><WorkspaceActions firstClient onAddClient={handleOpenCreateClient} onNewOrder={()=>onNewOrder?.('')}/></div>
             </div>
           </div>
         </section>
@@ -761,7 +761,7 @@ export function ClientsScreen({
            =================================================================== */
         <div className="w-full bg-white rounded-[8px] p-[2px] flex flex-col gap-[2px]">
           {/* Header Bar */}
-          <div className="w-full p-[24px] flex flex-col lg:flex-row items-start justify-between gap-[16px]">
+          <div className="w-full px-4 py-4 sm:px-6 flex flex-col lg:flex-row items-start justify-between gap-[16px]">
             <div className="flex flex-col gap-[4px] lg:gap-[8px] items-start">
               <h2 className="text-[16px] font-semibold text-black leading-normal">
                 Client Directory
@@ -794,22 +794,12 @@ export function ClientsScreen({
                 )}
               </div>
 
-              {/* Add New Client Pill Button */}
-              <button
-                type="button"
-                onClick={() => handleOpenCreateClient()}
-                className="bg-[#1d49e8] hover:opacity-95 transition-opacity rounded-[24px] px-[14px] py-[8px] flex items-center justify-center w-full sm:w-auto cursor-pointer shrink-0"
-              >
-                <span className="text-[14px] font-medium text-white leading-normal whitespace-nowrap">
-                  Add New Client
-                </span>
-              </button>
-              <button type="button" onClick={()=>onNewOrder?.('')} className="min-h-11 w-full shrink-0 rounded-full border border-[var(--outline)] bg-white px-4 text-sm font-medium sm:w-auto">New order</button>
+              <WorkspaceActions onAddClient={handleOpenCreateClient} onNewOrder={()=>onNewOrder?.('')}/>
             </div>
           </div>
 
           {/* Clients Cards Grid Container */}
-          <div className="w-full bg-[#f8f8f8] rounded-[6px] p-[16px] lg:p-[24px] min-h-[502px]">
+          <div className="w-full bg-[#f8f8f8] rounded-[6px] p-3 min-h-[502px]">
             {filteredDirectoryClients.length === 0 ? (
               <div className="py-16 text-center flex flex-col items-center justify-center gap-2">
                 <p className="text-[14px] text-[#595959]">
@@ -904,22 +894,13 @@ export function ClientsScreen({
         {/* ===================================================================
             TOP CLIENT HEADER BAR (Present in all 9 Figma frames)
             =================================================================== */}
-        <div className="w-full bg-[var(--surface)] rounded-[6px] px-4 sm:px-6 py-4 sm:py-5 flex flex-col gap-4 relative">
-          <button
+        <div className="w-full bg-[var(--surface)] rounded-[6px] px-4 sm:px-6 py-4 flex flex-col gap-4 relative">
+          <BackButton
             type="button"
             onClick={handleBackToDirectory}
-            className="flex items-center gap-[4px] text-[#595959] hover:text-black transition-colors cursor-pointer w-fit"
+
             title="Back to client directory"
-          >
-            <img
-              src="/icons/order-details/arrow-u-up-left.svg"
-              alt=""
-              width={16}
-              height={16}
-              className="w-[16px] h-[16px] shrink-0"
-            />
-            <span className="text-[12px] font-normal leading-normal">Back</span>
-          </button>
+          />
 
           <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             {/* Left Identity Cluster */}
@@ -968,9 +949,9 @@ export function ClientsScreen({
                   setIsOverflowMenuOpen(false);
                   onNewOrder?.(selectedClientProfile.id);
                 }}
-                className="flex-1 sm:flex-initial h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[#E8E8E8] transition-colors flex items-center justify-center cursor-pointer"
+                className={workspaceSecondaryAction+" w-full sm:w-auto"}
               >
-                New order
+                <Plus size={16} aria-hidden="true"/>New order
               </button>
 
               <ChoiceMenu kind="menu" iconOnly placeholder="Client profile actions" options={[{"value":"0","label":"Edit client","destructive":false},{"value":"1","label":"Delete client","destructive":true}]} onChoose={value=>{const actions:Record<string,()=>void|Promise<void>>={"0":() => {
@@ -1207,20 +1188,7 @@ export function ClientsScreen({
               {!showingOrder && viewState === 'SavedMeasurements_UseFlow' && (
                 <div className="flex flex-col gap-3.5 pt-0.5">
                   {/* Back Link */}
-                  <button
-                    type="button"
-                    onClick={() => {if(showingOrder&&onOrderBack?.()===false)return;setViewState('SavedMeasurements_Default');}}
-                    className="flex items-center gap-[4px] text-[#595959] hover:text-black transition-colors w-fit cursor-pointer"
-                  >
-                    <img
-                      src="/icons/order-details/arrow-u-up-left.svg"
-                      alt=""
-                      width={16}
-                      height={16}
-                      className="w-[16px] h-[16px] shrink-0"
-                    />
-                    <span className="text-[12px] font-normal leading-normal">Back</span>
-                  </button>
+                  <BackButton onClick={()=>{if(showingOrder&&onOrderBack?.()===false)return;setViewState('SavedMeasurements_Default');}}/>
 
                   <ChoiceMenu className="w-[300px] max-w-full" label="Saved fitting" placeholder="No saved measurements" value={activeSnapshot?.id||''} options={clientSnapshots.map(s=>({value:s.id,label:`${s.garmentType} · ${s.date}`}))} onChoose={handleSelectSnapshot}/>
 
@@ -1572,20 +1540,7 @@ export function ClientsScreen({
               {/* Left Column: New Order Form */}
               <div className="w-full lg:w-[34%] bg-[var(--card)] rounded-[6px] p-3 flex flex-col gap-2.5 shrink-0">
                 <div className="flex flex-col gap-2 px-0.5">
-                  <button
-                    type="button"
-                    onClick={() => {if(showingOrder&&onOrderBack?.()===false)return;setViewState('SavedMeasurements_Default');}}
-                    className="flex items-center gap-[4px] text-[#595959] hover:text-black transition-colors cursor-pointer w-fit"
-                  >
-                    <img
-                      src="/icons/order-details/arrow-u-up-left.svg"
-                      alt=""
-                      width={16}
-                      height={16}
-                      className="w-[16px] h-[16px] shrink-0"
-                    />
-                    <span className="text-[12px] font-normal leading-normal">Back</span>
-                  </button>
+                  <BackButton onClick={()=>{if(showingOrder&&onOrderBack?.()===false)return;setViewState('SavedMeasurements_Default');}}/>
                   <h2 className="text-[14px] sm:text-[15px] font-bold text-[var(--text)]">
                     New Order
                   </h2>

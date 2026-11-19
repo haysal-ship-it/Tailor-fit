@@ -22,6 +22,7 @@ export function ChoiceMenu({
   className = "",
   iconOnly = false,
   icon,
+  triggerClassName,
 }: {
   options: Choice[];
   value?: string;
@@ -33,6 +34,7 @@ export function ChoiceMenu({
   className?: string;
   iconOnly?: boolean;
   icon?: ReactNode;
+  triggerClassName?: string;
 }) {
   const id = useId(),
     trigger = useRef<HTMLButtonElement>(null),
@@ -121,11 +123,11 @@ export function ChoiceMenu({
             openMenu();
           }
         }}
-        className={
+        className={triggerClassName || (
           iconOnly
             ? "flex h-11 w-11 items-center justify-center rounded-full bg-[var(--chip)] text-[var(--text-2)] hover:bg-[var(--card)] focus-visible:outline-2 focus-visible:outline-[var(--primary)]"
             : "flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-[var(--outline)] bg-[var(--surface)] px-3.5 text-left text-sm disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-[var(--primary)]"
-        }
+        )}
       >
         {iconOnly ? (
           icon || <MoreVertical size={16} aria-hidden="true" />

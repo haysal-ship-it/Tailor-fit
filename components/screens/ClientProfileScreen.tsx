@@ -1,4 +1,6 @@
 'use client';
+import {workspaceLayout} from '@/components/workspace/layout';
+import {BackButton} from '@/components/ui/BackButton';
 
 import React, { useState } from 'react';
 import { useStore } from '@/lib/store';
@@ -94,18 +96,11 @@ export function ClientProfileScreen({
   };
 
   return (
-    <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-3 space-y-4 pb-28 md:pb-6">
+    <div className={workspaceLayout.shell}>
       {/* Top Header Card */}
       <div className="rounded-2xl bg-[var(--surface-1)] border border-[var(--border)] p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setActiveScreen('clients')}
-            title="Back to Clients"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
+          <BackButton onClick={()=>setActiveScreen('clients')} aria-label="Back"/>
 
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-[var(--surface-2)] text-[var(--text)] font-semibold text-xs flex items-center justify-center border border-[var(--border)] shrink-0">

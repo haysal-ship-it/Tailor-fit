@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import {workspaceLayout} from '@/components/workspace/layout';
 import {
   Check,
   ClipboardList,
@@ -13,7 +14,7 @@ import {useWorkspaceNavigationGuard} from "@/lib/use-workspace-navigation-guard"
 import {recoverIntake} from '@/lib/legacy-intake';
 import {deleteDraft} from '@/lib/drafts/storage';
 import {IntakeDraftRecovery} from './IntakeDraftRecovery';
-import {useTour} from '@/components/onboarding/TourProvider';
+import {BackButton} from '@/components/ui/BackButton';
 import { useStore } from "@/lib/store";
 import { useDraft } from "@/lib/drafts/use-draft";
 import { RotatableMannequin } from "@/components/mannequin/RotatableMannequin";
@@ -269,20 +270,11 @@ export function OrderWorkspace({
     return (
       <div className="py-8 flex flex-col gap-4 items-start">
         {!isClientPreview && (
-          <button
+          <BackButton
             type="button"
             onClick={onBack}
-            className="flex items-center gap-[4px] text-[#595959] hover:text-black transition-colors cursor-pointer"
-          >
-            <img
-              src="/icons/order-details/arrow-u-up-left.svg"
-              alt=""
-              width={16}
-              height={16}
-              className="w-[16px] h-[16px] shrink-0"
-            />
-            <span className="text-[12px] font-normal leading-normal">Back</span>
-          </button>
+
+          />
         )}
         <div>
           <h2 className="text-lg font-semibold">Order unavailable</h2>
@@ -292,7 +284,7 @@ export function OrderWorkspace({
         </div>
       </div>
     );
-  if(!orderId&&reuseSnapshotId&&(!client||!snapshot))return <section className="rounded-lg bg-white p-6"><h2 className="text-lg font-semibold">Saved fitting unavailable</h2><p className="mt-2 text-sm">This fitting does not belong to the selected client or is no longer available.</p><button type="button" className={button+' mt-4'} onClick={onBack}>Back to client</button></section>;
+  if(!orderId&&reuseSnapshotId&&(!client||!snapshot))return <section className="rounded-lg bg-white p-6"><h2 className="text-lg font-semibold">Saved fitting unavailable</h2><p className="mt-2 text-sm">This fitting does not belong to the selected client or is no longer available.</p><BackButton className="mt-4" onClick={onBack} aria-label="Back to client">Back</BackButton></section>;
   if (editing)
     return (
       <OrderEditor
@@ -332,20 +324,11 @@ export function OrderWorkspace({
       <div className="w-full p-[16px] flex items-center justify-between">
         <div className="flex flex-col gap-[16px] items-start min-w-0 flex-1">
           {!isClientPreview && (
-            <button
+            <BackButton
               type="button"
               onClick={onBack}
-              className="flex items-center gap-[4px] text-[#595959] hover:text-black transition-colors cursor-pointer"
-            >
-              <img
-                src="/icons/order-details/arrow-u-up-left.svg"
-                alt=""
-                width={16}
-                height={16}
-                className="w-[16px] h-[16px] shrink-0"
-              />
-              <span className="text-[12px] font-normal leading-normal">Back</span>
-            </button>
+
+            />
           )}
           <h2 className="text-[16px] font-semibold leading-normal text-black">
             Order Details
@@ -1005,10 +988,10 @@ function OrderEditor({
   const client = store.clients.find((c) => c.id === chosenClient);
   const [name,setName]=useState(clientId?client?.name||'':''),[phone,setPhone]=useState(clientId?client?.phone||'':''),[email,setEmail]=useState(clientId?client?.email||'':'');
   const [mobileView,setMobileView]=useState<'details'|'measurements'>('details');
+  const [measurementView,setMeasurementView]=useState<'diagram'|'list'>('diagram');
+  const [templateId,setTemplateId]=useState('');
   const [discardOpen,setDiscardOpen]=useState(false);
   const [recoverySource,setRecoverySource]=useState('');
-  const tour=useTour();
-  useEffect(()=>{if(!tour.isTourRunning)return;queueMicrotask(()=>setMobileView(tour.currentStepId==='template'||tour.currentStepId==='measure'?'measurements':'details'));},[tour.isTourRunning,tour.currentStepId]);
   const saving=useRef(false);
   const [garment, setGarment] = useState(order?.garmentType || (clientId?snapshot?.garmentType:"") || ""),
     [price, setPrice] = useState(formatPriceInput(order?.price)),
@@ -1090,6 +1073,7 @@ function OrderEditor({
   useWorkspaceNavigationGuard(dirty,'Leave this order with unsaved changes? Your draft will remain on this device.',leaveApproved);
   const chooseFitting = (id: string) => {
     setFittingId(id);
+    setTemplateId('');
     const fitting = store.snapshots.find(
       (s) => s.id === id && s.clientId === chosenClient,
     );
@@ -1185,29 +1169,13 @@ function OrderEditor({
     <form
       noValidate
       onSubmit={save}
-      className="new-order-workspace space-y-0 rounded-lg bg-white p-[2px]"
+      className={"new-order-workspace space-y-0 "+workspaceLayout.frame}
       aria-label={order ? "Edit order" : "New order"}
     >
-      <div className="flex flex-col gap-3 p-5 sm:p-6">
-        <button
-          type="button"
-          onClick={() => void cancel()}
-          disabled={busy}
-          className="flex items-center gap-[4px] text-[#595959] hover:text-black transition-colors cursor-pointer w-fit disabled:opacity-50"
-        >
-          <img
-            src="/icons/order-details/arrow-u-up-left.svg"
-            alt=""
-            width={16}
-            height={16}
-            className="w-[16px] h-[16px] shrink-0"
-          />
-          <span className="text-[12px] font-normal leading-normal">Back</span>
-        </button>
+      <div className={"flex flex-col gap-2 "+workspaceLayout.header}>
+        <BackButton onClick={()=>void cancel()} disabled={busy} aria-label="Back from order workspace"/>
         <div className="flex flex-wrap justify-between gap-3">
-          <h2 className="text-lg font-semibold">
-            {order ? "Edit order" : "New order"}
-          </h2>
+          <div><h2 className="text-base font-semibold">{order ? "Edit order" : "New Order"}</h2><p className="mt-2 text-xs text-[var(--text-2)]">Client details, garment and measurements. One connected workspace.</p></div>
           <div className={cn("flex w-full flex-col gap-2 sm:w-auto sm:flex-row",!order&&"hidden")}>
             <button
               type="button"
@@ -1218,7 +1186,7 @@ function OrderEditor({
               Cancel
             </button>
             <button className={primary} disabled={busy || !draft.loaded}>
-              {busy ? "Saving…" : order ? "Save changes" : "Save order"}
+              <img src="/icons/order-details/floppy-disk.svg" width={16} height={16} alt=""/>{busy ? "Saving..." : "Save changes"}
             </button>
           </div>
         </div>
@@ -1230,21 +1198,23 @@ function OrderEditor({
         </p>
       )}
       <div className="flex gap-2 bg-[var(--card)] p-3 lg:hidden" role="group" aria-label="New order sections">{(['details','measurements'] as const).map(v=><button type="button" key={v} aria-pressed={mobileView===v} onClick={()=>setMobileView(v)} className={cn('min-h-11 flex-1 rounded-full text-sm capitalize',mobileView===v?'bg-white font-semibold':'text-[var(--text-2)]')}>{v}</button>)}</div>
-      <div className="grid gap-3 rounded-md bg-[var(--card)] p-3 lg:grid-cols-2">
-        <div data-tour="client-basics" className={cn("min-w-0 space-y-5 rounded-md bg-white p-4 sm:p-5",mobileView!=='details'&&'hidden lg:block')}>
-          {!order&&!clientId&&<><Input label="Client name" maxLength={200} value={name} onChange={e=>setName(e.target.value)} placeholder="Enter client's name" required/><div className="grid gap-4 sm:grid-cols-2"><Input label="Phone number" type="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+234"/><Input label="Email address" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="client@example.com"/></div></>}
+      <div className="grid gap-[2px] lg:grid-cols-2">
+        <div className={cn("min-w-0 rounded-md bg-[var(--card)] p-3",mobileView!=='details'&&'hidden lg:block')}>
+          <div className="h-full space-y-4 rounded-lg bg-white p-4"><h3 className="text-sm font-semibold">Client Order and Details</h3>
+          {!order&&!clientId&&<><div className="grid gap-2 sm:grid-cols-2"><Input label="Client name" maxLength={200} value={name} onChange={e=>setName(e.target.value)} placeholder="Enter client's name" required/><Input label="Garment Type" value={garment} onChange={e=>setGarment(e.target.value)} required/></div><div className="grid gap-2 sm:grid-cols-2"><Input label="Phone number" type="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+234"/><Input label="Email address" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="client@example.com"/></div></>}
           {(order||clientId) && client && (
             <ClientSummary
               client={client}
               onEdit={() => onEditClient(client.id)}
             />
           )}
-          <Input
+          {(order||clientId)&&<Input
             label="Garment"
             value={garment}
             onChange={(e) => setGarment(e.target.value)}
             required
-          />
+          />}
+          <h3 className="text-sm font-semibold">Style References</h3>
       <AnimatedFileUpload
         images={images.map((i) => i.url)}
         onChange={(urls) =>
@@ -1260,7 +1230,7 @@ function OrderEditor({
           )
         }
       />
-          <div className="grid gap-4 sm:grid-cols-2">
+          <h3 className="text-sm font-semibold">Price/Due date</h3><div className="grid gap-2 sm:grid-cols-2">
             <Input
               label={`Price (${currency || "currency not set"})`}
               type="text"
@@ -1277,7 +1247,7 @@ function OrderEditor({
               onChange={(e) => setDue(e.target.value)}
             />
           </div>
-          <ChoiceMenu
+          {order&&<ChoiceMenu
             label="Order status"
             value={status}
             options={[
@@ -1289,16 +1259,16 @@ function OrderEditor({
               "Picked Up",
             ].map((v) => ({ value: v, label: v }))}
             onChoose={(v) => setStatus(v as OrderStatus)}
-          />
-          <Textarea
-            label="Internal notes"
+          />}
+          <h3 className="text-sm font-semibold">Notes</h3><Textarea
+            label="Workroom notes and fabric details"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            rows={3}
+            rows={5}
             helperText="Not included in the invoice."
-          />
+          /></div>
         </div>
-        <div className={cn("min-w-0 space-y-4 rounded-md bg-[var(--card)] p-4 sm:p-5",mobileView!=='measurements'&&'hidden lg:block')}>
+        <div className={cn("min-w-0 space-y-3 rounded-md bg-[var(--card)] p-3",mobileView!=='measurements'&&'hidden lg:block')}>
           {order&&<>
           <ChoiceMenu
             label="Saved measurements"
@@ -1315,55 +1285,15 @@ function OrderEditor({
             onChoose={chooseFitting}
           />
           </>}
-          <div data-tour="choose-template"><ChoiceMenu
-            label="Garment blueprint"
-            placeholder="Choose measurement fields"
-            options={store.settings.templates.map((template) => ({
-              value: template.id,
-              label: template.name,
-            }))}
-            onChoose={(id) => {
-              const template = store.settings.templates.find(
-                (item) => item.id === id,
-              );
-              if (!template) return;
-              setFittingId("");
-              setMeasurements(
-                Object.fromEntries(
-                  template.fieldKeys.map((key) => [
-                    key,
-                    measurements[key] ?? "",
-                  ]),
-                ),
-              );
-              if (!garment.trim()) setGarment(template.name);
-            }}
-          />
-          </div><div data-tour="mannequin-viewer"><RotatableMannequin
-            gender={gender}
-            onGenderChange={setGender}
-            showGenderToggle
-            measurements={measurements}
-            activePointKeys={Object.keys(measurements)}
-            unit={unit}
-            onSelectPoint={(key) => {
-              setPoint(key);
-              setPointValue(String(measurements[key] ?? ""));
-            }}
-          />
-          </div><ChoiceMenu
-            label="Add a measurement"
-            value=""
-            placeholder="Choose measurement point"
-            options={store.allHotspots
-              .filter((h) => !(h.key in measurements))
-              .map((h) => ({ value: h.key, label: h.label }))}
-            onChoose={(key) => {
-              setPoint(key);
-              setPointValue("");
-            }}
-          />
-          <div className="space-y-3" aria-label="Edit measurement list">
+          <div><h3 className="text-sm font-bold">Mannequin</h3><p className="mt-1 text-[10px] text-[var(--text-2)]">{Object.keys(measurements).length ? Object.keys(measurements).length+' selected points' : 'All available points'} · {gender==='female'?'Feminine':'Masculine'} Form</p></div>
+          <div className="flex flex-wrap items-center gap-2 rounded-[24px] bg-white p-2 xl:flex-nowrap xl:rounded-full" aria-label="Measurement toolbar">
+            <ChoiceMenu className="min-w-[140px] flex-1" placeholder="Choose Template" value={templateId} triggerClassName="flex min-h-11 w-full items-center justify-between gap-2 rounded-full bg-[var(--chip)] px-3 text-xs focus-visible:outline-2 focus-visible:outline-[var(--primary)]" options={store.settings.templates.map(t=>({value:t.id,label:t.name}))} onChoose={id=>{const t=store.settings.templates.find(t=>t.id===id);if(!t)return;setTemplateId(id);setFittingId('');setMeasurements(Object.fromEntries(t.fieldKeys.map(key=>[key,measurements[key]??''])));if(!garment.trim())setGarment(t.name);}}/>
+            <div className="flex shrink-0 gap-1 rounded-full bg-[var(--chip)] p-1" role="group" aria-label="Mannequin form">{(['male','female'] as const).map(g=><button key={g} type="button" aria-label={g==='male'?'Masculine form':'Feminine form'} aria-pressed={gender===g} onClick={()=>setGender(g)} className={cn('flex h-11 w-11 items-center justify-center rounded-full text-xs min-[1200px]:h-7 min-[1200px]:w-7',gender===g?'bg-[var(--primary)] text-white':'bg-white text-[var(--text-2)]')}>{g==='male'?'M':'F'}</button>)}</div>
+            <div className="flex shrink-0 gap-1 rounded-full bg-[var(--chip)] p-1" role="group" aria-label="Measurement view">{(['diagram','list'] as const).map(v=><button key={v} type="button" aria-label={v==='diagram'?'Mannequin diagram':'Measurement list'} aria-pressed={measurementView===v} onClick={()=>setMeasurementView(v)} className={cn('flex h-11 w-11 items-center justify-center rounded-full min-[1200px]:h-7 min-[1200px]:w-7',measurementView===v?'bg-[var(--primary)]':'bg-white')}><img src={v==='diagram'?'/icons/order-details/person.svg':'/icons/order-details/clipboard-text.svg'} width={16} height={16} alt="" className={measurementView===v?'brightness-0 invert':''}/></button>)}</div>
+            <ChoiceMenu className="shrink-0" placeholder="Add Point" value="" triggerClassName="flex min-h-11 items-center justify-between gap-1 rounded-full border border-[var(--outline)] bg-[var(--chip)] px-3 text-xs focus-visible:outline-2 focus-visible:outline-[var(--primary)]" options={store.allHotspots.filter(h=>!(h.key in measurements)).map(h=>({value:h.key,label:h.label}))} onChoose={key=>{setPoint(key);setPointValue('');}}/>
+          </div>
+          <div className={measurementView==='diagram'?'flex min-h-[360px] items-center justify-center py-6':'hidden'}><RotatableMannequin gender={gender} onGenderChange={setGender} showControls={false} showGenderToggle={false} className="max-w-[450px]" measurements={measurements} activePointKeys={Object.keys(measurements)} unit={unit} onSelectPoint={key=>{setPoint(key);setPointValue(String(measurements[key]??''));}}/></div>
+          <div className={cn("min-h-[360px] space-y-3 rounded-lg bg-white p-4",measurementView!=='list'&&'hidden')} aria-label="Edit measurement list">{!Object.keys(measurements).length&&<p className="text-sm text-[var(--text-2)]">Choose a template or add a point to start recording measurements.</p>}
             {Object.entries(measurements).map(([key, value]) => (
               <div
                 key={key}
@@ -1387,7 +1317,7 @@ function OrderEditor({
             ))}
           </div>
           <p className="text-xs text-[var(--text-2)]">
-            Sizes are in {unit}. Changed sizes are saved as a new fitting,
+            Drag the mannequin or use arrow keys to rotate. Sizes are in {unit}. Changed sizes are saved as a new fitting,
             preserving the original.
           </p>
         </div>
@@ -1427,7 +1357,7 @@ function OrderEditor({
           ))}
         </div>
       )}
-      {!order&&<div className="flex flex-col justify-end gap-2 p-4 sm:flex-row"><button type="button" className={button} disabled={busy} onClick={()=>void cancel()}>Cancel</button><button type="submit" data-tour="save-order" className={primary} disabled={busy||!draft.loaded}>{busy?'Saving…':'Save order'}</button></div>}
+      {!order&&<div className="flex flex-col justify-end gap-2 p-4 sm:flex-row"><button type="button" className={button} disabled={busy} onClick={()=>void cancel()}>Cancel</button><button type="submit" className={primary} disabled={busy||!draft.loaded}><img src="/icons/order-details/floppy-disk.svg" width={16} height={16} alt=""/>{busy?'Saving...':'Save'}</button></div>}
       {discardOpen&&<ConfirmDialog title="Discard unsaved order?" onClose={()=>setDiscardOpen(false)}><p className="text-sm text-[var(--text-2)]">The changes in this order draft will be removed.</p><div className="dialog-actions mt-5 flex justify-end gap-2"><button type="button" className={button} onClick={()=>setDiscardOpen(false)}>Keep editing</button><button type="button" className={primary} onClick={async()=>{await draft.discard();leaveApproved.current=true;onCancel();}}>Discard changes</button></div></ConfirmDialog>}
       {point && (
         <ConfirmDialog

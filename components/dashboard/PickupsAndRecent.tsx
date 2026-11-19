@@ -98,7 +98,7 @@ const {orders,clients}=useStore();
 
   const renderCalendarCard = () => (
     <div
-      id="overview-calendar"
+      id="overview-calendar" data-tour="overview-calendar"
       className="w-full bg-[var(--card)] rounded-[6px] p-3 flex flex-col gap-3 relative"
     >
       <div className="flex items-center justify-between">

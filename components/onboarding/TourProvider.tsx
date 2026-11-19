@@ -96,7 +96,7 @@ export function TourProvider({ children }: TourProviderProps) {
     // Support URL query parameters for test automation & verification
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('tourStep') && ['client', 'template', 'measure', 'save', 'reuse'].includes(params.get('tourStep')!)) {
+      if (params.get('tourStep') && ["analytics","chart","calendar","add-client","new-order"].includes(params.get('tourStep')!)) {
         setCurrentStepId(params.get('tourStep') as TourStepId);
         setIsTourRunning(true);
       }

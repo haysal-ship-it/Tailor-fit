@@ -1,4 +1,6 @@
 'use client';
+import {workspaceLayout} from '@/components/workspace/layout';
+import {BackButton} from '@/components/ui/BackButton';
 import {SelectMenu} from '@/components/ui/SelectMenu';
 
 import React, { useState, useMemo } from 'react';
@@ -47,7 +49,7 @@ export function MeasurementCaptureScreen() {
   const [unit, setUnit] = useState<UnitType>(existingSnapshot?.unit || settings.defaultUnit || 'cm');
   const [garmentType, setGarmentType] = useState<string>(existingSnapshot?.garmentType || 'Full 2-Piece Suit');
   const [notes, setNotes] = useState<string>(existingSnapshot?.notes || '');
-  
+
   // Measurements record { [key]: value }
   const [measurements, setMeasurements] = useState<Record<string, number | string>>(
     existingSnapshot?.measurements || {}
@@ -181,17 +183,15 @@ export function MeasurementCaptureScreen() {
   );
 
   return (
-    <div className="w-full max-w-[1200px] mx-auto px-4 sm:px-6 py-6 pb-32 sm:pb-16">
+    <div className={workspaceLayout.shell}>
       {/* Header Bar */}
       <div className="flex items-center justify-between gap-4 mb-6 pb-4 border-b border-[#ebe8e4]">
         <div className="flex items-center gap-3">
-          <button
+          <BackButton
             type="button"
             onClick={() => (clientId ? openClientProfile(clientId) : setActiveScreen('dashboard'))}
-            className="w-9 h-9 rounded-full border border-[#ebe8e4] flex items-center justify-center text-[#44403b] hover:bg-[#f5f3f1] transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
+
+           aria-label="Back"/>
           <div>
             <h1 className="text-2xl sm:text-3xl font-light tracking-tight text-[#000000]">
               {existingSnapshot ? 'Edit Measurement Snapshot' : 'Take Body Measurements'}
