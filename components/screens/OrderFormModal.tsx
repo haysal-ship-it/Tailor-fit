@@ -1,4 +1,5 @@
 'use client';
+import {SelectMenu} from '@/components/ui/SelectMenu';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
@@ -918,19 +919,17 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                   </div>
 
                   <div className="relative">
-                    <select
-                      value={selectedSavedTemplateId}
-                      onChange={(e) => handleSelectSavedTemplate(e.target.value)}
-                      className="w-full h-8 px-3 pr-8 rounded-[24px] border border-[var(--track)] bg-white text-[13px] text-[var(--text-2)] focus:outline-none appearance-none cursor-pointer"
-                    >
+                    <SelectMenu value={selectedSavedTemplateId}
+                      onValueChange={(value) => handleSelectSavedTemplate(value)}
+                      className="w-full">
                       <option value="">Choose Saved Measurements or Blueprint</option>
                       {savedTemplates.map((t) => (
                         <option key={t.id} value={t.id} className="text-black">
                           {t.label}
                         </option>
                       ))}
-                    </select>
-                    <ChevronDown className="w-4 h-4 text-[var(--text-2)] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </SelectMenu>
+
                   </div>
 
                   {measurementValidationError && (
@@ -973,22 +972,20 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                           Order Status
                         </label>
                         <div className="relative">
-                          <select
-                            value={orderStatus}
-                            onChange={(e) => {
-                              setOrderStatus(e.target.value as OrderStatus);
+                          <SelectMenu value={orderStatus}
+                            onValueChange={(value) => {
+                              setOrderStatus(value as OrderStatus);
                               setHasFormEdited(true);
                             }}
-                            className="w-full bg-[var(--field-on-card)] border border-[#EDEDED] rounded-[8px] p-2 text-[13px] font-medium text-black focus:outline-none appearance-none cursor-pointer"
-                          >
+                            className="w-full">
                             <option value="In Progress">In Progress</option>
                             <option value="Pending">Pending</option>
                             <option value="Ready">Ready for pickup</option>
                             <option value="Picked Up">Collected (Picked Up)</option>
                             <option value="Completed">Completed</option>
                             <option value="Paused">Paused</option>
-                          </select>
-                          <ChevronDown className="w-4 h-4 text-[var(--text-2)] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          </SelectMenu>
+
                         </div>
                       </div>
                     )}
@@ -1379,19 +1376,17 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                   </div>
 
                   <div className="relative">
-                    <select
-                      value={selectedSavedTemplateId}
-                      onChange={(e) => handleSelectSavedTemplate(e.target.value)}
-                      className="w-full h-12 px-3 pr-8 rounded-[24px] border border-[var(--track)] bg-white text-[16px] text-[var(--text-2)] focus:outline-none appearance-none cursor-pointer"
-                    >
+                    <SelectMenu value={selectedSavedTemplateId}
+                      onValueChange={(value) => handleSelectSavedTemplate(value)}
+                      className="w-full">
                       <option value="">Choose Saved Template</option>
                       {savedTemplates.map((t) => (
                         <option key={t.id} value={t.id} className="text-black">
                           {t.label}
                         </option>
                       ))}
-                    </select>
-                    <ChevronDown className="w-4 h-4 text-[var(--text-2)] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </SelectMenu>
+
                   </div>
 
                   {measurementValidationError && (
@@ -1430,22 +1425,20 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                       Order Status
                     </label>
                     <div className="relative">
-                      <select
-                        value={orderStatus}
-                        onChange={(e) => {
-                          setOrderStatus(e.target.value as OrderStatus);
+                      <SelectMenu value={orderStatus}
+                        onValueChange={(value) => {
+                          setOrderStatus(value as OrderStatus);
                           setHasFormEdited(true);
                         }}
-                        className="w-full bg-[var(--field-on-card)] border border-[#EDEDED] rounded-[8px] px-3 h-12 text-[14px] font-medium text-black focus:outline-none appearance-none cursor-pointer"
-                      >
+                        className="w-full">
                         <option value="In Progress">In Progress</option>
                         <option value="Pending">Pending</option>
                         <option value="Ready">Ready for pickup</option>
                         <option value="Picked Up">Collected (Picked Up)</option>
                         <option value="Completed">Completed</option>
                         <option value="Paused">Paused</option>
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-[var(--text-2)] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </SelectMenu>
+
                     </div>
                   </div>
                 )}

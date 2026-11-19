@@ -48,6 +48,7 @@ import { getOrderStatusPresentation, formatDate } from '@/lib/status';
 import { ContextualTip } from '@/components/onboarding/ContextualTip';
 
 interface ClientsScreenProps {
+  onReuseFitting?:(clientId:string,snapshotId:string)=>void;reuseSnapshotId?:string;
   orderId?:string;newOrder?:boolean;orderClientId?:string;onOrderBack?:()=>boolean;onOrderSaved?:(id:string,clientId:string)=>void;
   onOpenClient?: (clientId: string) => void;
   onNewMeasurement?: (clientId: string) => void;
@@ -88,6 +89,7 @@ const SAVED_CARD_DISPLAY_LABELS: Record<string, string> = {
 
 export function ClientsScreen({
   onOpenClient,
+  onReuseFitting,reuseSnapshotId,
   onNewMeasurement,
   onNewOrder,
   onEditOrder, orderId, newOrder, orderClientId, onOrderBack, onOrderSaved,
@@ -361,7 +363,7 @@ export function ClientsScreen({
     }
     const snaps = getClientSnapshots(selectedClientProfile.id);
     if (snaps.length > 0) {
-      const latest = snaps[0];
+      const latest = snaps.find(snapshot=>snapshot.id===activeSnapshotId) || snaps[0];
       const normalized = normalizeMeasurementsRecord(latest.measurements);
       const keys = Object.keys(normalized);
 
@@ -386,7 +388,7 @@ export function ClientsScreen({
       setActivePointKeys([]);
       setMeasurements({});
     }
-  }, [selectedClientProfile?.id, getClientSnapshots]);
+  }, [selectedClientProfile?.id, getClientSnapshots, activeSnapshotId, unitLabel]);
 
   const activeSnapshot = useMemo(() => {
     return clientSnapshots.find((s) => s.id === activeSnapshotId) || clientSnapshots[0];
@@ -398,7 +400,8 @@ export function ClientsScreen({
     nextMeasurements: Record<string, number>,
     garmentLabel?: string
   ) => {
-    if (viewState === 'Inline_NewOrder' || !selectedClientProfile) return;
+    if (viewState === 'Inline_NewOrder') return true;
+    if (!selectedClientProfile) return false;
 
     const filteredObj: Record<string, number> = {};
     nextKeys.forEach((k) => {
@@ -410,8 +413,9 @@ export function ClientsScreen({
     });
 
     if (activeSnapshotId) {
-      updateSnapshot(activeSnapshotId, {
+      return await updateSnapshot(activeSnapshotId, {
         measurements: filteredObj,
+        unit: unitLabel,
         ...(garmentLabel ? { garmentType: garmentLabel } : {}),
       });
     } else {
@@ -423,11 +427,12 @@ export function ClientsScreen({
           year: 'numeric',
         }),
         unit: unitLabel,
-        garmentType: garmentLabel || selectedTemplateName || 'Bespoke wedding gown',
+        garmentType: garmentLabel || selectedTemplateName || 'Bespoke fitting',
         measurements: filteredObj,
       });
-      if(!created)return;
+      if(!created)return false;
       setActiveSnapshotId(created.id);
+      return true;
     }
   };
 
@@ -439,7 +444,7 @@ export function ClientsScreen({
     setActiveSnapshotId(found.id);
     setSelectedTemplateName(found.garmentType || 'Bespoke wedding gown');
     setActivePointKeys(Object.keys(normalized));
-    setMeasurements(normalized);
+    setMeasurements(found.unit!==unitLabel?Object.fromEntries(Object.entries(normalized).map(([key,value])=>[key,convertMeasurement(value,found.unit,unitLabel)])):normalized);
     setIsSnapshotDropdownOpen(false);
   };
 
@@ -521,7 +526,7 @@ export function ClientsScreen({
     setPointModalError('');
   };
 
-  const handleSavePointModal = () => {
+  const handleSavePointModal = async () => {
     if (!pointModalData) return;
     const num = parseFloat(pointModalData.value);
     if (isNaN(num) || num <= 0 || num > 300) {
@@ -538,9 +543,9 @@ export function ClientsScreen({
       [canonical]: num,
     };
 
+    if(!await persistMeasurementsToStore(nextKeys,nextMeasurements)){setPointModalError('Measurement was not saved. Check your connection and retry.');return;}
     setActivePointKeys(nextKeys);
     setMeasurements(nextMeasurements);
-    persistMeasurementsToStore(nextKeys, nextMeasurements);
 
     setPointModalData(null);
     setPointModalError('');
@@ -730,7 +735,7 @@ export function ClientsScreen({
     <div className="w-full max-w-[1216px] mx-auto mt-3 lg:mt-4 px-3 sm:px-4 xl:px-0 pb-24 lg:pb-12 text-[var(--text)]">
       {/* Accessible Landmark Heading (A11, A16) */}
       <h1 className="sr-only">Client Management &amp; Measurements Atelier</h1>
-      {Boolean(orderId) || newOrder || (!selectedClientProfile && showingOrder) ? (<OrderWorkspace key={orderId||'new'} orderId={orderId} clientId={orderClientId} onBack={()=>onOrderBack?.()} onSaved={(id,cid)=>onOrderSaved?.(id,cid)} onEditClient={id=>handleOpenEditClient(id)}/>) : !selectedClientProfile && allClientList.length === 0 ? (
+      {Boolean(orderId) || newOrder || (!selectedClientProfile && showingOrder) ? (<OrderWorkspace key={orderId||'new'} orderId={orderId} clientId={orderClientId} reuseSnapshotId={reuseSnapshotId} onBack={()=>onOrderBack?.()} onSaved={(id,cid)=>onOrderSaved?.(id,cid)} onEditClient={id=>handleOpenEditClient(id)}/>) : !selectedClientProfile && allClientList.length === 0 ? (
         <section className="w-full rounded-[8px] bg-[var(--surface)] p-[2px]">
           <header className="flex flex-col gap-2 p-6">
             <h2 className="text-[16px] font-semibold text-[var(--text)]">Client Directory</h2>
@@ -968,72 +973,13 @@ export function ClientsScreen({
                 New order
               </button>
 
-              <div ref={overflowMenuRef} className="relative flex items-center shrink-0">
-                <button
-                  type="button"
-                  aria-label="Client profile actions"
-                  aria-haspopup="menu"
-                  aria-expanded={isOverflowMenuOpen}
-                  onClick={() => setIsOverflowMenuOpen((prev) => !prev)}
-                  className="bg-[#f2f2f2] hover:bg-[#e8e8e8] rounded-[32px] size-[40px] p-[4px] flex items-center justify-center transition-colors cursor-pointer"
-                >
-                  <img
-                    src="/icons/order-details/dots-vertical.svg"
-                    alt=""
-                    width={24}
-                    height={24}
-                    className="w-[24px] h-[24px]"
-                  />
-                </button>
-
-                {isOverflowMenuOpen && (
-                  <div
-                    role="menu"
-                    aria-label="Client profile actions"
-                    className="absolute right-0 top-[calc(100%+6px)] z-50 w-[157px] bg-white border border-[#eeecec] rounded-[8px] p-[2px] shadow-lg flex flex-col items-start"
-                  >
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
+              <ChoiceMenu kind="menu" iconOnly placeholder="Client profile actions" options={[{"value":"0","label":"Edit client","destructive":false},{"value":"1","label":"Delete client","destructive":true}]} onChoose={value=>{const actions:Record<string,()=>void|Promise<void>>={"0":() => {
                         setIsOverflowMenuOpen(false);
                         handleOpenEditClient();
-                      }}
-                      className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#f8f8f8] transition-colors cursor-pointer text-left"
-                    >
-                      <PencilSimple
-                        size={16}
-                        weight="regular"
-                        className="w-[16px] h-[16px] shrink-0 text-[#595959]"
-                      />
-                      <span className="font-medium text-[12px] text-[#595959] whitespace-nowrap">
-                        Edit client
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
+                      },"1":() => {
                         setIsOverflowMenuOpen(false);
                         setIsDeleteConfirmOpen(true);
-                      }}
-                      className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#fff5f5] transition-colors cursor-pointer text-left"
-                    >
-                      <img
-                        src="/icons/order-details/trash.svg"
-                        alt=""
-                        width={16}
-                        height={16}
-                        className="w-[16px] h-[16px] shrink-0"
-                      />
-                      <span className="font-medium text-[12px] text-[#f83437] whitespace-nowrap">
-                        Delete client
-                      </span>
-                    </button>
-                  </div>
-                )}
-              </div>
+                      }};void actions[value]?.();}}/>
             </div>
           </div>
         </div>
@@ -1144,7 +1090,7 @@ export function ClientsScreen({
                           id="clients-use-measurement-btn"
                           onClick={() => {
                             setIsSnapshotDropdownOpen(false);
-                            setViewState('SavedMeasurements_UseFlow');
+                            if(activeSnapshot)onReuseFitting?.(selectedClientProfile.id,activeSnapshot.id);
                           }}
                           className="w-full sm:w-auto h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[#E8E8E8] transition-colors flex items-center justify-center cursor-pointer shrink-0"
                         >
@@ -1155,9 +1101,7 @@ export function ClientsScreen({
                           type="button"
                           id="clients-use-measurement-btn"
                           onClick={() => {
-                            if (onNewMeasurement) {
-                              onNewMeasurement(selectedClientProfile.id);
-                            }
+                            setViewState('SavedMeasurements_Default');handleOpenAddPoint();
                           }}
                           className="w-full sm:w-auto h-9 px-4 rounded-[24px] bg-[var(--primary)] text-white text-[12px] font-semibold hover:bg-[var(--primary)]/90 transition-colors flex items-center gap-1.5 justify-center cursor-pointer shrink-0"
                         >
@@ -1198,15 +1142,13 @@ export function ClientsScreen({
                               No Saved Measurements
                             </h3>
                             <p className="text-[12px] text-[var(--muted)] max-w-sm mt-1.5 leading-relaxed">
-                              No anatomical measurements have been recorded for {selectedClientProfile.name} yet. Capture measurements using the 3D studio mannequin on Overview or record their first bespoke fitting.
+                              No anatomical measurements have been recorded for {selectedClientProfile.name} yet. Use the 3D mannequin here to record their first fitting.
                             </p>
                           </div>
                           <button
                             type="button"
                             onClick={() => {
-                              if (onNewMeasurement) {
-                                onNewMeasurement(selectedClientProfile.id);
-                              }
+                              setViewState('SavedMeasurements_Default');handleOpenAddPoint();
                             }}
                             className="mt-2 h-9 px-5 rounded-[24px] bg-[var(--primary)] text-white text-[12px] font-medium hover:bg-[var(--primary)]/90 transition-colors cursor-pointer flex items-center gap-1.5"
                           >
@@ -1512,8 +1454,6 @@ export function ClientsScreen({
                         onClick={() => {
                           if (onNewOrder) {
                             onNewOrder(selectedClientProfile.id);
-                          } else {
-                            setViewState('Inline_NewOrder');
                           }
                         }}
                         className="mt-2 h-9 px-5 rounded-[24px] bg-[var(--primary)] text-white text-[12px] font-medium hover:bg-[var(--primary)]/90 transition-colors cursor-pointer flex items-center gap-1.5"
@@ -1715,46 +1655,7 @@ export function ClientsScreen({
                     </div>
 
                     {/* Saved Measurements Selector */}
-                    <div
-                      ref={newOrderTemplateDropdownRef}
-                      className="mt-2.5 relative"
-                    >
-                      <label className="text-[11px] font-medium text-[var(--muted)] mb-1 block">
-                        Saved Measurements
-                      </label>
-                      <button
-                        type="button"
-                        aria-haspopup="listbox"
-                        aria-expanded={isNewOrderTemplateDropdownOpen}
-                        onClick={() =>
-                          setIsNewOrderTemplateDropdownOpen((prev) => !prev)
-                        }
-                        className="w-full h-9 px-3.5 rounded-[24px] bg-[var(--surface)] border border-[var(--outline)] flex items-center justify-between gap-2 text-[12px] text-[var(--text-2)] hover:border-[var(--muted)] transition-colors cursor-pointer"
-                      >
-                        <span className="truncate">
-                          {newOrderSavedTemplateLabel ||
-                            'Choose Saved Template'}
-                        </span>
-                        <ChevronDown className="w-3.5 h-3.5 text-[var(--text-2)] shrink-0" />
-                      </button>
-
-                      <AnimatePresence>
-                        {isNewOrderTemplateDropdownOpen && (
-                          <motion.div
-                            role="listbox"
-                            initial={{ opacity: 0, y: -4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -4 }}
-                            transition={springSmooth}
-                            className="absolute left-0 top-[calc(100%+4px)] w-full bg-[var(--surface)] border border-[var(--outline)] rounded-[8px] p-1 shadow-[0_8px_24px_rgba(0,0,0,0.06)] z-30 flex flex-col gap-0.5"
-                          >
-                            {clientSnapshots.map((snap) => (
-                              <button
-                                key={snap.id}
-                                type="button"
-                                role="option"
-                                aria-selected={snap.id === activeSnapshot?.id}
-                                onClick={() => {
+                    <ChoiceMenu className="mt-2 w-full" label="Saved Measurements" placeholder="Choose saved fitting" value={activeSnapshot?.id||''} options={clientSnapshots.map(snap=>({value:snap.id,label:snap.garmentType+' · '+snap.date}))} onChoose={id=>{const snap=clientSnapshots.find(s=>s.id===id);if(!snap)return;(() => {
                                   handleSelectSnapshot(snap.id);
                                   setNewOrderSavedTemplateLabel(
                                     `${snap.garmentType}. ${snap.date}`
@@ -1763,18 +1664,7 @@ export function ClientsScreen({
                                     setNewOrderGarmentType(snap.garmentType);
                                   }
                                   setIsNewOrderTemplateDropdownOpen(false);
-                                }}
-                                className={cn(
-                                  'w-full px-3 py-2 rounded-[6px] text-left text-[12px] text-[var(--text-2)] hover:bg-[var(--card)] hover:text-[var(--text)] transition-colors cursor-pointer'
-                                )}
-                              >
-                                {snap.garmentType}. {snap.date}
-                              </button>
-                            ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
+                                })();}}/>
                   </div>
 
                   {/* Style References */}

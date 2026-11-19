@@ -1,4 +1,5 @@
 'use client';
+import {SelectMenu} from '@/components/ui/SelectMenu';
 
 import React, { useState } from 'react';
 import { useStore } from '@/lib/store';
@@ -446,15 +447,13 @@ export function PickupCalendarScreen({
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <select
-                      value={order.status}
-                      onChange={(e) => updateOrderStatus(order.id, e.target.value as any)}
-                      className="h-8 px-3 rounded-full border border-[#ebe8e4] bg-[#f5f3f1] text-[#000000] text-[12px] font-medium focus:outline-none"
-                    >
+                    <SelectMenu value={order.status}
+                      onValueChange={(value) => updateOrderStatus(order.id, value as any)}
+                      className="w-full">
                       <option value="In Progress">In Progress</option>
                       <option value="Ready">Ready</option>
                       <option value="Picked Up">Picked Up</option>
-                    </select>
+                    </SelectMenu>
 
                     <button
                       type="button"

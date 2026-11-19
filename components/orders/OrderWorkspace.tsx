@@ -10,6 +10,10 @@ import {
 } from "lucide-react";
 import { ArrowsClockwise } from "@phosphor-icons/react";
 import {useWorkspaceNavigationGuard} from "@/lib/use-workspace-navigation-guard";
+import {recoverIntake} from '@/lib/legacy-intake';
+import {deleteDraft} from '@/lib/drafts/storage';
+import {IntakeDraftRecovery} from './IntakeDraftRecovery';
+import {useTour} from '@/components/onboarding/TourProvider';
 import { useStore } from "@/lib/store";
 import { useDraft } from "@/lib/drafts/use-draft";
 import { RotatableMannequin } from "@/components/mannequin/RotatableMannequin";
@@ -93,6 +97,7 @@ const SELECTABLE_STATUSES: {
 
 type Props = {
   orderId?: string;
+  reuseSnapshotId?:string;
   clientId?: string;
   onBack?: () => void;
   onSaved?: (id: string, clientId: string) => void;
@@ -102,6 +107,7 @@ type Props = {
 };
 export function OrderWorkspace({
   orderId,
+  reuseSnapshotId,
   clientId,
   onBack = () => {},
   onSaved = () => {},
@@ -134,7 +140,7 @@ export function OrderWorkspace({
       : undefined);
   const storeSnapshot =
     snapshots.find(
-      (s) => s.id === order?.measurementSnapshotId && s.clientId === client?.id,
+      (s) => s.id === (order ? order.measurementSnapshotId : reuseSnapshotId) && s.clientId === client?.id,
     );
   const snapshot =
     storeSnapshot ||
@@ -286,6 +292,7 @@ export function OrderWorkspace({
         </div>
       </div>
     );
+  if(!orderId&&reuseSnapshotId&&(!client||!snapshot))return <section className="rounded-lg bg-white p-6"><h2 className="text-lg font-semibold">Saved fitting unavailable</h2><p className="mt-2 text-sm">This fitting does not belong to the selected client or is no longer available.</p><button type="button" className={button+' mt-4'} onClick={onBack}>Back to client</button></section>;
   if (editing)
     return (
       <OrderEditor
@@ -384,35 +391,7 @@ export function OrderWorkspace({
           </div>
 
           {!isClientPreview && (
-            <div ref={menuRef} className="relative flex items-center shrink-0">
-              <button
-                type="button"
-                aria-label="Order options"
-                aria-haspopup="menu"
-                aria-expanded={isMenuOpen}
-                disabled={busy}
-                onClick={() => setIsMenuOpen((prev) => !prev)}
-                className="bg-[#f2f2f2] hover:bg-[#e8e8e8] rounded-[32px] size-[40px] p-[4px] flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
-              >
-                <img
-                  src="/icons/order-details/dots-vertical.svg"
-                  alt=""
-                  width={24}
-                  height={24}
-                  className="w-[24px] h-[24px]"
-                />
-              </button>
-
-              {isMenuOpen && (
-                <div
-                  role="menu"
-                  aria-label="Order options"
-                  className="absolute right-0 top-[calc(100%+6px)] z-50 w-[157px] bg-white border border-[#eeecec] rounded-[8px] p-[2px] shadow-lg flex flex-col items-start"
-                >
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={async () => {
+            <ChoiceMenu kind="menu" iconOnly placeholder="Order options" disabled={busy} options={[{"value":"0","label":"Copy link","destructive":false},{"value":"1","label":"Update status","destructive":false},{"value":"2","label":"Delete order","destructive":true}]} onChoose={value=>{const actions:Record<string,()=>void|Promise<void>>={"0":async () => {
                       setIsMenuOpen(false);
                       setError("");
                       setNotice("");
@@ -434,69 +413,19 @@ export function OrderWorkspace({
                       } catch {
                         setError("Could not copy link automatically.");
                       }
-                    }}
-                    className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#f8f8f8] transition-colors cursor-pointer text-left"
-                  >
-                    <img
-                      src="/icons/order-details/link.svg"
-                      alt=""
-                      width={16}
-                      height={16}
-                      className="w-[16px] h-[16px] shrink-0"
-                    />
-                    <span className="font-medium text-[12px] text-[#595959] whitespace-nowrap">
-                      Copy link
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
+                    },"1":() => {
                       setIsMenuOpen(false);
                       setError("");
                       setNotice("");
                       setSelectedStatus(normalizeSelectableStatus(order.status));
                       setDialog("status");
-                    }}
-                    className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#f8f8f8] transition-colors cursor-pointer text-left"
-                  >
-                    <ArrowsClockwise
-                      size={16}
-                      weight="regular"
-                      className="w-[16px] h-[16px] shrink-0 text-[#595959]"
-                    />
-                    <span className="font-medium text-[12px] text-[#595959] whitespace-nowrap">
-                      Update status
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
+                    },"2":() => {
                       setIsMenuOpen(false);
                       setError("");
                       setNotice("");
                       deleteVersion.current = order.version;
                       setDialog("delete");
-                    }}
-                    className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#fff5f5] transition-colors cursor-pointer text-left"
-                  >
-                    <img
-                      src="/icons/order-details/trash.svg"
-                      alt=""
-                      width={16}
-                      height={16}
-                      className="w-[16px] h-[16px] shrink-0"
-                    />
-                    <span className="font-medium text-[12px] text-[#f83437] whitespace-nowrap">
-                      Delete order
-                    </span>
-                  </button>
-                </div>
-              )}
-            </div>
+                    }};void actions[value]?.();}}/>
           )}
         </div>
 
@@ -1074,11 +1003,14 @@ function OrderEditor({
     order?.clientId || clientId || "",
   );
   const client = store.clients.find((c) => c.id === chosenClient);
-  const [name,setName]=useState(''),[phone,setPhone]=useState(''),[email,setEmail]=useState('');
+  const [name,setName]=useState(clientId?client?.name||'':''),[phone,setPhone]=useState(clientId?client?.phone||'':''),[email,setEmail]=useState(clientId?client?.email||'':'');
   const [mobileView,setMobileView]=useState<'details'|'measurements'>('details');
   const [discardOpen,setDiscardOpen]=useState(false);
+  const [recoverySource,setRecoverySource]=useState('');
+  const tour=useTour();
+  useEffect(()=>{if(!tour.isTourRunning)return;queueMicrotask(()=>setMobileView(tour.currentStepId==='template'||tour.currentStepId==='measure'?'measurements':'details'));},[tour.isTourRunning,tour.currentStepId]);
   const saving=useRef(false);
-  const [garment, setGarment] = useState(order?.garmentType || ""),
+  const [garment, setGarment] = useState(order?.garmentType || (clientId?snapshot?.garmentType:"") || ""),
     [price, setPrice] = useState(formatPriceInput(order?.price)),
     [due, setDue] = useState(order?.pickupDateTime?.slice(0, 10) || ""),
     [notes, setNotes] = useState(order?.notes || "");
@@ -1103,7 +1035,7 @@ function OrderEditor({
   const leaveApproved = useRef(false);
   const data = {
     chosenClient,
-    name,phone,email,
+    name,phone,email,recoverySource,
     garment,
     price,
     due,
@@ -1125,6 +1057,7 @@ function OrderEditor({
       setChosenClient(
         order?.clientId || clientId || String(d.chosenClient || ""),
       );
+      setRecoverySource(String(d.recoverySource||''));
       setName(String(d.name||''));setPhone(String(d.phone||''));setEmail(String(d.email||''));
       setGarment(String(d.garment || ""));
       setPrice(String(d.price || ""));
@@ -1170,7 +1103,7 @@ function OrderEditor({
     setError("");
     const parsedPrice = parsePriceInput(price);
     if (
-      (order ? !client : !name.trim()) ||
+      ((order||clientId) ? !client : !name.trim()) ||
       !garment.trim() ||
       price.trim() === "" ||
       !Number.isFinite(parsedPrice) ||
@@ -1195,8 +1128,8 @@ function OrderEditor({
         (!!linked &&
           (linked.unit !== unit || linked.mannequinGender !== gender));
       const result = await store.saveIntake({
-        requestId: draft.getId(),
-        client: order&&client?client:{name:name.trim(),phone:phone.trim(),email:email.trim(),notes:""},
+        requestId: recoverySource || draft.getId(),
+        client: (order||clientId)&&client?client:recoverySource&&client?{...client,...(!order?{name:name.trim(),phone:phone.trim(),email:email.trim()}:{})}:{name:name.trim(),phone:phone.trim(),email:email.trim(),notes:""},
         snapshot:
           (changed || !linked) && Object.keys(measurements).length
             ? {
@@ -1230,6 +1163,7 @@ function OrderEditor({
         return;
       }
       await draft.discard();
+      if(recoverySource)await deleteDraft(recoverySource);
       leaveApproved.current = true;
       setOriginal(JSON.stringify(data));
       onSaved(result.orderId, result.clientId);
@@ -1289,6 +1223,7 @@ function OrderEditor({
           </div>
         </div>
       </div>
+      {!order&&!recoverySource&&<IntakeDraftRecovery disabled={dirty||busy} onRecover={legacy=>{const recovered=recoverIntake(legacy.data);setName(recovered.name);setPhone(recovered.phone);setEmail(recovered.email);setChosenClient(recovered.chosenClient);setGarment(recovered.garment);setPrice(recovered.price);setDue(recovered.due);setNotes(recovered.notes);setMeasurements(recovered.measurements);setGender(recovered.gender);setImages(recovered.images);setRecoverySource(legacy.id);if(recovered.dateNeedsReview)setError('Please review the recovered due date before saving.');}}/>}
       {(error || draft.warning) && (
         <p role="alert" className="text-sm text-red-700">
           {error || draft.warning}
@@ -1296,9 +1231,9 @@ function OrderEditor({
       )}
       <div className="flex gap-2 bg-[var(--card)] p-3 lg:hidden" role="group" aria-label="New order sections">{(['details','measurements'] as const).map(v=><button type="button" key={v} aria-pressed={mobileView===v} onClick={()=>setMobileView(v)} className={cn('min-h-11 flex-1 rounded-full text-sm capitalize',mobileView===v?'bg-white font-semibold':'text-[var(--text-2)]')}>{v}</button>)}</div>
       <div className="grid gap-3 rounded-md bg-[var(--card)] p-3 lg:grid-cols-2">
-        <div className={cn("min-w-0 space-y-5 rounded-md bg-white p-4 sm:p-5",mobileView!=='details'&&'hidden lg:block')}>
-          {!order&&<><Input label="Client name" maxLength={200} value={name} onChange={e=>setName(e.target.value)} placeholder="Enter client's name" required/><div className="grid gap-4 sm:grid-cols-2"><Input label="Phone number" type="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+234"/><Input label="Email address" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="client@example.com"/></div></>}
-          {order && client && (
+        <div data-tour="client-basics" className={cn("min-w-0 space-y-5 rounded-md bg-white p-4 sm:p-5",mobileView!=='details'&&'hidden lg:block')}>
+          {!order&&!clientId&&<><Input label="Client name" maxLength={200} value={name} onChange={e=>setName(e.target.value)} placeholder="Enter client's name" required/><div className="grid gap-4 sm:grid-cols-2"><Input label="Phone number" type="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+234"/><Input label="Email address" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="client@example.com"/></div></>}
+          {(order||clientId) && client && (
             <ClientSummary
               client={client}
               onEdit={() => onEditClient(client.id)}
@@ -1380,7 +1315,7 @@ function OrderEditor({
             onChoose={chooseFitting}
           />
           </>}
-          <ChoiceMenu
+          <div data-tour="choose-template"><ChoiceMenu
             label="Garment blueprint"
             placeholder="Choose measurement fields"
             options={store.settings.templates.map((template) => ({
@@ -1404,7 +1339,7 @@ function OrderEditor({
               if (!garment.trim()) setGarment(template.name);
             }}
           />
-          <RotatableMannequin
+          </div><div data-tour="mannequin-viewer"><RotatableMannequin
             gender={gender}
             onGenderChange={setGender}
             showGenderToggle
@@ -1416,7 +1351,7 @@ function OrderEditor({
               setPointValue(String(measurements[key] ?? ""));
             }}
           />
-          <ChoiceMenu
+          </div><ChoiceMenu
             label="Add a measurement"
             value=""
             placeholder="Choose measurement point"
@@ -1492,7 +1427,7 @@ function OrderEditor({
           ))}
         </div>
       )}
-      {!order&&<div className="flex flex-col justify-end gap-2 p-4 sm:flex-row"><button type="button" className={button} disabled={busy} onClick={()=>void cancel()}>Cancel</button><button type="submit" className={primary} disabled={busy||!draft.loaded}>{busy?'Saving…':'Save order'}</button></div>}
+      {!order&&<div className="flex flex-col justify-end gap-2 p-4 sm:flex-row"><button type="button" className={button} disabled={busy} onClick={()=>void cancel()}>Cancel</button><button type="submit" data-tour="save-order" className={primary} disabled={busy||!draft.loaded}>{busy?'Saving…':'Save order'}</button></div>}
       {discardOpen&&<ConfirmDialog title="Discard unsaved order?" onClose={()=>setDiscardOpen(false)}><p className="text-sm text-[var(--text-2)]">The changes in this order draft will be removed.</p><div className="dialog-actions mt-5 flex justify-end gap-2"><button type="button" className={button} onClick={()=>setDiscardOpen(false)}>Keep editing</button><button type="button" className={primary} onClick={async()=>{await draft.discard();leaveApproved.current=true;onCancel();}}>Discard changes</button></div></ConfirmDialog>}
       {point && (
         <ConfirmDialog

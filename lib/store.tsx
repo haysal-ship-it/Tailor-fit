@@ -240,11 +240,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setActiveScreen('clients');
   };
 
-  const openNewMeasurementForClient = (clientId?: string) => {
-    if (clientId) setSelectedClientId(clientId);
-    setSelectedSnapshotId(null);
-    setActiveScreen('new-measurement');
-  };
+  const openNewMeasurementForClient = (clientId?:string)=>{setSelectedClientId(clientId||null);setSelectedSnapshotId(null);setActiveScreen('clients');};
 
   const openNewOrderForClient = (clientId?: string) => {
     if (!account.requireAccount()) return;

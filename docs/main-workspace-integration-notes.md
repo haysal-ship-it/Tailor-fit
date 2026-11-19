@@ -15,7 +15,7 @@ Implemented in the main application, with menu and Clients empty-state refinemen
 - Order details use the saved order ID and linked fitting ID. An unrelated fitting is never substituted for an order without one.
 - Generic New order starts without a selected client, previous fitting or client selector. It creates a client record from the typed contact details, using the existing saveIntake transaction, upload staging and idempotent draft ID.
 - Existing order edits preserve an unknown historical currency instead of assigning the latest studio default.
-- Legacy overview-intake drafts remain accessible from Overview. Client-specific fitting capture uses separate draft keys and saves fittings without creating orders.
+- The old intake page and Overview shortcut are retired. Genuine old intake drafts can be explicitly recovered inside New order. Measurement capture stays in the client profile and saves fittings without creating orders.
 - Settings: grouped desktop navigation and mobile index/detail pages; profile name, verified email change, password reset, business identity, units/currency, templates, backup/restore, contextual tips and tour replay.
 - Studio identity is included in newly generated invoices. Existing order currencies and saved fitting units are retained.
 - Native workspace dialogs become bottom sheets below 1024px. Focus trapping, restoration, nested scroll locks, safe-area spacing, software-keyboard viewport changes and busy dismissal protection are handled centrally.
@@ -31,7 +31,7 @@ Self-service deletion requires SUPABASE_SERVICE_ROLE_KEY on the server. The inte
 
 - scripts/test-workspace-integration.cjs: 12 analytics and mocked account-deletion checks.
 - scripts/test-client-details.cjs: 5 client persistence/validation checks.
-- scripts/check-workspace-render.cjs: 4 server-render checks for Overview, blank New order, exact order details and grouped Settings. Mannequin/upload internals are stubbed in this test; it is not a browser screenshot check.
+- scripts/check-workspace-render.cjs: 7 server-render checks for Overview, blank New order, exact order details, grouped Settings, primary button fills and explicit fitting reuse. Mannequin/upload internals are stubbed in this test; it is not a browser screenshot check.
 - TypeScript and targeted ESLint checks.
 - Production build passed with a separate output directory. An initial attempt exhausted memory; icon imports were optimized and the build was retried without the preview process.
 
@@ -44,3 +44,11 @@ The local main workspace preview is served on port 4320 at /app?tab=overview. Th
 ## Menu and empty-state refinements — 19 November 2026
 
 The Overview chart period and All orders filter now reuse the same ChoiceMenu component as Clients. The Clients directory empty state now follows the existing white frame, grey content container, compact icon and typography, with stacked full-width phone actions.
+
+## Flow and dropdown consistency fixes
+
+All workspace selection and action menus share ChoiceMenu, preserving the approved Saved Measurements design. Menus open below their trigger, constrain their scrollable height to the visible viewport and render inside an owning native dialog when applicable. Settings action styles use separate primary/secondary backgrounds to prevent white-on-white default buttons.
+
+Take Measurements stays in the client profile. Explicit fitting reuse opens OrderWorkspace with an ownership-checked fitting ID; generic New order remains blank. Tour entry points use the approved order form. Old intake URLs redirect to the dashboard or selected client, and old drafts are recovered only by an explicit action inside the new form.
+
+Additional verification: scripts/test-workspace-flow.cjs covers menu geometry, legacy redirects and draft conversion, including invalid dates. These fixes replace the previous intake flow and menu implementations.

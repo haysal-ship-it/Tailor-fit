@@ -1,4 +1,5 @@
 'use client';
+import {SelectMenu} from '@/components/ui/SelectMenu';
 
 import React, { useState, useMemo } from 'react';
 import { useStore } from '@/lib/store';
@@ -535,17 +536,15 @@ export function MeasurementCaptureScreen() {
               <label className="block text-[12px] font-medium text-[#777169] mb-1.5">
                 Client
               </label>
-              <select
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                className="w-full h-10 px-3 rounded-[4px] border border-[#ebe8e4] bg-[#fdfcfc] text-[#000000] text-[14px] focus:outline-none focus:border-[#000000]"
-              >
+              <SelectMenu value={clientId}
+                onValueChange={(value) => setClientId(value)}
+                className="w-full">
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} ({c.phone})
                   </option>
                 ))}
-              </select>
+              </SelectMenu>
             </div>
 
             {/* Date Picker */}

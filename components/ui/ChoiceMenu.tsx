@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import {menuPosition} from '@/lib/menu-position';
 import { Check, ChevronDown, MoreVertical } from "lucide-react";
 export type Choice = {
   value: string;
@@ -8,6 +9,7 @@ export type Choice = {
   description?: string;
   destructive?: boolean;
   disabled?: boolean;
+  checked?: boolean;
 };
 export function ChoiceMenu({
   options,
@@ -19,6 +21,7 @@ export function ChoiceMenu({
   disabled = false,
   className = "",
   iconOnly = false,
+  icon,
 }: {
   options: Choice[];
   value?: string;
@@ -29,11 +32,13 @@ export function ChoiceMenu({
   disabled?: boolean;
   className?: string;
   iconOnly?: boolean;
+  icon?: ReactNode;
 }) {
   const id = useId(),
     trigger = useRef<HTMLButtonElement>(null),
     panel = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const [portalHost,setPortalHost]=useState<HTMLElement|null>(null);
   const [position, setPosition] = useState({
     top: 0,
     left: 0,
@@ -43,37 +48,28 @@ export function ChoiceMenu({
   const selected = options.find((o) => o.value === value);
   const close = () => {
     setOpen(false);
-    trigger.current?.focus();
+    trigger.current?.focus({preventScroll:true});
   };
+  const openMenu=()=>{setPortalHost(trigger.current?.closest('dialog')||document.body);setOpen(true);};
   useLayoutEffect(() => {
     if (!open) return;
     const place = () => {
-      const rect = trigger.current!.getBoundingClientRect();
-      const width = Math.min(
-        Math.max(rect.width, kind === "menu" ? 190 : 0),
-        window.innerWidth - 16,
-      );
-      const below = window.innerHeight - rect.bottom - 12;
-      const height = Math.min(280, Math.max(below, rect.top - 12));
-      const above = below < 180 && rect.top > below;
-      setPosition({
-        left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
-        top: above
-          ? Math.max(
-              8,
-              rect.top -
-                Math.min(panel.current?.scrollHeight || 280, height) -
-                4,
-            )
-          : rect.bottom + 4,
-        width,
-        maxHeight: Math.max(88, height),
-      });
+      const viewport=window.visualViewport;
+      const bounds={left:viewport?.offsetLeft||0,top:viewport?.offsetTop||0,width:viewport?.width||window.innerWidth,height:viewport?.height||window.innerHeight};
+      const rect=trigger.current!.getBoundingClientRect();
+      setPosition(menuPosition(rect,bounds,kind==='menu'?190:0));
     };
+    const initialRect=trigger.current!.getBoundingClientRect();
+    const viewportBottom=(window.visualViewport?.offsetTop||0)+(window.visualViewport?.height||window.innerHeight);
+    if(viewportBottom-initialRect.bottom<100)trigger.current!.scrollIntoView({block:'center',behavior:'instant'});
     place();
+    window.visualViewport?.addEventListener("resize",place);
+    window.visualViewport?.addEventListener("scroll",place);
     window.addEventListener("resize", place);
     window.addEventListener("scroll", place, true);
     return () => {
+      window.visualViewport?.removeEventListener("resize",place);
+      window.visualViewport?.removeEventListener("scroll",place);
       window.removeEventListener("resize", place);
       window.removeEventListener("scroll", place, true);
     };
@@ -86,7 +82,8 @@ export function ChoiceMenu({
     (
       chosen ||
       panel.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")
-    )?.focus();
+    )?.focus({preventScroll:true});
+    if(chosen&&panel.current){const list=panel.current;if(chosen.offsetTop+chosen.offsetHeight>list.clientHeight)list.scrollTop=chosen.offsetTop;}
     const outside = (e: PointerEvent) => {
       if (
         !trigger.current?.contains(e.target as Node) &&
@@ -117,11 +114,11 @@ export function ChoiceMenu({
         aria-haspopup={kind}
         aria-expanded={open}
         aria-controls={open ? `${id}-choices` : undefined}
-        onClick={() => setOpen(!open)}
+        onClick={() => {if(open)close();else openMenu();}}
         onKeyDown={(e) => {
           if (["ArrowDown", "ArrowUp"].includes(e.key)) {
             e.preventDefault();
-            setOpen(true);
+            openMenu();
           }
         }}
         className={
@@ -131,7 +128,7 @@ export function ChoiceMenu({
         }
       >
         {iconOnly ? (
-          <MoreVertical size={16} aria-hidden="true" />
+          icon || <MoreVertical size={16} aria-hidden="true" />
         ) : (
           <>
             <span className="truncate">
@@ -183,7 +180,8 @@ export function ChoiceMenu({
                           (e.key === "ArrowDown" ? 1 : -1) +
                           items.length) %
                         items.length;
-                items[next]?.focus();
+                items[next]?.focus({preventScroll:true});
+                if(items[next]){const item=items[next],list=panel.current!;if(item.offsetTop<list.scrollTop)list.scrollTop=item.offsetTop;else if(item.offsetTop+item.offsetHeight>list.scrollTop+list.clientHeight)list.scrollTop=item.offsetTop+item.offsetHeight-list.clientHeight;}
               }
             }}
           >
@@ -193,7 +191,8 @@ export function ChoiceMenu({
                   key={o.value}
                   type="button"
                   disabled={o.disabled}
-                  role={kind === "menu" ? "menuitem" : "option"}
+                  role={kind === "menu" ? o.checked===undefined?"menuitem":"menuitemcheckbox" : "option"}
+                  aria-checked={kind==='menu'?o.checked:undefined}
                   aria-selected={
                     kind === "listbox" ? o.value === value : undefined
                   }
@@ -211,7 +210,7 @@ export function ChoiceMenu({
                       </span>
                     )}
                   </span>
-                  {kind === "listbox" && o.value === value && (
+                  {((kind === "listbox" && o.value === value)||o.checked===true) && (
                     <Check size={16} aria-hidden="true" />
                   )}
                 </button>
@@ -220,7 +219,7 @@ export function ChoiceMenu({
               <p className="p-3 text-sm">No options available</p>
             )}
           </div>,
-          document.body,
+          portalHost || document.body,
         )}
     </div>
   );
