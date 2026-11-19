@@ -10,7 +10,6 @@ import {workspacePrimaryAction,workspaceSecondaryAction} from '@/components/work
 import {useTour} from './TourProvider';
 import {StudioSetupContext} from './StudioSetupContext';
 import {StudioSetupScreen} from './StudioSetupScreen';
-import './studio-setup.css';
 export function StudioSetupProvider({children}:{children:ReactNode}){
  const store=useStore(),account=useAccount(),tour=useTour(),owner=account.user?.id;
  const [state,setState]=useState<StudioSetupState|null>(null),[phase,setPhase]=useState<'loading'|'ready'|'error'>(owner?'loading':'ready'),[error,setError]=useState('');

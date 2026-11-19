@@ -1,4 +1,56 @@
-.studio-onboarding{min-height:100dvh;color:#100f0f;padding:0 16px 32px}.ob-setup-nav,.ob-checklist{background:white;border:1px solid #e8e8e8;border-radius:8px;overflow:hidden}.ob-checklist-heading{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;gap:12px}.ob-checklist-toggle{display:flex;align-items:center;gap:12px;flex:1;min-width:0;text-align:left;border:0;background:none}.ob-checklist-toggle>span:nth-child(2){display:flex;flex-direction:column;gap:4px;min-width:0}.ob-checklist-toggle strong{font-size:14px;font-weight:600}.ob-checklist-toggle small{font-size:11px;color:#777;line-height:1.5}.ob-checklist-toggle>svg:last-child{margin-left:auto;color:#777;transition:transform 160ms ease}.ob-chevron-open{transform:rotate(180deg)}.ob-progress-ring{--progress:0%;width:38px;height:38px;border-radius:50%;background:conic-gradient(#1d49e8 var(--progress),#edf0fa 0);padding:3px;flex-shrink:0}.ob-progress-ring>span{height:100%;width:100%;border-radius:50%;background:white;display:flex;align-items:center;justify-content:center;font-size:13px;color:#1d49e8;font-weight:600}.ob-dismiss{background:none;border:0;color:#777;display:flex;align-items:center;justify-content:center;width:32px;min-height:44px}.ob-checklist-content{padding:0 20px 16px}.ob-task-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid #f0f0f0;padding-top:16px;gap:16px}.ob-task{display:flex;align-items:flex-start;gap:9px;position:relative;min-width:0;padding-right:10px;border-right:1px solid #eee}.ob-task:last-child{border:0}.ob-task-check{height:22px;width:22px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid #ddd;font-size:10px;color:#595959}.ob-task.done .ob-task-check{border-color:#1d49e8;background:#1d49e8;color:white}.ob-task>div{flex:1;min-width:0}.ob-task strong{font-size:11px;font-weight:600}.ob-task p{font-size:10px;color:#777;line-height:1.6;margin-top:4px;max-width:190px}.ob-task-action{display:flex;align-items:center;gap:2px;background:#f8f8f8;border:1px solid #eee;border-radius:24px;font-size:10px;color:#595959;padding:0 9px;min-height:32px}.ob-tour-prompt{display:flex;justify-content:flex-end;align-items:center;gap:10px;padding-top:16px;color:#777;font-size:10px}.ob-tour-prompt>button,.ob-guide-shortcut>button{display:flex;gap:6px;align-items:center;color:#1d49e8;min-height:32px;background:none;border:0;font-size:11px;font-weight:500}.ob-guide-shortcut{display:flex;justify-content:flex-end;gap:16px}@keyframes ob-enter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+/* Shared setup layout from the approved onboarding direction. */
+.ob-setup-nav{max-width:1216px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.ob-setup-nav{height:100px;padding:0 12px}
+.ob-brand{display:inline-flex;gap:8px;align-items:center;flex-shrink:0}
+.ob-brand>img{height:29px;width:41px;object-fit:cover;object-position:left}
+.ob-brand>strong{font-size:23px;font-weight:700;letter-spacing:-.8px}
+.ob-nav-note{font-size:12px;color:#777}
+.ob-text-button{display:inline-flex;align-items:center;gap:8px;font-size:12px;min-height:44px;color:#595959;background:none;border:0}
+.ob-setup-main{max-width:1040px;margin:26px auto 0}
+.ob-setup-frame{background:white;border:2px solid white;border-radius:12px;display:grid;grid-template-columns:1fr 1fr;gap:2px;min-height:600px;overflow:hidden}
+.ob-setup-form{padding:36px 40px;background:white;min-width:0;animation:ob-enter 200ms cubic-bezier(.23,1,.32,1)}
+.ob-step-meta{display:flex;justify-content:space-between;gap:12px;font-size:11px;color:#595959}
+.ob-step-meta>span:first-child{font-weight:600;color:#242424}
+.ob-step-track{display:flex;gap:6px;margin:14px 0 0}
+.ob-step-track>span{height:3px;background:#eee;width:50%;border-radius:4px}
+.ob-step-track>.active{background:#1d49e8}
+.ob-intro{margin:40px 0 28px}
+.ob-intro>h1{font-size:28px;line-height:1.3;letter-spacing:-1px;font-weight:600;max-width:350px}
+.ob-intro>p{font-size:13px;line-height:1.7;color:#595959;max-width:310px;margin-top:12px}
+.ob-fields{display:flex;flex-direction:column;gap:20px}
+.ob-fields input{height:46px;font-size:14px;font-weight:400}
+.ob-fields label{font-size:12px}
+.ob-fields [id$='-helper']{font-size:11px;line-height:1.5}
+.ob-continue{width:100%;margin-top:32px;min-height:46px}
+.ob-settings-note{font-size:10px;line-height:1.7;text-align:center;color:#777;margin:16px 0 0}
+.ob-setup-footnote{color:#777;font-size:11px;text-align:center;margin:24px 0}
+.ob-companion{background:#f8f8f8;position:relative;border-radius:8px;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.ob-companion-header{padding:32px 32px 0;position:relative;z-index:1}
+.ob-product-label{display:flex;gap:7px;align-items:center;font-size:10px;color:#595959}
+.ob-product-label>span{height:5px;width:5px;background:#1d49e8;border-radius:50%}
+.ob-companion-header>p{font-size:19px;font-weight:500;line-height:1.5;letter-spacing:-.5px;margin:14px 0 0}
+.ob-mannequin{display:flex;justify-content:center;align-items:center;flex:1;padding:8px 20px 0;min-height:310px}
+.ob-mannequin>div{max-width:375px!important}
+.ob-companion-footer{border-top:1px solid #e9e9e9;display:flex;align-items:center;gap:12px;margin:0 28px;padding:18px 0;color:#595959}
+.ob-companion-footer>p{font-size:11px;line-height:1.6}
+.ob-companion-footer strong{font-weight:500;color:#222}
+.ob-choice-label{display:flex;align-items:flex-start;gap:10px}
+.ob-choice-label>svg{color:#595959;margin-top:2px}
+.ob-choice-label h2{font-size:12px;font-weight:600;line-height:1.5}
+.ob-choice-label p{font-size:11px;color:#777;margin-top:3px}
+.ob-fields:has(.ob-choice-label){gap:10px}
+.ob-choice-second{margin-top:14px}
+.ob-studio-summary{display:flex;align-items:center;gap:10px;background:#f8f8f8;border:1px solid #eee;padding:12px;border-radius:8px;margin:24px 0}
+.ob-avatar{display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#595959;color:white;width:32px;height:32px;border-radius:50%;font-weight:600;font-size:12px}
+.ob-studio-summary>div{min-width:0;display:flex;flex-direction:column;gap:3px}
+.ob-studio-summary strong{font-size:12px;font-weight:600;overflow-wrap:anywhere}
+.ob-studio-summary>div>span{font-size:10px;color:#777}
+.ob-edit-label{font-size:9px;color:#777;margin-left:auto;flex-shrink:0}
+.ob-step-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:24px}
+.ob-step-actions>button:last-child{font-size:12px;padding-left:18px;padding-right:18px}
+.ob-error{font-size:12px;line-height:1.6;color:#b42318;background:#fff3f1;padding:12px;border:1px solid #ffd7d1;border-radius:8px;margin-top:16px}
+
+.studio-onboarding{min-height:100dvh;color:#100f0f;padding:0 16px 32px}.ob-checklist{background:white;border:1px solid #e8e8e8;border-radius:8px;overflow:hidden}.ob-checklist-heading{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;gap:12px}.ob-checklist-toggle{display:flex;align-items:center;gap:12px;flex:1;min-width:0;text-align:left;border:0;background:none}.ob-checklist-toggle>span:nth-child(2){display:flex;flex-direction:column;gap:4px;min-width:0}.ob-checklist-toggle strong{font-size:14px;font-weight:600}.ob-checklist-toggle small{font-size:11px;color:#777;line-height:1.5}.ob-checklist-toggle>svg:last-child{margin-left:auto;color:#777;transition:transform 160ms ease}.ob-chevron-open{transform:rotate(180deg)}.ob-progress-ring{--progress:0%;width:38px;height:38px;border-radius:50%;background:conic-gradient(#1d49e8 var(--progress),#edf0fa 0);padding:3px;flex-shrink:0}.ob-progress-ring>span{height:100%;width:100%;border-radius:50%;background:white;display:flex;align-items:center;justify-content:center;font-size:13px;color:#1d49e8;font-weight:600}.ob-dismiss{background:none;border:0;color:#777;display:flex;align-items:center;justify-content:center;width:32px;min-height:44px}.ob-checklist-content{padding:0 20px 16px}.ob-task-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid #f0f0f0;padding-top:16px;gap:16px}.ob-task{display:flex;align-items:flex-start;gap:9px;position:relative;min-width:0;padding-right:10px;border-right:1px solid #eee}.ob-task:last-child{border:0}.ob-task-check{height:22px;width:22px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid #ddd;font-size:10px;color:#595959}.ob-task.done .ob-task-check{border-color:#1d49e8;background:#1d49e8;color:white}.ob-task>div{flex:1;min-width:0}.ob-task strong{font-size:11px;font-weight:600}.ob-task p{font-size:10px;color:#777;line-height:1.6;margin-top:4px;max-width:190px}.ob-task-action{display:flex;align-items:center;gap:2px;background:#f8f8f8;border:1px solid #eee;border-radius:24px;font-size:10px;color:#595959;padding:0 9px;min-height:32px}.ob-tour-prompt{display:flex;justify-content:flex-end;align-items:center;gap:10px;padding-top:16px;color:#777;font-size:10px}.ob-tour-prompt>button,.ob-guide-shortcut>button{display:flex;gap:6px;align-items:center;color:#1d49e8;min-height:32px;background:none;border:0;font-size:11px;font-weight:500}.ob-guide-shortcut{display:flex;justify-content:flex-end;gap:16px}@keyframes ob-enter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 @media(hover:hover) and (pointer:fine){.ob-text-button:hover,.ob-task-action:hover{color:#1d49e8}.ob-app-nav button:not(.selected):hover{background:#252525}}
 @media(max-width:1100px){.ob-setup-form{padding:32px}.ob-task-list{grid-template-columns:1fr;gap:12px}.ob-task{border:0;padding:0;align-items:center}.ob-task p{max-width:none}.ob-checklist-content{padding-bottom:12px}.ob-task-action{min-height:36px}.ob-tour-prompt{justify-content:space-between}}
 @media(max-width:1023px){.studio-onboarding{padding-bottom:96px}.ob-dashboard-grid{grid-template-columns:1fr}.ob-app-nav>nav{position:fixed;z-index:30;top:auto;bottom:max(16px,env(safe-area-inset-bottom));left:50%;padding:6px;box-shadow:0 4px 20px #0002;white-space:nowrap}.ob-app-nav>nav>button{min-height:40px;padding:0 16px;font-size:11px}.ob-setup-main{margin-top:12px}.ob-companion-header{padding:24px 24px 0}.ob-companion-header>p{font-size:17px}.ob-companion-footer{margin:0 20px}.ob-page-header{align-items:flex-start}.ob-metrics{gap:12px}.ob-directory{grid-template-columns:repeat(2,minmax(0,1fr))}}
