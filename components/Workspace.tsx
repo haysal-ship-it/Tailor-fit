@@ -5,6 +5,8 @@ import { WorkspaceLoading } from "@/components/workspace/WorkspaceLoading";
 import loadingStyles from "@/components/workspace/workspace-loading.module.css";
 import { useAccount } from "@/components/auth/AccountProvider";
 import { StoreProvider, useStore } from "@/lib/store";
+import {StudioSetupProvider} from "@/components/onboarding/StudioSetupProvider";
+import {useStudioSetup} from "@/components/onboarding/StudioSetupContext";
 import { TourProvider, useTour } from "@/components/onboarding/TourProvider";
 import {normalizeWorkspaceUrl} from '@/lib/workspace-routes';
 import {requestWorkspaceNavigation} from "@/lib/workspace-confirmation";
@@ -39,6 +41,7 @@ function TailorFitApp() {
     fitting?: string;
   }>({});
   const tour=useTour();
+  const studioSetup=useStudioSetup();
   const [addingClient,setAddingClient]=useState(false);
   const [list,setList]=useState<{filter:OrderFilter;query:string}|null>(null);
   const origin=React.useRef('?tab=overview');
@@ -179,6 +182,7 @@ function TailorFitApp() {
     requestAnimationFrame(()=>{if(resume)tour.resumeTour();else tour.startTour();});
   };
   React.useEffect(()=>{const start=(event:Event)=>startOverviewTour(!!(event as CustomEvent<{resume:boolean}>).detail?.resume);window.addEventListener('tailorfit:request-tour',start);return()=>window.removeEventListener('tailorfit:request-tour',start);});
+  React.useEffect(()=>{const show=()=>{const go=()=>{if(!requireAccount())return;void studioSetup?.setChecklistHidden(false).then(saved=>{if(!saved)return;const url=new URL(location.href);url.search='?tab=overview';history.pushState({},'',url);currentUrl.current=url.toString();setList(null);setOrderRoute({});setSelectedClientId(null);setActiveScreen('overview');});};if(canLeave(go))go();};window.addEventListener('tailorfit:request-getting-started',show);return()=>window.removeEventListener('tailorfit:request-getting-started',show);});
   const handleReuseFitting=(clientId:string,fittingId:string)=>{if(!requireAccount()||!canLeave(()=>handleReuseFitting(clientId,fittingId)))return;rememberOrigin();routeOrder('new',clientId,false,fittingId);};
   const handleEditOrder = (orderId: string) => {
     if (!canLeave(()=>handleEditOrder(orderId))) return;
@@ -230,7 +234,7 @@ function TailorFitApp() {
       {/* Main Content Area */}
       <main id="main-content" aria-busy={!isHydrated || !routeReady} className="flex-1 w-full max-lg:pb-24">
         {!isHydrated || !routeReady ? <WorkspaceLoading embedded screen={activeScreen} stage="records" /> : <div className={loadingStyles.ready}>
-        {(activeScreen==='overview'||activeScreen==='dashboard')&&<OverviewScreen onOpenOrder={handleEditOrder} onAddClient={()=>{if(requireAccount())setAddingClient(true);}} onNewOrder={()=>handleOpenNewOrder()} onOpenOrders={showOrders}/>}
+        {(activeScreen==='overview'||activeScreen==='dashboard')&&<OverviewScreen onOpenOrder={handleEditOrder} onAddClient={()=>{if(requireAccount())setAddingClient(true);}} onNewOrder={()=>handleOpenNewOrder()} onOpenOrders={showOrders} onOpenClients={()=>{routeOrder(undefined,undefined);}}/>}
         {activeScreen==='clients'&&list&&<OrdersScreen filter={list.filter} query={list.query} onFilter={f=>showOrders(f,list.query)} onQuery={q=>showOrders(list.filter,q)} onEditOrder={handleEditOrder} onNewOrder={()=>handleOpenNewOrder()} onBack={()=>{setList(null);setActiveScreen('overview');}}/>}
 
         {(activeScreen === "clients" || activeScreen === "client-profile") && !list && (
@@ -269,7 +273,7 @@ export default function Workspace({ initialScreen = 'overview' }: { initialScree
   return (
     <StoreProvider key={user?.id || "guest"}>
       <TourProvider>
-        <TailorFitApp />
+        <StudioSetupProvider><TailorFitApp /></StudioSetupProvider>
       </TourProvider>
     </StoreProvider>
   );

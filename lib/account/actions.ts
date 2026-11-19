@@ -10,9 +10,9 @@ type AccountResult={ok:true}|{ok:false;error:string};
 
 export async function saveProfile(raw:unknown):Promise<AccountResult> {
  try {
-  const input=z.object({displayName:z.string().trim().min(1).max(100)}).parse(raw);
+  const input=z.object({displayName:z.string().trim().min(1).max(100),expectedOwner:z.string().uuid().optional()}).parse(raw);
   const db=await serverSupabase();const {data:{user}}=await db.auth.getUser();
-  if(!user)throw new AccountSettingsError('Sign in to update your profile.');
+  if(!user||(input.expectedOwner&&input.expectedOwner!==user.id))throw new AccountSettingsError('Sign in to the same account before saving these profile details.');
   const {error}=await db.from('profiles').upsert({id:user.id,display_name:input.displayName});
   if(error)throw new AccountSettingsError('Your profile could not be saved. Try again.');
   const result=await db.auth.updateUser({data:{display_name:input.displayName}});
