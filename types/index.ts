@@ -83,6 +83,7 @@ export interface GarmentTemplate {
 }
 
 export interface AppSettings {
+  studio?: {name:string;email:string;phone:string;address:string};
   version?: number;
   onboarding?: Record<string, unknown>;
   defaultUnit: UnitType;

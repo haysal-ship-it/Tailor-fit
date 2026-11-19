@@ -1,0 +1,1771 @@
+'use client';
+import {ModalDialog} from '@/components/ui/ModalDialog';
+
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { useStore } from '@/lib/store';
+import { useDraft } from '@/lib/drafts/use-draft';
+import { useAccount } from '@/components/auth/AccountProvider';
+import {
+  PersonStanding,
+  ClipboardList,
+  ChevronRight,
+  ChevronLeft,
+  X,
+  Check,
+  Calendar as CalendarIcon,
+  Trash2,
+} from 'lucide-react';
+import { ToastContainer, type ToastMessage } from '@/components/ui/Toasts';
+import { springSmooth, springSnappy } from '@/lib/motion-tokens';
+import { Input } from '@/components/ui/Input';
+import { Textarea } from '@/components/ui/Textarea';
+import { MorphingSaveButton } from '@/components/ui/MorphingSaveButton';
+import { AnimatedFileUpload } from '@/components/ui/AnimatedFileUpload';
+import { RotatableMannequin } from '@/components/mannequin/RotatableMannequin';
+import {
+  ANATOMICAL_ZONES,
+  getZoneLabel,
+  normalizeZoneId,
+  resolveCanonicalKey,
+  parseDueDateToISO,
+} from '@/lib/initial-data';
+import { formatPriceInput, parsePriceInput, formatDateInput } from '@/lib/smart-inputs';
+import { cn } from '@/lib/utils';
+import { getOrderStatusPresentation, type OrderStatusPresentation } from '@/lib/status';
+import { useTour } from '@/components/onboarding/TourProvider';
+import { TourInvitation, TourCompletionFeedback } from '@/components/onboarding/TourInvitation';
+import { ContextualTip } from '@/components/onboarding/ContextualTip';
+
+interface CalendarOrderItem {
+  id: string;
+  clientId: string;
+  client: string;
+  garment: string;
+  time: string;
+  status: string;
+  statusPresentation: OrderStatusPresentation;
+}
+
+interface OverviewScreenProps {
+  measurementOnly?: boolean;
+  onOpenClient: (clientId: string) => void;
+  onOpenOrder?: (orderId: string, clientId?: string) => void;
+}
+
+export function LegacyIntakeScreen({ onOpenClient, measurementOnly=false }: OverviewScreenProps) {
+  const {
+    saveIntake,
+    saveFitting,
+    orders,
+    clients,
+    settings,
+    allHotspots,
+    deleteTemplate,
+    selectedClientId,
+    setSelectedClientId,
+    getClientById,
+  } = useStore();
+  const shouldReduceMotion = useReducedMotion();
+  const unitLabel = settings?.defaultUnit || 'cm';
+  const currencySymbol = settings?.currency || '₦';
+
+  const {
+    isReadyForInvitation,
+    startTour,
+    dismissTour,
+    deferInvitation,
+    justFinishedTour,
+    dismissCompletion,
+    registerBlocker,
+  } = useTour();
+
+  // Responsive check for 1024px breakpoint via useSyncExternalStore
+  const isDesktop = React.useSyncExternalStore(
+    (callback) => {
+      if (typeof window === 'undefined') return () => {};
+      const mq = window.matchMedia('(min-width: 1024px)');
+      mq.addEventListener('change', callback);
+      return () => mq.removeEventListener('change', callback);
+    },
+    () => (typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)').matches : true),
+    () => true
+  );
+
+  // New Client Intake form state
+  const [clientName, setClientName] = useState('');
+  const [clientGarment, setClientGarment] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+  const [clientPrice, setClientPrice] = useState('');
+  const [clientDueDate, setClientDueDate] = useState('');
+  const [clientNotes, setClientNotes] = useState('');
+  const [styleImages, setStyleImages] = useState<string[]>([]);
+  const [clientFormErrors, setClientFormErrors] = useState<{
+    name?: string;
+    phone?: string;
+    email?: string;
+    garment?: string;
+  }>({});
+
+  const clientNameInputRef = useRef<HTMLInputElement>(null);
+  const clientPhoneInputRef = useRef<HTMLInputElement>(null);
+  const clientEmailInputRef = useRef<HTMLInputElement>(null);
+  const clientGarmentInputRef = useRef<HTMLInputElement>(null);
+
+  // Prefill intake form when selectedClientId is present (A05)
+  useEffect(() => {
+    if (selectedClientId) {
+      const client = getClientById(selectedClientId);
+      if (client) {
+        setClientName(client.name || '');
+        setClientPhone(client.phone || '');
+        setClientEmail(client.email || '');
+        setClientNotes(client.notes || '');
+      }
+    }
+  }, [selectedClientId, getClientById]);
+
+  // System toasts
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const showToast = (toast: Omit<ToastMessage, 'id'>) => {
+    const id = `toast-${Date.now()}-${Math.random()}`;
+    setToasts((prev) => [...prev, { ...toast, id }]);
+  };
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // Mannequin state: F is selected by default
+  const [gender, setGender] = useState<'male' | 'female'>('female');
+  const [centerView, setCenterView] = useState<'mannequin' | 'table'>('mannequin');
+
+  /**
+   * Requirement D: Touchpoints ONLY show when user adds a point OR chooses a saved template.
+   * Otherwise, the empty state of only the mannequin is visible.
+   */
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [selectedTemplateName, setSelectedTemplateName] = useState<string>('');
+  const [dialogSelectedTemplateId, setDialogSelectedTemplateId] = useState<string>('');
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+
+  // Active point keys currently placed on the mannequin & list view (starts EMPTY per Requirement D)
+  const [activePointKeys, setActivePointKeys] = useState<string[]>([]);
+
+  // Measurements state: single source of truth for both diagram points and list view
+  const [measurements, setMeasurements] = useState<Record<string, number>>({});
+
+  const account = useAccount();
+  const draft = useDraft(measurementOnly?'fitting:'+selectedClientId:'overview-intake', {clientName,clientGarment,clientPhone,clientEmail,clientPrice,clientDueDate,clientNotes,styleImages,gender,centerView,selectedTemplateId,selectedTemplateName,activePointKeys,measurements,selectedClientId}, d=>{
+    setClientName(String(d.clientName||''));setClientGarment(String(d.clientGarment||''));setClientPhone(String(d.clientPhone||''));setClientEmail(String(d.clientEmail||''));setClientPrice(String(d.clientPrice||''));setClientDueDate(String(d.clientDueDate||''));setClientNotes(String(d.clientNotes||''));
+    setStyleImages((d.styleImages||[]) as string[]);setGender(d.gender==='male'?'male':'female');setCenterView(d.centerView==='table'?'table':'mannequin');
+    setSelectedTemplateId(String(d.selectedTemplateId||''));setSelectedTemplateName(String(d.selectedTemplateName||''));setActivePointKeys((d.activePointKeys||[]) as string[]);setMeasurements((d.measurements||{}) as Record<string,number>);
+    if(typeof d.selectedClientId==='string')setSelectedClientId(d.selectedClientId);
+  }, !!(clientName||clientGarment||clientPhone||clientEmail||clientPrice||clientDueDate||clientNotes||styleImages.length||activePointKeys.length));
+
+  // Undo toast when a field is removed
+  const [undoToast, setUndoToast] = useState<{
+    key: string;
+    label: string;
+    value?: number;
+  } | null>(null);
+  const undoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Input refs for Enter key navigation in list view
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  // Focus trap refs
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const templateDialogRef = useRef<HTMLDivElement | null>(null);
+  const pointDialogRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * Requirement C & D:
+   * - Mode 'edit': Tapping an existing touchpoint opens a modal to update ONLY the size value (read-only name).
+   * - Mode 'add': Clicking "Add Point" opens a modal to choose a measurement from the 21 standard sizing items + set its size.
+   */
+  const [pointModalData, setPointModalData] = useState<{
+    mode: 'edit' | 'add';
+    key: string;
+    name: string;
+    zone: string;
+    value: string;
+  } | null>(null);
+  const [pointModalError, setPointModalError] = useState<string>('');
+
+  // Register blockers for onboarding guide & contextual tips when dialogs are active
+  useEffect(() => {
+    if (isTemplateModalOpen) {
+      return registerBlocker('template-dialog');
+    }
+  }, [isTemplateModalOpen, registerBlocker]);
+
+  useEffect(() => {
+    if (pointModalData !== null) {
+      return registerBlocker('point-modal');
+    }
+  }, [pointModalData, registerBlocker]);
+
+  // Map canonical key -> hotspot metadata
+  const hotspotMap = useMemo(() => {
+    const map: Record<
+      string,
+      { key: string; label: string; zone: string; defaultValCm: number }
+    > = {};
+    allHotspots.forEach((h) => {
+      map[h.key] = {
+        key: h.key,
+        label: h.label,
+        zone: getZoneLabel(h.category),
+        defaultValCm: h.defaultValCm ?? 40,
+      };
+    });
+    return map;
+  }, [allHotspots]);
+
+  // Grouped hotspots for the "Add Point" modal selector
+  const hotspotsByZone = useMemo(() => {
+    return ANATOMICAL_ZONES.map((zone) => ({
+      ...zone,
+      items: allHotspots.filter((h) => normalizeZoneId(h.category) === zone.id),
+    }));
+  }, [allHotspots]);
+
+  // Templates from global store (Requirement B)
+  const storeTemplates = useMemo(() => {
+    return settings?.templates || [];
+  }, [settings?.templates]);
+
+  // Calendar state
+  const [viewDate, setViewDate] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [activeDatePopover, setActiveDatePopover] = useState<number | null>(null);
+
+  const calendarYear = viewDate.getFullYear();
+  const calendarMonth = viewDate.getMonth();
+  const calendarOffset = (new Date(calendarYear, calendarMonth, 1).getDay() + 6) % 7;
+  const calendarDaysCount = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+  const todayWeekdayIndex = (new Date().getDay() + 6) % 7;
+  const calendarMonthLabel = new Intl.DateTimeFormat('en-GB', {
+    month: 'long',
+    year: 'numeric',
+  }).format(viewDate);
+
+  // Status dots on calendar synced strictly with store orders
+  const getOrdersForDay = (day: number) => {
+    const dayOrders: CalendarOrderItem[] = [];
+
+    if (orders && orders.length > 0) {
+      for (const ord of orders) {
+        if (!ord.pickupDateTime) continue;
+        const d = new Date(ord.pickupDateTime);
+        if (
+          !isNaN(d.getTime()) &&
+          d.getFullYear() === calendarYear &&
+          d.getMonth() === calendarMonth &&
+          d.getDate() === day
+        ) {
+          const clientObj = clients?.find((c) => c.id === ord.clientId);
+          const cName = clientObj?.name || 'Client';
+          const statusPres = getOrderStatusPresentation(ord.status, ord.pickupDateTime);
+
+          const hours = d.getHours();
+          const minutes = d.getMinutes();
+          const ampm = hours >= 12 ? 'PM' : 'AM';
+          const displayHours = hours % 12 || 12;
+          const displayMinutes = minutes < 10 ? `0${minutes}` : minutes;
+          const timeStr = `${String(displayHours).padStart(2, '0')}:${displayMinutes} ${ampm}`;
+
+          dayOrders.push({
+            id: ord.id,
+            clientId: ord.clientId,
+            client: cName,
+            garment: ord.garmentType || 'Garment',
+            time: timeStr,
+            status: ord.status,
+            statusPresentation: statusPres,
+          });
+        }
+      }
+    }
+
+    return dayOrders;
+  };
+
+  // Due Date popover state with dynamic month/year navigation
+  const [isDueDatePickerOpen, setIsDueDatePickerOpen] = useState(false);
+  const [duePickerDate, setDuePickerDate] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const dueDatePickerRef = useRef<HTMLDivElement>(null);
+
+  const duePickerYear = duePickerDate.getFullYear();
+  const duePickerMonth = duePickerDate.getMonth();
+  const duePickerFirstDayOffset = new Date(duePickerYear, duePickerMonth, 1).getDay();
+  const duePickerDaysCount = new Date(duePickerYear, duePickerMonth + 1, 0).getDate();
+  const duePickerMonthLabel = new Intl.DateTimeFormat('en-GB', {
+    month: 'long',
+    year: 'numeric',
+  }).format(duePickerDate);
+
+  // Handle Escape key to close modals and popovers
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (pointModalData) {
+          setPointModalData(null);
+          setPointModalError('');
+          if (triggerRef.current) triggerRef.current.focus();
+        }
+        if (isTemplateModalOpen) {
+          setIsTemplateModalOpen(false);
+          if (triggerRef.current) triggerRef.current.focus();
+        }
+        setActiveDatePopover(null);
+        setIsDueDatePickerOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [pointModalData, isTemplateModalOpen]);
+
+  const isPointModalOpen = Boolean(pointModalData);
+
+  // Focus trap inside active modal
+  useEffect(() => {
+    if (isTemplateModalOpen || isPointModalOpen) {
+      const activeRef = isTemplateModalOpen ? templateDialogRef : pointDialogRef;
+      const handleTab = (e: KeyboardEvent) => {
+        if (e.key !== 'Tab' || !activeRef.current) return;
+        const focusables = activeRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      };
+      window.addEventListener('keydown', handleTab);
+      return () => window.removeEventListener('keydown', handleTab);
+    }
+  }, [isTemplateModalOpen, isPointModalOpen]);
+
+  // Click outside to close Due Date popover
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dueDatePickerRef.current && !dueDatePickerRef.current.contains(e.target as Node)) {
+        setIsDueDatePickerOpen(false);
+      }
+    };
+    if (isDueDatePickerOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isDueDatePickerOpen]);
+
+  // Apply a selected Garment Blueprint template (Requirement D)
+  const applyTemplateById = (tmplId: string) => {
+    const tmpl = storeTemplates.find((t) => t.id === tmplId);
+    if (!tmpl) return;
+
+    const canonicalKeys = Array.from(
+      new Set((tmpl.fieldKeys || []).map((k) => resolveCanonicalKey(k)))
+    );
+
+    setSelectedTemplateId(tmpl.id);
+    setSelectedTemplateName(tmpl.name);
+    if (!clientGarment.trim() || clientGarment === selectedTemplateName) {
+      setClientGarment(tmpl.name);
+    }
+    setActivePointKeys(canonicalKeys);
+
+    // Populate default or existing values for each template field
+    setMeasurements((prev) => {
+      const next = { ...prev };
+      canonicalKeys.forEach((k) => {
+        if (next[k] === undefined) {
+          const defaultCm = hotspotMap[k]?.defaultValCm ?? 40;
+          next[k] =
+            unitLabel === 'in'
+              ? parseFloat((defaultCm / 2.54).toFixed(1))
+              : defaultCm;
+        }
+      });
+      return next;
+    });
+  };
+
+  // Requirement C: Tap on an active mannequin touchpoint opens modal to edit ONLY its size
+  const handleOpenPoint = (key: string, name: string) => {
+    const canonical = resolveCanonicalKey(key);
+    const meta = hotspotMap[canonical];
+    triggerRef.current = document.activeElement as HTMLButtonElement;
+    const currentVal =
+      measurements[canonical] !== undefined ? String(measurements[canonical]) : '';
+    setPointModalError('');
+    setPointModalData({
+      mode: 'edit',
+      key: canonical,
+      name: meta?.label || name,
+      zone: meta?.zone || 'Torso',
+      value: currentVal,
+    });
+  };
+
+  // Requirement D: Clicking "Add Point" opens modal to select from the 21 standard measurements
+  const handleOpenAddPoint = () => {
+    triggerRef.current = document.activeElement as HTMLButtonElement;
+    const firstUnadded =
+      allHotspots.find((h) => !activePointKeys.includes(h.key)) || allHotspots[0];
+    const key = firstUnadded?.key || 'neck_circumference';
+    const existingVal =
+      measurements[key] !== undefined ? String(measurements[key]) : '';
+    setPointModalError('');
+    setPointModalData({
+      mode: 'add',
+      key,
+      name: firstUnadded?.label || 'Neck circumference',
+      zone: firstUnadded ? getZoneLabel(firstUnadded.category) : 'Head/Neck',
+      value: existingVal,
+    });
+  };
+
+  const handlePointModalSubmit = () => {
+    if (!pointModalData) return;
+    if (!pointModalData.key) {
+      setPointModalError('Please choose a measurement point');
+      return;
+    }
+    const num = parseFloat(pointModalData.value);
+    if (isNaN(num) || num <= 0 || num > 300) {
+      setPointModalError('Enter a valid positive size (0.1 – 300)');
+      return;
+    }
+
+    const canonical = resolveCanonicalKey(pointModalData.key);
+    setActivePointKeys((prev) =>
+      prev.includes(canonical) ? prev : [...prev, canonical]
+    );
+    setMeasurements((prev) => ({
+      ...prev,
+      [canonical]: num,
+    }));
+
+    setPointModalData(null);
+    setPointModalError('');
+    if (triggerRef.current) triggerRef.current.focus();
+  };
+
+  const handleFieldChange = (fieldKey: string, strVal: string) => {
+    const num = parseFloat(strVal);
+    setMeasurements((prev) => {
+      const updated = { ...prev };
+      if (!isNaN(num)) {
+        updated[fieldKey] = num;
+      } else if (strVal === '') {
+        delete updated[fieldKey];
+      }
+      return updated;
+    });
+  };
+
+  const handleRemoveField = (fieldKey: string, label: string) => {
+    const prevValue = measurements[fieldKey];
+    setActivePointKeys((prev) => prev.filter((k) => k !== fieldKey));
+    setUndoToast({ key: fieldKey, label, value: prevValue });
+    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+    undoTimeoutRef.current = setTimeout(() => {
+      setUndoToast(null);
+    }, 5000);
+  };
+
+  const handleUndoRemove = () => {
+    if (!undoToast) return;
+    setActivePointKeys((prev) =>
+      prev.includes(undoToast.key) ? prev : [...prev, undoToast.key]
+    );
+    if (undoToast.value !== undefined) {
+      setMeasurements((prev) => ({ ...prev, [undoToast.key]: undoToast.value! }));
+    }
+    setUndoToast(null);
+    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+  };
+
+  // Active list fields resolved from activePointKeys
+  const visibleListFields = useMemo(() => {
+    return activePointKeys.map((key) => {
+      const meta = hotspotMap[key];
+      return {
+        id: key,
+        label: meta?.label || key,
+        zone: meta?.zone || 'Torso',
+      };
+    });
+  }, [activePointKeys, hotspotMap]);
+
+  // Keyboard navigation across input fields
+  const handleInputKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    currentIndex: number,
+    totalCount: number
+  ) => {
+    if (e.key === 'Enter' && totalCount > 0) {
+      e.preventDefault();
+      const nextIndex = (currentIndex + 1) % totalCount;
+      const nextField = visibleListFields[nextIndex];
+      if (nextField && inputRefs.current[nextField.id]) {
+        inputRefs.current[nextField.id]?.focus();
+        inputRefs.current[nextField.id]?.select();
+      }
+    }
+  };
+
+  const handleSaveOrder = async () => {
+    if(!draft.loaded || !account.requireAccount()) throw new Error("Sign in to save your work.");
+    await draft.flush().catch(()=>{});
+    const trimmedName = clientName.trim();
+    const trimmedPhone = clientPhone.trim();
+    const trimmedEmail = clientEmail.trim();
+    const trimmedGarment = clientGarment.trim() || selectedTemplateName;
+    const priceNum = parsePriceInput(clientPrice);
+
+    const errors: { name?: string; phone?: string; email?: string; garment?: string } = {};
+    const missing: string[] = [];
+
+    if (!trimmedName) {
+      errors.name = 'Client Name is required';
+      missing.push('Client Name');
+    }
+    if (!measurementOnly && !trimmedPhone) {
+      errors.phone = 'Phone Number is required';
+      missing.push('Phone Number');
+    }
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      errors.email = 'Enter a valid email address';
+      missing.push('Valid Email Address');
+    }
+    if (!trimmedGarment) {
+      errors.garment = 'Garment Type is required';
+      missing.push('Garment Type');
+    }
+
+    if (missing.length > 0) {
+      setClientFormErrors(errors);
+      showToast({
+        type: 'warning',
+        title: 'Incomplete Client Details',
+        message: `Please complete all required fields (${missing.join(', ')}) before saving.`,
+        duration: 5000,
+      });
+
+      if (errors.name) {
+        clientNameInputRef.current?.focus();
+      } else if (errors.garment) {
+        clientGarmentInputRef.current?.focus();
+      } else if (errors.phone) {
+        clientPhoneInputRef.current?.focus();
+      } else if (errors.email) {
+        clientEmailInputRef.current?.focus();
+      }
+      throw new Error(`Incomplete client fields: ${missing.join(', ')}`);
+    }
+
+    setClientFormErrors({});
+
+    const isExistingClient = !!(selectedClientId && getClientById(selectedClientId));
+    const activeMeasurementsOnly = Object.fromEntries(activePointKeys.filter(k=>measurements[k]!==undefined).map(k=>[k,measurements[k]]));
+    if(measurementOnly){
+      if(!Object.keys(activeMeasurementsOnly).length)throw new Error('Record at least one measurement before saving.');
+      const fitting=await saveFitting({requestId:draft.getId(),client:{...(isExistingClient?getClientById(selectedClientId!):{}),name:trimmedName,phone:trimmedPhone,email:trimmedEmail,notes:clientNotes.trim()},snapshot:{date:new Date().toISOString().slice(0,10),unit:unitLabel,garmentType:trimmedGarment,measurements:activeMeasurementsOnly,notes:clientNotes,mannequinGender:gender}});
+      if(!fitting)throw new Error('Measurements were not saved. Retry with your draft intact.');
+      await draft.discard();onOpenClient(fitting.clientId);return;
+    }
+    const saved=await saveIntake({
+      requestId:draft.getId(),
+      client:{...(isExistingClient?getClientById(selectedClientId!):{}),name:trimmedName,phone:trimmedPhone,email:trimmedEmail,notes:clientNotes.trim()},
+      snapshot:{date:new Date().toISOString().slice(0,10),unit:unitLabel,garmentType:trimmedGarment,measurements:activeMeasurementsOnly,notes:clientNotes,mannequinGender:gender},
+      order:{garmentType:trimmedGarment,status:'In Progress',pickupDateTime:parseDueDateToISO(clientDueDate),price:priceNum,currency:currencySymbol,referenceImages:styleImages.map((url,i)=>({id:`ref-${i}`,url,title:`Style Ref ${i+1}`})),notes:clientNotes}
+    });
+    if(!saved)throw new Error('Not saved. Review the message above and retry.');
+    const targetClientId=saved.clientId;
+    await draft.discard();
+
+    // Reset intake form fields cleanly after save
+    setClientName('');
+    setClientGarment('');
+    setClientPhone('');
+    setClientEmail('');
+    setClientPrice('');
+    setClientDueDate('');
+    setClientNotes('');
+    setStyleImages([]);
+    setActivePointKeys([]);
+    setMeasurements({});
+    setSelectedTemplateId('');
+    setSelectedTemplateName('');
+    if (selectedClientId) {
+      setSelectedClientId(null);
+    }
+
+    showToast({
+      type: 'success',
+      title: 'Client & Order Saved',
+      message: `${isExistingClient ? 'Updated' : 'Created'} profile for "${trimmedName}" and booked order for "${trimmedGarment}". Find this order and its measurements in Clients.`,
+      duration: 5000,
+      action: {
+        label: 'Open client',
+        onClick: () => onOpenClient(targetClientId),
+      },
+    });
+  };
+
+  // Live Recent Orders list connected to global store, sorted by createdAt descending
+  const recentOrdersList = useMemo(() => {
+    if (!orders || orders.length === 0) return [];
+    const sorted = [...orders].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    return sorted.slice(0, 4).map((ord) => {
+      const cl = clients.find((c) => c.id === ord.clientId);
+      const clientFullName = cl?.name || 'Client';
+      const initials =
+        clientFullName
+          .split(' ')
+          .map((p) => p[0])
+          .join('')
+          .slice(0, 2)
+          .toUpperCase() || 'CL';
+      return {
+        id: ord.id,
+        client: clientFullName,
+        initials,
+        garment: ord.garmentType || 'Bespoke Order',
+        clientId: cl?.id || ord.clientId || '',
+      };
+    });
+  }, [orders, clients]);
+
+  // Shared Subcomponents for Desktop & Mobile
+  const renderNewClientCard = (isMobile = false) => (
+    <div
+      id="overview-client-intake"
+      className="w-full bg-[var(--card)] rounded-[6px] p-3 flex flex-col gap-2"
+    >
+      <div>
+        <h2 className="text-[16px] font-bold text-[var(--text)] leading-tight">
+          {measurementOnly?'New measurement':'Resume client intake'}
+        </h2>
+        <p className="text-[12px] font-normal text-[var(--text-2)] mt-0.5 leading-snug">
+          Enter client contact info, select garment template, and style notes.
+        </p>
+      </div>
+
+      <div className="bg-[var(--card)] rounded-[8px] flex flex-col gap-[2px] p-[2px]">
+        {/* Section 1: Basic Information */}
+        <div data-tour="client-basics" className="bg-[var(--surface)] p-2.5 flex flex-col gap-1 rounded-[6px]">
+          <h3 className="text-[14px] font-semibold text-[var(--text)]">
+            Basic Information
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+            <Input
+              readOnly={measurementOnly} ref={clientNameInputRef}
+              label="Client name *"
+              placeholder="e.g. Adriana Kunle"
+              value={clientName}
+              error={clientFormErrors.name}
+              onChange={(e) => {
+                deferInvitation();
+                setClientName(e.target.value);
+                if (clientFormErrors.name) {
+                  setClientFormErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.name;
+                    return next;
+                  });
+                }
+              }}
+            />
+            <Input
+              ref={clientGarmentInputRef}
+              label="Garment Type *"
+              placeholder="Bespoke African Gown"
+              value={clientGarment}
+              error={clientFormErrors.garment}
+              onChange={(e) => {
+                deferInvitation();
+                setClientGarment(e.target.value);
+                if (clientFormErrors.garment) {
+                  setClientFormErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.garment;
+                    return next;
+                  });
+                }
+              }}
+            />
+            <Input
+              readOnly={measurementOnly} ref={clientPhoneInputRef}
+              label={measurementOnly?'Phone number':'Phone Number *'}
+              type="tel"
+              placeholder="+234 -"
+              value={clientPhone}
+              error={clientFormErrors.phone}
+              onChange={(e) => {
+                deferInvitation();
+                setClientPhone(e.target.value);
+                if (clientFormErrors.phone) {
+                  setClientFormErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.phone;
+                    return next;
+                  });
+                }
+              }}
+            />
+            <Input
+              readOnly={measurementOnly} ref={clientEmailInputRef}
+              label="Email address (optional)"
+              placeholder="name@example.com"
+              type="email"
+              value={clientEmail}
+              error={clientFormErrors.email}
+              onChange={(e) => {
+                setClientEmail(e.target.value);
+                if (clientFormErrors.email) {
+                  setClientFormErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.email;
+                    return next;
+                  });
+                }
+              }}
+            />
+          </div>
+        </div>
+
+        {!measurementOnly&&<>
+        {/* Section 2: Style References */}
+        <div className="bg-[var(--surface)] p-2.5 flex flex-col gap-1 rounded-[6px]">
+          <h3 className="text-[14px] font-semibold text-[var(--text)]">
+            Style References
+          </h3>
+          <div className="pt-0.5">
+            <AnimatedFileUpload images={styleImages} onChange={setStyleImages} />
+          </div>
+        </div>
+
+        {/* Section 3: Price and schedule */}
+        <div className="bg-[var(--surface)] p-2.5 flex flex-col gap-1 rounded-[6px]">
+          <h3 className="text-[14px] font-semibold text-[var(--text)]">
+            Price and schedule
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+            <Input
+              label={`Price (${currencySymbol})`}
+              inputMode="decimal"
+              placeholder={`${currencySymbol}0.00`}
+              value={clientPrice}
+              onChange={(e) => setClientPrice(formatPriceInput(e.target.value))}
+              className="tabular-nums"
+            />
+            <div className="relative" ref={dueDatePickerRef}>
+              <Input
+                label="Due date (DD/MM/YYYY)"
+                type="text"
+                placeholder="DD/MM/YYYY"
+                value={clientDueDate}
+                onChange={(e) => setClientDueDate(formatDateInput(e.target.value, clientDueDate))}
+                className={cn(
+                  'tabular-nums',
+                  clientDueDate
+                    ? 'text-[var(--text-strong)] font-semibold'
+                    : ''
+                )}
+                rightAddon={
+                  <button
+                    type="button"
+                    aria-label="Open calendar to pick due date"
+                    onClick={() => setIsDueDatePickerOpen((prev) => !prev)}
+                    className="p-1 text-[var(--text-2)] hover:text-black cursor-pointer transition-colors"
+                    title="Open calendar to pick due date"
+                  >
+                    <CalendarIcon className="w-3.5 h-3.5" />
+                  </button>
+                }
+              />
+
+              {/* Dynamic Date Picker Popover */}
+              <AnimatePresence>
+                {isDueDatePickerOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 4, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 4, scale: 0.96 }}
+                    transition={springSmooth}
+                    className="absolute top-full right-0 mt-1.5 w-64 bg-white border border-[var(--outline)] rounded-[8px] p-3 shadow-lg z-30"
+                  >
+                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--outline)]">
+                      <span className="text-[12px] font-bold text-[var(--text-strong)]">
+                        {duePickerMonthLabel}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          aria-label="Previous month"
+                          onClick={() =>
+                            setDuePickerDate(
+                              (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1)
+                            )
+                          }
+                          className="p-0.5 rounded hover:bg-[var(--chip)] text-[var(--text-2)] hover:text-black cursor-pointer"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Next month"
+                          onClick={() =>
+                            setDuePickerDate(
+                              (prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1)
+                            )
+                          }
+                          className="p-0.5 rounded hover:bg-[var(--chip)] text-[var(--text-2)] hover:text-black cursor-pointer"
+                        >
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Close calendar"
+                          onClick={() => setIsDueDatePickerOpen(false)}
+                          className="text-[var(--text-2)] hover:text-black p-0.5 cursor-pointer ml-1"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-medium text-[var(--weekday)] mb-1">
+                      <span>Su</span>
+                      <span>Mo</span>
+                      <span>Tu</span>
+                      <span>We</span>
+                      <span>Th</span>
+                      <span>Fr</span>
+                      <span>Sa</span>
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-medium">
+                      {Array.from({ length: duePickerFirstDayOffset }, (_, idx) => (
+                        <span key={`empty-${idx}`} />
+                      ))}
+                      {Array.from({ length: duePickerDaysCount }, (_, i) => i + 1).map((day) => {
+                        const formatted = `${String(day).padStart(2, '0')}/${String(
+                          duePickerMonth + 1
+                        ).padStart(2, '0')}/${duePickerYear}`;
+                        const isSelected = clientDueDate === formatted;
+                        return (
+                          <button
+                            key={day}
+                            type="button"
+                            onClick={() => {
+                              setClientDueDate(formatted);
+                              setIsDueDatePickerOpen(false);
+                            }}
+                            className={cn(
+                              'w-7 h-7 rounded-[4px] flex items-center justify-center transition-colors cursor-pointer tabular-nums text-[11px]',
+                              isSelected
+                                ? 'bg-[var(--primary)] text-white font-bold'
+                                : 'text-[var(--text-strong)] hover:bg-[var(--chip)]'
+                            )}
+                          >
+                            {day}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </div>
+
+        </>}
+        {/* Section 4: Notes */}
+        <div className="bg-[var(--surface)] p-2.5 flex flex-col gap-1 rounded-[6px]">
+          <h3 className="text-[14px] font-semibold text-[var(--text)]">Notes</h3>
+          <div className="pt-0.5">
+            <Textarea
+              label="Workroom notes and fabric details"
+              placeholder="e.g. hand-stitched, monogram design on wrist and gold buttons"
+              value={clientNotes}
+              onChange={(e) => setClientNotes(e.target.value)}
+              className={isMobile ? 'h-[90px]' : 'h-[133px]'}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderMannequinCard = (isMobile = false) => (
+    <div className="w-full bg-[var(--card)] rounded-[6px] p-3 flex flex-col gap-2 flex-1">
+      {/* Title & Subtitle */}
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h2 className="text-[16px] font-bold text-[var(--text)] leading-tight">
+            {centerView === 'mannequin'
+              ? selectedTemplateName || 'Mannequin'
+              : 'Measurement List View'}
+          </h2>
+          <div className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--muted)] mt-0.5">
+            {centerView === 'mannequin' ? (
+              <>
+                <span className="tabular-nums">
+                  {activePointKeys.length === 0
+                    ? 'No points selected · Choose a template or add a point'
+                    : `${activePointKeys.length} active ${
+                        activePointKeys.length === 1 ? 'point' : 'points'
+                      }`}
+                </span>
+              </>
+            ) : (
+              <span>Fast keyboard entry for active garment fields</span>
+            )}
+          </div>
+        </div>
+
+        {activePointKeys.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedTemplateId('');
+              setSelectedTemplateName('');
+              setActivePointKeys([]);
+              setMeasurements({});
+            }}
+            className="text-[11px] font-medium text-[var(--muted)] hover:text-black cursor-pointer shrink-0 pt-0.5"
+          >
+            Clear points
+          </button>
+        )}
+      </div>
+
+      {/* Toolbar: white pill container */}
+      <div className={cn('w-full rounded-[32px] bg-white p-2 flex flex-nowrap items-center', isMobile ? 'gap-1' : 'gap-2')}>
+        {/* 1. Template */}
+        <div
+          id="overview-blueprints"
+          className="min-w-0 flex-1 flex items-center"
+        >
+          <button
+            ref={triggerRef}
+            data-tour="choose-template"
+            type="button"
+            onClick={() => {
+              setDialogSelectedTemplateId(
+                selectedTemplateId || storeTemplates[0]?.id || ''
+              );
+              setIsTemplateModalOpen(true);
+            }}
+            className={cn('w-full h-9 rounded-[24px] bg-[var(--chip)] text-[var(--text-2)] hover:bg-[#eaeaea] font-medium flex items-center justify-center transition-colors cursor-pointer', isMobile ? 'px-1.5 text-[12px]' : 'px-3 text-[14px]')}
+          >
+            Template
+          </button>
+        </div>
+
+        <div className="contents">
+        {/* 2. M / F toggle group */}
+        <div className={cn('h-9 bg-[var(--chip)] rounded-[24px] py-1.5 flex items-center shrink-0', isMobile ? 'px-0.5 gap-0' : 'px-2 gap-1')}>
+          <button
+            type="button"
+            aria-label="Masculine form"
+            aria-pressed={gender === 'male'}
+            onClick={() => setGender('male')}
+            className={cn(
+              'w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold transition-all cursor-pointer',
+              gender === 'male'
+                ? 'bg-[var(--primary)] text-white shadow-xs'
+                : 'bg-white text-[var(--text-2)] hover:text-black'
+            )}
+          >
+            M
+          </button>
+          <button
+            type="button"
+            aria-label="Feminine form"
+            aria-pressed={gender === 'female'}
+            onClick={() => setGender('female')}
+            className={cn(
+              'w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold transition-all cursor-pointer',
+              gender === 'female'
+                ? 'bg-[var(--primary)] text-white shadow-xs'
+                : 'bg-white text-[var(--text-2)] hover:text-black'
+            )}
+          >
+            F
+          </button>
+        </div>
+
+        {/* 3. View toggle group */}
+        <div className={cn('h-9 bg-[var(--chip)] rounded-[24px] py-1.5 flex items-center shrink-0', isMobile ? 'px-0.5 gap-0' : 'px-2 gap-1')}>
+          <button
+            type="button"
+            aria-label="Diagram view"
+            aria-pressed={centerView === 'mannequin'}
+            onClick={() => setCenterView('mannequin')}
+            className={cn(
+              'w-6 h-6 rounded-full flex items-center justify-center transition-all cursor-pointer',
+              centerView === 'mannequin'
+                ? 'bg-[var(--primary)] text-white shadow-xs'
+                : 'bg-white text-[var(--text-2)] hover:text-black'
+            )}
+            title="Diagram View"
+          >
+            <PersonStanding className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            aria-label="List view"
+            aria-pressed={centerView === 'table'}
+            onClick={() => setCenterView('table')}
+            className={cn(
+              'w-6 h-6 rounded-full flex items-center justify-center transition-all cursor-pointer',
+              centerView === 'table'
+                ? 'bg-[var(--primary)] text-white shadow-xs'
+                : 'bg-white text-[var(--text-2)] hover:text-black'
+            )}
+            title="List View"
+          >
+            <ClipboardList className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* 4. Add Point */}
+        <div
+          id="overview-touchpoints"
+          className="flex items-center gap-1 shrink-0"
+        >
+          <button
+            type="button"
+            onClick={handleOpenAddPoint}
+            className={cn('h-9 bg-[var(--chip)] border border-[var(--outline)] text-[var(--text-2)] font-medium rounded-[24px] hover:bg-[#eaeaea] transition-colors cursor-pointer shrink-0', isMobile ? 'px-1.5 text-[12px]' : 'px-3.5 text-[14px]')}
+          >
+            Add Point
+          </button>
+        </div>
+        </div>
+      </div>
+
+      {/* Main Content: Mannequin Diagram OR List View */}
+      {centerView === 'mannequin' ? (
+        <div
+          id="overview-mannequin"
+          data-tour="mannequin-viewer"
+          className="w-full flex flex-col items-center justify-center py-2 select-none flex-1 relative"
+        >
+          {Boolean(selectedTemplateName) && (
+            <ContextualTip id="viewer-rotate" variant="inline" className="w-full max-w-sm mb-2" />
+          )}
+          <RotatableMannequin
+            gender={gender}
+            onGenderChange={setGender}
+            showControls={true}
+            showGenderToggle={true}
+            measurements={measurements}
+            activePointKeys={activePointKeys}
+            selectedPointKey={pointModalData?.key || null}
+            unit={unitLabel}
+            onSelectPoint={handleOpenPoint}
+          />
+        </div>
+      ) : activePointKeys.length === 0 ? (
+        <div className="w-full flex-1 min-h-[320px] bg-white rounded-[12px] p-6 flex flex-col items-center justify-center text-center gap-3">
+          <p className="text-[14px] font-semibold text-black">
+            No measurement points selected yet
+          </p>
+          <p className="text-[12px] text-[var(--text-2)] max-w-xs">
+            Choose a saved Garment Template or click &ldquo;Add Point&rdquo; to select measurements from the catalog.
+          </p>
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setDialogSelectedTemplateId(
+                  selectedTemplateId || storeTemplates[0]?.id || ''
+                );
+                setIsTemplateModalOpen(true);
+              }}
+              className="h-9 px-4 rounded-[24px] bg-[var(--primary)] text-white text-[13px] font-medium hover:opacity-95 transition-opacity cursor-pointer"
+            >
+              Choose Template
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenAddPoint}
+              className="h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[var(--text-2)] text-[13px] font-medium hover:bg-[#eaeaea] transition-colors cursor-pointer"
+            >
+              Add Point
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Measurement List View */
+        <div className="w-full flex flex-col gap-2 py-1">
+          <ContextualTip id="measurement-list" variant="inline" className="w-full" />
+          <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {visibleListFields.map((field, idx) => {
+            const rawVal = measurements[field.id];
+            const strVal = rawVal !== undefined ? String(rawVal) : '';
+
+            return (
+              <div
+                key={field.id}
+                className="bg-white rounded-[16px] p-4 flex flex-col justify-between gap-3 shadow-2xs"
+              >
+                <div className="flex items-start justify-between gap-1">
+                  <div className="min-w-0">
+                    <span className="text-[13px] font-semibold text-[var(--text)] block truncate">
+                      {field.label}
+                    </span>
+                    <span className="text-[10px] font-medium text-[var(--muted)] block">
+                      {field.zone}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${field.label}`}
+                    onClick={() => handleRemoveField(field.id, field.label)}
+                    className="w-6 h-6 -mr-1 -mt-0.5 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-black hover:bg-neutral-100 transition-colors cursor-pointer shrink-0"
+                    title={`Remove ${field.label}`}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="w-full h-10 bg-[#F8F8F8] border border-transparent rounded-[8px] px-3 flex items-center transition-colors focus-within:border-[#CCCCCC]">
+                  <input
+                    ref={(el) => {
+                      inputRefs.current[field.id] = el;
+                    }}
+                    type="text"
+                    inputMode="decimal"
+                    aria-label={`${field.label} in ${unitLabel}`}
+                    placeholder="0.0"
+                    value={strVal}
+                    onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                    onKeyDown={(e) =>
+                      handleInputKeyDown(e, idx, visibleListFields.length)
+                    }
+                    className="w-full bg-transparent border-0 p-0 text-[13px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:ring-0 tabular-nums"
+                  />
+                  <span className="pl-2 text-[12px] font-semibold text-[#727272] select-none shrink-0 uppercase">
+                    {unitLabel}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Inline Save Button */}
+      {isMobile && (
+        <div className="w-full pt-2 flex justify-end">
+          <MorphingSaveButton idleText="Save" onClick={handleSaveOrder} dataTour="save-order" />
+        </div>
+      )}
+    </div>
+  );
+
+  const renderCalendarCard = () => (
+    <div
+      id="overview-calendar"
+      className="w-full bg-[var(--card)] rounded-[6px] p-3 flex flex-col gap-3 relative"
+    >
+      <div className="flex items-center justify-between">
+        <h3 className="text-[14px] font-semibold text-[var(--text-strong)] leading-none">
+          Pickup Calendar
+        </h3>
+        <div className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-strong)]">
+          <span>{calendarMonthLabel}</span>
+          <div className="flex items-center gap-0.5 text-[var(--text-2)]">
+            <button
+              type="button"
+              aria-label="Previous Month"
+              className="w-7 h-7 flex items-center justify-center rounded hover:bg-neutral-200 focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:outline-none transition-colors cursor-pointer"
+              title="Previous Month"
+              onClick={() => {
+                setActiveDatePopover(null);
+                setViewDate(
+                  (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1)
+                );
+              }}
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label="Next Month"
+              className="w-7 h-7 flex items-center justify-center rounded hover:bg-neutral-200 focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:outline-none transition-colors cursor-pointer"
+              title="Next Month"
+              onClick={() => {
+                setActiveDatePopover(null);
+                setViewDate(
+                  (prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1)
+                );
+              }}
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <ContextualTip id="calendar-dates" variant="inline" className="mt-0.5" />
+
+      {/* Weekday row */}
+      <div className="grid grid-cols-7 gap-[2px]">
+        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, idx) => (
+          <div
+            key={d}
+            className="h-8 bg-white rounded-[4px] flex items-center justify-center text-[11px] font-semibold"
+          >
+            <span
+              className={
+                idx === todayWeekdayIndex
+                  ? 'text-[var(--text-strong)]'
+                  : 'text-[var(--weekday)]'
+              }
+            >
+              {d}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Date grid */}
+      <div className="grid grid-cols-7 gap-[2px]">
+        {Array.from({ length: calendarOffset }, (_, idx) => (
+          <div key={`offset-${idx}`} className="h-10 opacity-0 pointer-events-none" />
+        ))}
+
+        {Array.from({ length: calendarDaysCount }, (_, i) => i + 1).map((day) => {
+          const dayOrders = getOrdersForDay(day);
+          const hasOrders = dayOrders.length > 0;
+          const status = dayOrders[0]?.status;
+
+          return (
+            <button
+              key={day}
+              type="button"
+              onClick={() => {
+                if (hasOrders) {
+                  setActiveDatePopover(activeDatePopover === day ? null : day);
+                } else {
+                  setActiveDatePopover(null);
+                }
+              }}
+              className={cn(
+                'h-10 bg-white rounded-[4px] relative flex items-center justify-center text-[12px] font-medium text-[var(--text-date)] tabular-nums transition-colors',
+                hasOrders ? 'cursor-pointer hover:bg-neutral-50' : 'cursor-default'
+              )}
+            >
+              <span>{day}</span>
+
+              {hasOrders && (
+                <span
+                  className="absolute bottom-1 right-1 w-2 h-2 rounded-full"
+                  style={{ backgroundColor: dayOrders[0]?.statusPresentation.dotColor }}
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Peek Card Popover */}
+      <AnimatePresence>
+        {activeDatePopover !== null && (
+          <motion.div
+            initial={{ opacity: 0, y: -4, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={springSnappy}
+            className="absolute left-3 right-3 top-[170px] z-30 bg-white border border-[var(--outline)] rounded-[8px] p-3 shadow-xl"
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--outline)] mb-2">
+              <span className="text-[12px] font-bold text-[var(--text-strong)] tabular-nums">
+                {activeDatePopover} {calendarMonthLabel} — Pickups
+              </span>
+              <button
+                type="button"
+                aria-label="Close pickups popover"
+                onClick={() => setActiveDatePopover(null)}
+                className="text-[var(--text-2)] hover:text-black p-0.5 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            {getOrdersForDay(activeDatePopover).length > 0 ? (
+              <div className="flex flex-col gap-1.5">
+                {getOrdersForDay(activeDatePopover).map((item, idx) => (
+                  <button
+                    key={item.id || idx}
+                    type="button"
+                    onClick={() => {
+                      setActiveDatePopover(null);
+                      onOpenClient(item.clientId);
+                    }}
+                    className="w-full text-left flex items-center justify-between text-[11px] bg-[var(--chip)] hover:bg-[#EAEAEA] p-2 rounded-[6px] transition-colors cursor-pointer"
+                  >
+                    <div>
+                      <div className="font-medium text-[var(--text-strong)] flex items-center gap-1.5">
+                        <span>{item.client}</span>
+                        <span
+                          style={{ backgroundColor: item.statusPresentation.badgeColor }}
+                          className="px-1.5 py-0.5 rounded-full text-[9px] font-semibold text-white leading-none"
+                        >
+                          {item.statusPresentation.badgeLabel}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-[var(--muted)]">
+                        {item.garment}
+                      </div>
+                    </div>
+                    <span className="font-semibold text-[var(--text-date)] tabular-nums">
+                      {item.time}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="py-3 text-center flex flex-col items-center justify-center gap-1.5">
+                <p className="text-[12px] text-[var(--muted)]">
+                  No pickups or fittings scheduled for this date.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const padDay = String(activeDatePopover).padStart(2, '0');
+                    const padMonth = String(calendarMonth + 1).padStart(2, '0');
+                    const dmy = `${padDay}/${padMonth}/${calendarYear}`;
+                    setActiveDatePopover(null);
+                    setClientDueDate(dmy);
+                  }}
+                  className="text-[11px] font-semibold text-[var(--primary)] hover:underline cursor-pointer"
+                >
+                  Set as due date for intake form
+                </button>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Legend row */}
+      <div className="pt-2 flex items-center justify-start gap-[24px] text-[11px] font-normal text-[var(--text-strong)]">
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-[var(--pending)] shrink-0" />
+          <span>Pending</span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-[var(--completed)] shrink-0" />
+          <span>Completed</span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-[var(--paused)] shrink-0" />
+          <span>Paused</span>
+        </span>
+      </div>
+    </div>
+  );
+
+  const renderRecentOrdersCard = () => (
+    <div
+      id="overview-recent-orders"
+      className="w-full bg-[var(--card)] rounded-[6px] p-3 flex flex-col gap-2"
+    >
+      <h3 className="text-[14px] font-semibold text-[var(--text-strong)]">
+        Recent Orders
+      </h3>
+
+      {recentOrdersList.length === 0 ? (
+        <div className="bg-[var(--surface)] rounded-[8px] p-6 text-center flex flex-col items-center justify-center gap-2 border border-[var(--outline)]">
+          <div className="w-10 h-10 rounded-full bg-[var(--chip)] flex items-center justify-center text-[var(--muted)] mb-0.5">
+            <ClipboardList className="w-5 h-5 text-[var(--text-2)]" />
+          </div>
+          <span className="text-[13px] font-semibold text-[var(--text-strong)]">
+            No Recent Orders
+          </span>
+          <p className="text-[11px] text-[var(--muted)] max-w-xs leading-relaxed">
+            Active fittings and garment orders will appear here automatically as you create client orders.
+          </p>
+        </div>
+      ) : (
+        <div className="bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
+          {recentOrdersList.map((order) => (
+            <div
+              key={order.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => onOpenClient(order.clientId)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onOpenClient(order.clientId);
+                }
+              }}
+              className="bg-[var(--chip)] hover:bg-[#EAEAEA] rounded-[6px] p-2 flex items-center gap-2 justify-between cursor-pointer transition-colors"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-[12px] font-bold text-[var(--text-strong)] shrink-0">
+                  {order.initials}
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[12px] font-medium text-[var(--text-strong)] leading-tight truncate">
+                    {order.client}
+                  </span>
+                  <span className="text-[11px] font-normal text-[var(--muted)] leading-tight truncate">
+                    {order.garment}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                aria-label={`Open client profile for ${order.client}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenClient(order.clientId);
+                }}
+                className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-[var(--text-strong)] hover:bg-neutral-100 transition-colors cursor-pointer shrink-0"
+                title={`Open client profile for ${order.client}`}
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  // Render shared Garment Templates list inside desktop/mobile modal
+  const renderTemplatesModalList = () => (
+    <div className="flex flex-col gap-2.5 max-h-[380px] overflow-y-auto">
+      {storeTemplates.length === 0 ? (
+        <div className="p-6 text-center text-[12px] text-[var(--muted)]">
+          No saved templates yet. You can create new templates in Settings.
+        </div>
+      ) : (
+        storeTemplates.map((tmpl) => {
+          const isSelected = dialogSelectedTemplateId === tmpl.id;
+          return (
+            <div
+              key={tmpl.id}
+              onClick={() => setDialogSelectedTemplateId(tmpl.id)}
+              className={cn(
+                'w-full p-3.5 rounded-[12px] text-left transition-all flex items-center justify-between cursor-pointer border',
+                isSelected
+                  ? 'border-[var(--selected)] bg-[var(--selected-bg)]'
+                  : 'border-[var(--outline)] bg-[var(--card)] hover:bg-[#F3F3F3]'
+              )}
+            >
+              <div className="flex-1 pr-3 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[14px] font-semibold text-black truncate">
+                    {tmpl.name}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-white text-[10px] font-medium text-[var(--text-2)] border border-[#EDEDED] shrink-0 tabular-nums">
+                    {tmpl.fieldKeys.length} pts
+                  </span>
+                </div>
+                <div className="text-[12px] font-normal text-[var(--text-2)] mt-0.5 leading-snug line-clamp-2">
+                  {tmpl.description}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <div
+                  className={cn(
+                    'w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors',
+                    isSelected
+                      ? 'bg-[var(--selected)] text-white'
+                      : 'border border-[var(--outline)] bg-white'
+                  )}
+                >
+                  {isSelected && <Check className="w-3 h-3 stroke-[2.5]" />}
+                </div>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+
+  // Render Point Modal form content (Requirement C: edit mode only edits size value; Requirement D: add mode picks from catalog)
+  const renderPointModalForm = () => {
+    if (!pointModalData) return null;
+
+    return (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          handlePointModalSubmit();
+        }}
+        className="flex flex-col gap-4"
+      >
+        {pointModalData.mode === 'edit' ? (
+          /* Requirement C: Read-Only Measurement Info Banner — user can update ONLY the size */
+          <div className="rounded-[10px] bg-[var(--card)] p-3 border border-[#EDEDED] flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.3px] text-[var(--muted)] block">
+                {pointModalData.zone}
+              </span>
+              <span className="text-[14px] font-semibold text-black">
+                {pointModalData.name}
+              </span>
+            </div>
+            <span className="px-2.5 py-1 rounded-full bg-white text-[11px] font-medium text-[var(--text-2)] border border-[#EDEDED]">
+              Size Only
+            </span>
+          </div>
+        ) : (
+          /* Requirement B & D: Add Point chooses from the 21 standard Sizing/Measurements */
+          <div className="flex flex-col gap-2">
+            <label className="block text-[11px] font-semibold text-[var(--text)]">
+              Select Sizing Measurement
+            </label>
+            <div className="flex flex-col gap-2.5 max-h-[210px] overflow-y-auto rounded-[10px] bg-[var(--card)] p-2.5 border border-[#EDEDED]">
+              {hotspotsByZone.map((zone) => (
+                <div key={zone.id} className="flex flex-col gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.3px] text-[var(--muted)]">
+                    {zone.label}
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {zone.items.map((item) => {
+                      const isSelected = pointModalData.key === item.key;
+                      const isAlreadyActive = activePointKeys.includes(item.key);
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          onClick={() => {
+                            setPointModalError('');
+                            const existing =
+                              measurements[item.key] !== undefined
+                                ? String(measurements[item.key])
+                                : pointModalData.value;
+                            setPointModalData({
+                              ...pointModalData,
+                              key: item.key,
+                              name: item.label,
+                              zone: zone.label,
+                              value: existing,
+                            });
+                          }}
+                          className={cn(
+                            'px-2.5 py-1 rounded-[16px] text-[11px] font-medium transition-all flex items-center gap-1 cursor-pointer border',
+                            isSelected
+                              ? 'bg-[var(--selected-bg)] border-[var(--selected)] text-[var(--primary)] font-semibold'
+                              : isAlreadyActive
+                              ? 'bg-[#F2F2F2] border-[#E0E0E0] text-black'
+                              : 'bg-white border-[#E5E5E5] text-[var(--text-2)] hover:text-black'
+                          )}
+                        >
+                          <span>{item.label}</span>
+                          {isSelected && <Check className="w-3 h-3 stroke-[2.5]" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div>
+          <label className="block text-[11px] font-semibold text-[var(--text)] mb-1">
+            Measurement Size ({unitLabel.toUpperCase()})
+          </label>
+          <div className="w-full h-11 bg-[#F8F8F8] border border-transparent rounded-[8px] px-3 flex items-center transition-colors focus-within:border-[#CCCCCC]">
+            <input
+              type="text"
+              inputMode="decimal"
+              value={pointModalData.value}
+              placeholder="0.0"
+              onChange={(e) => {
+                setPointModalError('');
+                setPointModalData({ ...pointModalData, value: e.target.value });
+              }}
+              autoFocus
+              className="w-full bg-transparent border-0 p-0 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:ring-0 tabular-nums"
+            />
+            <span className="pl-2 text-[12px] font-semibold text-[#727272] select-none shrink-0 uppercase">
+              {unitLabel}
+            </span>
+          </div>
+        </div>
+
+        {pointModalError && (
+          <p className="text-[12px] text-[var(--paused)] font-medium">
+            {pointModalError}
+          </p>
+        )}
+
+        <div className="flex items-center justify-end gap-2.5 pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              setPointModalData(null);
+              setPointModalError('');
+              if (triggerRef.current) triggerRef.current.focus();
+            }}
+            className="h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[var(--text-2)] text-[14px] font-medium hover:bg-[#eaeaea] transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="h-9 px-6 rounded-[24px] bg-[var(--primary)] text-white text-[14px] font-medium hover:opacity-95 transition-opacity cursor-pointer shadow-xs"
+          >
+            {pointModalData.mode === 'edit' ? 'Update Size' : 'Add Point'}
+          </button>
+        </div>
+      </form>
+    );
+  };
+
+  return (
+    <div className="w-full max-w-[1216px] mx-auto px-3 sm:px-4 xl:px-0 mt-3 lg:mt-4 pb-24 lg:pb-12 text-[var(--text)]">
+      {/* Accessible Landmark Heading (A11, A16) */}
+      <h1 className="sr-only">TailorFit Studio Overview and Order Intake</h1>
+
+      {/* Onboarding Tour Welcome Invitation (Nonblocking) */}
+      {isReadyForInvitation && (
+        <div className="mb-3">
+          <TourInvitation
+            onStart={startTour}
+            onDismiss={dismissTour}
+          />
+        </div>
+      )}
+
+      {/* Onboarding Tour Completion Feedback */}
+      {justFinishedTour && (
+        <div className="mb-3">
+          <TourCompletionFeedback
+            hasDraft={Boolean(clientName.trim() || clientGarment.trim() || clientPhone.trim())}
+            onAction={() => {
+              dismissCompletion();
+              clientNameInputRef.current?.focus();
+            }}
+            onDismiss={dismissCompletion}
+          />
+        </div>
+      )}
+      {/* =======================================================================
+          PART A: MOBILE OVERVIEW (< 1024px)
+          ======================================================================= */}
+      {!isDesktop && (
+        <div className="w-full lg:hidden flex flex-col gap-2">
+          <div className="w-full bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
+            {renderNewClientCard(true)}
+            {renderMannequinCard(true)}
+            {renderCalendarCard()}
+            {renderRecentOrdersCard()}
+          </div>
+        </div>
+      )}
+
+      {/* =======================================================================
+          PART B: DESKTOP OVERVIEW (>= 1024px / lg)
+          ======================================================================= */}
+      {isDesktop && (
+        <div className="hidden lg:block w-full">
+          <div className="w-full flex flex-col xl:flex-row gap-4 items-start">
+            {/* LEFT CONTAINER (70.5% width) */}
+            <div className="w-full xl:w-[70.5%] bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
+              <div className="w-full flex flex-col lg:flex-row gap-[2px] items-stretch flex-1">
+                <div className="w-full lg:w-[43.7%] flex flex-col">
+                  {renderNewClientCard(false)}
+                </div>
+                <div className="w-full lg:flex-1 flex flex-col">
+                  {renderMannequinCard(false)}
+                </div>
+              </div>
+
+              {/* Desktop Save Bar */}
+              <div className="w-full px-4 py-2 flex justify-end items-center bg-[var(--surface)] rounded-[6px]">
+                <MorphingSaveButton idleText="Save" onClick={handleSaveOrder} dataTour="save-order" />
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN (aligned 1:1 with Navbar right edge) */}
+            <div className="w-full xl:flex-1 bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
+              {renderCalendarCard()}
+              {renderRecentOrdersCard()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isTemplateModalOpen&&<ModalDialog title="Garment templates" onRequestClose={()=>setIsTemplateModalOpen(false)}><div className="space-y-4 p-5">{renderTemplatesModalList()}<div className="dialog-actions flex justify-end gap-2"><button type="button" className="min-h-11 rounded-full border border-[var(--outline)] px-4" onClick={()=>setIsTemplateModalOpen(false)}>Cancel</button><button type="button" disabled={!dialogSelectedTemplateId} className="min-h-11 rounded-full bg-[var(--primary)] px-4 text-white disabled:opacity-50" onClick={()=>{applyTemplateById(dialogSelectedTemplateId);setIsTemplateModalOpen(false);}}>Select template</button></div></div></ModalDialog>}
+      {pointModalData&&<ModalDialog title={pointModalData.mode==='edit'?'Update measurement':'Add measurement'} onRequestClose={()=>{setPointModalData(null);setPointModalError('');}}><div className="p-5">{renderPointModalForm()}</div></ModalDialog>}
+      {/* Floating Undo Toast when a field is removed */}
+      <AnimatePresence>
+        {undoToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 16, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.95 }}
+            transition={springSmooth}
+            className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-50 bg-white rounded-[16px] px-4 py-3 shadow-xl border border-[var(--outline)] flex items-center gap-3 select-none"
+          >
+            <span className="text-[12px] font-medium text-[var(--text-strong)]">
+              Removed &ldquo;{undoToast.label}&rdquo;
+            </span>
+            <button
+              type="button"
+              onClick={handleUndoRemove}
+              className="text-[12px] font-bold text-[var(--primary)] hover:underline cursor-pointer"
+            >
+              Undo
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setUndoToast(null);
+                if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+              }}
+              className="p-1 text-[var(--muted)] hover:text-black cursor-pointer"
+              aria-label="Dismiss toast"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating System Toasts */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+    </div>
+  );
+}

@@ -1,4 +1,5 @@
 "use client";
+import {prepareWorkspaceDialog} from '@/lib/dialog-environment';
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 export function ConfirmDialog({
@@ -17,8 +18,10 @@ export function ConfirmDialog({
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     const dialog = ref.current!;
+    const releaseEnvironment=prepareWorkspaceDialog(dialog);
     dialog.showModal();
     return () => {
+      releaseEnvironment();
       dialog.close();
       previous?.focus();
     };
@@ -31,7 +34,7 @@ export function ConfirmDialog({
         e.preventDefault();
         if (!busy) onClose();
       }}
-      className="m-auto max-h-[90dvh] w-[calc(100%_-_32px)] max-w-2xl overflow-auto rounded-2xl bg-[var(--surface)] p-5 text-[var(--text)] shadow-xl backdrop:bg-black/40 sm:p-6"
+      className="workspace-dialog m-auto max-h-[90dvh] w-[calc(100%_-_32px)] max-w-2xl overflow-auto rounded-2xl bg-[var(--surface)] p-5 text-[var(--text)] shadow-xl backdrop:bg-black/40 sm:p-6"
     >
       <h2 id={titleId} className="mb-4 text-lg font-semibold">
         {title}

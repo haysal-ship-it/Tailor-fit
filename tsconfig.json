@@ -43,6 +43,7 @@
     "node_modules",
     "**/node_modules/**",
     ".next*/standalone/**",
-    ".next*/cache/**"
+    ".next*/cache/**",
+    "skills/stageshow/**"
   ]
 }

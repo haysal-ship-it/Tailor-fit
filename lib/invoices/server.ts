@@ -125,6 +125,7 @@ export async function loadInvoice(orderId: string) {
     };
   });
   const model: InvoiceModel = {
+    studio: settings?.studio,
     orderId,
     reference: `TF-${orderId.toUpperCase()}`,
     issuedAt: row.created_at,

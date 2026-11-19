@@ -8,6 +8,7 @@ export type InvoiceMeasurement = {
   back?: { x: number; y: number };
 };
 export type InvoiceModel = {
+  studio?: {name:string;email:string;phone:string;address:string};
   orderId: string;
   reference: string;
   issuedAt: string;

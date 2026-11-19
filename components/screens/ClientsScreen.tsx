@@ -1,10 +1,14 @@
 'use client';
+import {LegacyDialog} from '@/components/ui/LegacyDialog';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '@/lib/store';
 import { OrderWorkspace } from '@/components/orders/OrderWorkspace';
 import { ChoiceMenu } from '@/components/ui/ChoiceMenu';
+import { ClientDetailsDialog } from '@/components/clients/ClientDetailsDialog';
+import { ClientPickerDialog } from '@/components/clients/ClientPickerDialog';
+import type { ClientDetailsTarget } from '@/lib/client-details';
 import {
   Phone,
   AtSign,
@@ -92,6 +96,7 @@ export function ClientsScreen({
   const {
     clients,
     orders,
+    saveStatus,
     settings,
     allHotspots,
     selectedClientId,
@@ -106,6 +111,7 @@ export function ClientsScreen({
     deleteTemplate,
     getClientSnapshots,
     getClientOrders,
+    error: clientSaveError,
   } = useStore();
 
   const handleBackToDirectory = () => {
@@ -144,13 +150,9 @@ export function ClientsScreen({
   const snapshotDropdownRef = useRef<HTMLDivElement>(null);
   const newOrderTemplateDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Modals: Edit Profile, Delete Confirmation, Client Directory Switcher, Garment Templates, Point Size
-  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
-  const [editProfileMode, setEditProfileMode] = useState<'edit' | 'create' | 'switch'>('edit');
-  const [editName, setEditName] = useState('');
-  const [editPhone, setEditPhone] = useState('');
-  const [editEmail, setEditEmail] = useState('');
-  const [editNotes, setEditNotes] = useState('');
+  // Separate client details and switching dialogs; other workspace modals.
+  const [clientDialog, setClientDialog] = useState<ClientDetailsTarget | null>(null);
+  const [isClientPickerOpen, setIsClientPickerOpen] = useState(false);
   const [directorySearch, setDirectorySearch] = useState('');
 
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -218,13 +220,13 @@ export function ClientsScreen({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if(document.querySelector('dialog[open]'))return;
         setIsOverflowMenuOpen(false);
         setIsSnapshotDropdownOpen(false);
         setIsNewOrderTemplateDropdownOpen(false);
         setPointModalData(null);
         setPointModalError('');
         setIsTemplateModalOpen(false);
-        setIsEditProfileModalOpen(false);
         setIsDeleteConfirmOpen(false);
       }
     };
@@ -594,68 +596,35 @@ export function ClientsScreen({
     });
   }, [getClientOrders, selectedClientProfile?.id, currencySymbol]);
 
-  const profileEditId=useRef<string|null>(null);
-  // Open Edit Profile modal prefilled with current client
-  const handleOpenEditProfile = (mode: 'edit' | 'create' | 'switch' = 'edit', clientId?:string) => {
-    const profile=clientId?clients.find(c=>c.id===clientId):selectedClientProfile;
-    profileEditId.current=profile?.id||null;
+  const handleOpenCreateClient = () => {
     setIsOverflowMenuOpen(false);
-    if (mode === 'create' || !profile) {
-      setEditName('');
-      setEditPhone('');
-      setEditEmail('');
-      setEditNotes('');
-      setEditProfileMode(mode === 'switch' ? 'switch' : 'create');
-    } else {
-      setEditName(profile.name);
-      setEditPhone(profile.phone);
-      setEditEmail(profile.email);
-      setEditNotes(profile.notes);
-      setEditProfileMode(mode);
+    setClientDialog({ kind: 'create' });
+  };
+  const handleOpenEditClient = (clientId?: string) => {
+    const client = clientId ? clients.find(c => c.id === clientId) : selectedClientProfile;
+    if (!client) return;
+    setIsOverflowMenuOpen(false);
+    setClientDialog({ kind: 'edit', client: { id: client.id, name: client.name, phone: client.phone || '', email: client.email || '', notes: client.notes || '' } });
+  };
+  const handleOpenClientPicker = () => {
+    setIsOverflowMenuOpen(false);
+    setIsClientPickerOpen(true);
+  };
+  const handleClientSaved = (result: { id: string; name: string; created: boolean }) => {
+    setClientDialog(null);
+    if (result.created) {
+      setSelectedClientId(result.id);
+      setViewState('SavedMeasurements_Default');
+      onOpenClient?.(result.id);
+      requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-client-profile-heading]')?.focus());
     }
-    setIsEditProfileModalOpen(true);
+    showToast({ type: 'success', title: result.created ? 'Client added' : 'Client updated',
+      message: result.created ? `${result.name} is ready. Add measurements or an order when you're ready.` : `${result.name}'s details have been updated.`, duration: 4000 });
   };
 
-  const handleSaveProfileModal = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmedName = editName.trim();
-    if (!trimmedName) return;
-
-    if (editProfileMode === 'create' || !profileEditId.current) {
-      const created = await addClient({
-        name: trimmedName,
-        phone: editPhone.trim(),
-        email: editEmail.trim(),
-        notes: editNotes.trim(),
-      });
-      if(!created)return;
-      setSelectedClientId(created.id);
-      showToast({
-        type: 'success',
-        title: 'Client Created',
-        message: `${created.name} added to your atelier directory.`,
-        duration: 3000,
-      });
-    } else {
-      const updated = await updateClient(profileEditId.current, {
-        name: trimmedName,
-        phone: editPhone.trim(),
-        email: editEmail.trim(),
-        notes: editNotes.trim(),
-      });
-      if(!updated)return;
-      showToast({
-        type: 'success',
-        title: 'Profile Updated',
-        message: `${trimmedName}'s profile has been updated.`,
-        duration: 3000,
-      });
-    }
-    setIsEditProfileModalOpen(false);
-  };
-
+  const workspaceBusy=saveStatus==='saving';
   const handleConfirmDeleteClient = async () => {
-    if (!selectedClientProfile) return;
+    if (!selectedClientProfile || workspaceBusy) return;
     const name = selectedClientProfile.name;
     if(!await deleteClient(selectedClientProfile.id))return;
     setIsDeleteConfirmOpen(false);
@@ -761,33 +730,26 @@ export function ClientsScreen({
     <div className="w-full max-w-[1216px] mx-auto mt-3 lg:mt-4 px-3 sm:px-4 xl:px-0 pb-24 lg:pb-12 text-[var(--text)]">
       {/* Accessible Landmark Heading (A11, A16) */}
       <h1 className="sr-only">Client Management &amp; Measurements Atelier</h1>
-      {Boolean(orderId) || (!selectedClientProfile && showingOrder) ? (<OrderWorkspace key={orderId||'new'} orderId={orderId} clientId={orderClientId} onBack={()=>onOrderBack?.()} onSaved={(id,cid)=>onOrderSaved?.(id,cid)} onEditClient={id=>handleOpenEditProfile('edit',id)}/>) : !selectedClientProfile && allClientList.length === 0 ? (
-        <div className="w-full bg-[var(--surface)] p-8 sm:p-14 rounded-[12px] border border-[var(--outline)] flex flex-col items-center justify-center text-center gap-4 shadow-xs">
-          <div className="w-16 h-16 rounded-full bg-[var(--chip)] border border-[var(--outline)] flex items-center justify-center text-[var(--text-2)]">
-            <Users className="w-8 h-8 text-[var(--text-strong)]" />
+      {Boolean(orderId) || newOrder || (!selectedClientProfile && showingOrder) ? (<OrderWorkspace key={orderId||'new'} orderId={orderId} clientId={orderClientId} onBack={()=>onOrderBack?.()} onSaved={(id,cid)=>onOrderSaved?.(id,cid)} onEditClient={id=>handleOpenEditClient(id)}/>) : !selectedClientProfile && allClientList.length === 0 ? (
+        <section className="w-full rounded-[8px] bg-[var(--surface)] p-[2px]">
+          <header className="flex flex-col gap-2 p-6">
+            <h2 className="text-[16px] font-semibold text-[var(--text)]">Client Directory</h2>
+            <p className="text-[12px] leading-normal text-[var(--text-2)]">Versioned anatomical measurements across customer visits.</p>
+          </header>
+          <div className="flex min-h-[502px] items-center rounded-[6px] bg-[var(--card)] p-4 lg:p-6">
+            <div className="flex w-full flex-col items-center justify-center gap-3 rounded-[8px] border border-[var(--outline)] bg-[var(--surface)] p-8 text-center sm:p-12">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--chip)] text-[var(--text-2)]"><Users className="h-6 w-6" aria-hidden="true"/></div>
+              <div>
+                <h3 className="text-[15px] font-semibold text-[var(--text)]">No clients yet</h3>
+                <p className="mt-1.5 max-w-sm text-[12px] leading-relaxed text-[var(--muted)]">Add a client to keep their contact details, measurements and orders together.</p>
+              </div>
+              <div className="mt-2 flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                <button type="button" onClick={handleOpenCreateClient} className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[24px] bg-[var(--primary)] px-5 text-[13px] font-medium text-white transition-opacity hover:opacity-95 sm:w-auto"><Plus className="h-3.5 w-3.5" aria-hidden="true"/>Add first client</button>
+                <button type="button" onClick={()=>onNewOrder?.('')} className="min-h-11 w-full rounded-[24px] border border-[var(--outline)] bg-[var(--surface)] px-5 text-[13px] font-medium transition-colors hover:bg-[var(--chip)] sm:w-auto">New order</button>
+              </div>
+            </div>
           </div>
-          <div>
-            <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[var(--muted)] mb-1 block">
-              Atelier Client Registry
-            </span>
-            <h2 className="text-[22px] sm:text-[26px] font-bold text-[var(--text)] tracking-tight">
-              No Clients in Atelier
-            </h2>
-            <p className="text-[14px] text-[var(--text-2)] max-w-md mt-2 leading-relaxed">
-              Your client registry is currently empty. Add your first bespoke client to record anatomical measurements, manage fitting schedules, and track couture garment orders.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center justify-center gap-3 mt-3">
-            <button
-              type="button"
-              onClick={() => handleOpenEditProfile('create')}
-              className="h-10 px-6 rounded-[24px] bg-[var(--primary)] text-white text-[13px] font-semibold hover:bg-[var(--primary)]/90 transition-colors shadow-xs cursor-pointer flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add First Client</span>
-            </button>
-          </div>
-        </div>
+        </section>
       ) : !selectedClientProfile ? (
         /* ===================================================================
            CLIENT DIRECTORY VIEW (Figma Redesign: Desktop 664:2188 & Mobile 664:2080)
@@ -804,7 +766,7 @@ export function ClientsScreen({
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-[8px] w-full lg:w-auto shrink-0">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-[8px] w-full lg:w-auto shrink-0">
               {/* Search Pill */}
               <div className="bg-[#f1f1f1] border border-transparent border-solid rounded-[32px] px-[12px] lg:px-[10px] py-[8px] flex items-center gap-[8px] w-full lg:w-[350px] transition-colors focus-within:border-[#CCCCCC]">
                 <Search className="size-[16px] text-[#a3a3a3] shrink-0" />
@@ -830,13 +792,14 @@ export function ClientsScreen({
               {/* Add New Client Pill Button */}
               <button
                 type="button"
-                onClick={() => handleOpenEditProfile('create')}
+                onClick={() => handleOpenCreateClient()}
                 className="bg-[#1d49e8] hover:opacity-95 transition-opacity rounded-[24px] px-[14px] py-[8px] flex items-center justify-center w-full sm:w-auto cursor-pointer shrink-0"
               >
                 <span className="text-[14px] font-medium text-white leading-normal whitespace-nowrap">
                   Add New Client
                 </span>
               </button>
+              <button type="button" onClick={()=>onNewOrder?.('')} className="min-h-11 w-full shrink-0 rounded-full border border-[var(--outline)] bg-white px-4 text-sm font-medium sm:w-auto">New order</button>
             </div>
           </div>
 
@@ -860,13 +823,13 @@ export function ClientsScreen({
                 {filteredDirectoryClients.map((client, index) => (
                   <div
                     key={client.id}
-                    onClick={() => setSelectedClientId(client.id)}
+                    onClick={() => {setSelectedClientId(client.id);onOpenClient?.(client.id);}}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        setSelectedClientId(client.id);
+                        setSelectedClientId(client.id);onOpenClient?.(client.id);
                       }
                     }}
                     className="bg-white rounded-[24px] p-[16px] flex flex-col gap-[16px] justify-center w-full cursor-pointer text-left transition-shadow hover:shadow-sm"
@@ -962,24 +925,19 @@ export function ClientsScreen({
               {/* 64px Dark Charcoal Initials Circle (#595959) */}
               <button
                 type="button"
-                onClick={() => handleOpenEditProfile('switch')}
-                title="Switch or manage client"
-                aria-label={`Switch or manage client (${selectedClientProfile.name})`}
+                onClick={() => handleOpenClientPicker()}
+                title="Switch client"
+                aria-label={`Switch client (${selectedClientProfile.name})`}
                 className="w-[56px] h-[56px] sm:w-[64px] sm:h-[64px] rounded-full bg-[var(--text-2)] flex items-center justify-center text-white text-[15px] sm:text-[16px] font-semibold shrink-0 cursor-pointer hover:opacity-95 transition-opacity"
               >
                 {selectedClientProfile.initials}
               </button>
 
               <div className="min-w-0 flex-1">
-                <button
-                  type="button"
-                  onClick={() => handleOpenEditProfile('switch')}
-                  className="text-left group cursor-pointer block max-w-full"
-                >
-                  <h1 className="text-[17px] sm:text-[18px] font-semibold text-[var(--text)] leading-tight truncate group-hover:text-[var(--primary)] transition-colors">
-                    {selectedClientProfile.name}
-                  </h1>
-                </button>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <h2 tabIndex={-1} data-client-profile-heading className="min-w-0 text-[17px] font-semibold leading-tight text-[var(--text)] focus:outline-none sm:text-[18px]">{selectedClientProfile.name}</h2>
+                  <button type="button" onClick={handleOpenClientPicker} className="min-h-11 rounded-md px-2 text-xs font-medium text-[var(--primary)] hover:bg-[var(--chip)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]">Switch client</button>
+                </div>
 
                 {/* Contact Info Row */}
                 <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 mt-1.5 text-[11px] sm:text-[12px] font-medium text-[var(--text)]">
@@ -1039,7 +997,7 @@ export function ClientsScreen({
                       role="menuitem"
                       onClick={() => {
                         setIsOverflowMenuOpen(false);
-                        handleOpenEditProfile('edit');
+                        handleOpenEditClient();
                       }}
                       className="w-full p-[8px] rounded-[6px] flex items-center gap-[8px] hover:bg-[#f8f8f8] transition-colors cursor-pointer text-left"
                     >
@@ -1049,7 +1007,7 @@ export function ClientsScreen({
                         className="w-[16px] h-[16px] shrink-0 text-[#595959]"
                       />
                       <span className="font-medium text-[12px] text-[#595959] whitespace-nowrap">
-                        Edit profile
+                        Edit client
                       </span>
                     </button>
 
@@ -1533,7 +1491,7 @@ export function ClientsScreen({
                   VIEW STATE 3: `OrderHistory_Grid`
                   (Desktop Frame 4: 4-Column Order Card Grid)
                   ============================================================= */}
-              {showingOrder&&<OrderWorkspace key={orderId||`new:${orderClientId||'choose'}`} orderId={orderId} clientId={orderClientId} onBack={()=>onOrderBack?.()} onSaved={(id,cid)=>onOrderSaved?.(id,cid)} onEditClient={id=>handleOpenEditProfile('edit',id)}/>}
+              {showingOrder&&<OrderWorkspace key={orderId||`new:${orderClientId||'choose'}`} orderId={orderId} clientId={orderClientId} onBack={()=>onOrderBack?.()} onSaved={(id,cid)=>onOrderSaved?.(id,cid)} onEditClient={id=>handleOpenEditClient(id)}/>}
               {!showingOrder && viewState === 'OrderHistory_Grid' && (
                 <div className="pt-1">
                   {orderHistoryCards.length === 0 ? (
@@ -2066,289 +2024,23 @@ export function ClientsScreen({
       </div>
       )}
 
-      {/* =====================================================================
-          EDIT PROFILE / SWITCH CLIENT MODAL
-          ===================================================================== */}
-      <AnimatePresence>
-        {isEditProfileModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-60 bg-black/50 backdrop-blur-[6px] flex items-center justify-center p-4"
-          >
-            <div
-              className="absolute inset-0"
-              onClick={() => setIsEditProfileModalOpen(false)}
-            />
-            <motion.div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Edit or switch client profile"
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              transition={springSmooth}
-              className="relative w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-[16px] bg-[var(--surface)] p-4 sm:p-6 shadow-2xl z-10 flex flex-col gap-4"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[var(--hairline)]">
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditProfileMode('edit')}
-                    className={cn(
-                      'px-3 py-1 rounded-full text-[12px] font-semibold transition-colors cursor-pointer',
-                      editProfileMode === 'edit'
-                        ? 'bg-[var(--primary)] text-white'
-                        : 'bg-[var(--chip)] text-[var(--text-2)]'
-                    )}
-                  >
-                    Edit Profile
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditProfileMode('switch')}
-                    className={cn(
-                      'px-3 py-1 rounded-full text-[12px] font-semibold transition-colors cursor-pointer flex items-center gap-1',
-                      editProfileMode === 'switch'
-                        ? 'bg-[var(--primary)] text-white'
-                        : 'bg-[var(--chip)] text-[var(--text-2)]'
-                    )}
-                  >
-                    <Users className="w-3 h-3" />
-                    <span>Clients ({allClientList.length})</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditProfileMode('create');
-                      setEditName('');
-                      setEditPhone('');
-                      setEditEmail('');
-                      setEditNotes('');
-                    }}
-                    className={cn(
-                      'px-3 py-1 rounded-full text-[12px] font-semibold transition-colors cursor-pointer flex items-center gap-1',
-                      editProfileMode === 'create'
-                        ? 'bg-[var(--primary)] text-white'
-                        : 'bg-[var(--chip)] text-[var(--text-2)]'
-                    )}
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>New</span>
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  aria-label="Close modal"
-                  onClick={() => setIsEditProfileModalOpen(false)}
-                  className="w-7 h-7 rounded-full bg-[var(--chip)] text-[var(--muted)] hover:text-[var(--text)] flex items-center justify-center cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {editProfileMode === 'switch' ? (
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center gap-2 bg-[#F8F8F8] border border-transparent focus-within:border-[#CCCCCC] rounded-[8px] px-3 py-2 transition-colors">
-                    <Search className="w-4 h-4 text-[var(--muted)] shrink-0" />
-                    <input
-                      type="text"
-                      value={directorySearch}
-                      onChange={(e) => setDirectorySearch(e.target.value)}
-                      placeholder="Search clients..."
-                      className="w-full bg-transparent border-0 text-[12px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-0"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5 max-h-[280px] overflow-y-auto">
-                    {(() => {
-                      const filtered = allClientList.filter(
-                        (c) =>
-                          !directorySearch.trim() ||
-                          c.name
-                            .toLowerCase()
-                            .includes(directorySearch.toLowerCase()) ||
-                          c.phone
-                            .toLowerCase()
-                            .includes(directorySearch.toLowerCase())
-                      );
-
-                      if (allClientList.length === 0) {
-                        return (
-                          <div className="py-8 text-center flex flex-col items-center justify-center gap-2">
-                            <p className="text-[13px] font-medium text-[var(--text)]">
-                              No clients in directory yet
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => setEditProfileMode('create')}
-                              className="mt-1 h-8 px-4 rounded-[24px] bg-[var(--primary)] text-white text-[12px] font-medium cursor-pointer"
-                            >
-                              + Create New Client
-                            </button>
-                          </div>
-                        );
-                      }
-
-                      if (filtered.length === 0) {
-                        return (
-                          <div className="py-8 text-center flex flex-col items-center justify-center gap-2">
-                            <p className="text-[13px] text-[var(--muted)]">
-                              No clients match &ldquo;{directorySearch}&rdquo;
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => setDirectorySearch('')}
-                              className="text-[12px] text-[var(--primary)] font-medium hover:underline cursor-pointer"
-                            >
-                              Clear search
-                            </button>
-                          </div>
-                        );
-                      }
-
-                      return filtered.map((client) => {
-                        const isSelected =
-                          selectedClientProfile &&
-                          client.id === selectedClientProfile.id;
-                        return (
-                          <button
-                            key={client.id}
-                            type="button"
-                            onClick={() => {
-                              if(onOpenClient)onOpenClient(client.id);else setSelectedClientId(client.id);
-                              setIsEditProfileModalOpen(false);
-                            }}
-                            className={cn(
-                              'w-full p-2.5 rounded-[10px] flex items-center justify-between text-left transition-colors cursor-pointer border',
-                              isSelected
-                                ? 'bg-[var(--selected-bg)] border-[var(--selected)]'
-                                : 'bg-[var(--card)] border-transparent hover:bg-[var(--chip)]'
-                            )}
-                          >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-8 h-8 rounded-full bg-[var(--text-2)] text-white flex items-center justify-center text-[12px] font-semibold shrink-0">
-                                {client.initials}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-[13px] font-semibold text-[var(--text)] truncate">
-                                  {client.name}
-                                </p>
-                                <p className="text-[11px] text-[var(--muted)] truncate">
-                                  {client.phone ? `${client.phone} • ` : ''}{client.email || 'No email'}
-                                </p>
-                              </div>
-                            </div>
-                            {isSelected && (
-                              <Check className="w-4 h-4 text-[var(--primary)] shrink-0" />
-                            )}
-                          </button>
-                        );
-                      });
-                    })()}
-                  </div>
-                </div>
-              ) : (
-                <form
-                  onSubmit={handleSaveProfileModal}
-                  className="flex flex-col gap-3.5"
-                >
-                  <div>
-                    <label className="text-[11px] font-semibold text-[var(--text)] mb-1 block">
-                      Full Name
-                    </label>
-                    <input
-                      type="text"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      placeholder="Client full name"
-                      required
-                      className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-transparent px-3 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#CCCCCC] transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-[var(--text)] mb-1 block">
-                      Phone Number
-                    </label>
-                    <input
-                      type="tel"
-                      value={editPhone}
-                      onChange={(e) => setEditPhone(e.target.value)}
-                      placeholder="+234 800 000 0000"
-                      className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-transparent px-3 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#CCCCCC] transition-colors tabular-nums"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-[var(--text)] mb-1 block">
-                      Email Address
-                    </label>
-                    <input
-                      type="email"
-                      value={editEmail}
-                      onChange={(e) => setEditEmail(e.target.value)}
-                      placeholder="client@example.com"
-                      className="w-full h-10 rounded-[8px] bg-[#F8F8F8] border border-transparent px-3 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] focus:outline-none focus:border-[#CCCCCC] transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-[var(--text)] mb-1 block">
-                      Client Notes
-                    </label>
-                    <textarea
-                      value={editNotes}
-                      onChange={(e) => setEditNotes(e.target.value)}
-                      placeholder="Fit preferences, fabric notes..."
-                      className="w-full min-h-[80px] rounded-[8px] bg-[#F8F8F8] border border-transparent p-3 text-[14px] font-medium text-[#1D1D1D] placeholder:text-[#8E8E8E] resize-none focus:outline-none focus:border-[#CCCCCC] transition-colors"
-                    />
-                  </div>
-                  <div className="flex items-center justify-end gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsEditProfileModalOpen(false)}
-                      className="h-9 px-4 rounded-[24px] bg-[var(--chip)] border border-[var(--outline)] text-[12px] font-medium text-[var(--text-2)] cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="h-9 px-5 rounded-[24px] bg-[var(--primary)] text-white text-[12px] font-medium hover:opacity-95 cursor-pointer"
-                    >
-                      {editProfileMode === 'create'
-                        ? 'Create Client'
-                        : 'Save Changes'}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {clientDialog && <ClientDetailsDialog
+        key={clientDialog.kind === 'create' ? 'create-client' : 'edit-client:' + clientDialog.client.id}
+        target={clientDialog} onCreate={addClient} onUpdate={updateClient}
+        persistenceError={clientSaveError} onSaved={handleClientSaved} onClose={() => setClientDialog(null)}
+      />}
+      {isClientPickerOpen && <ClientPickerDialog clients={allClientList} selectedClientId={selectedClientProfile?.id || null}
+        onClose={() => setIsClientPickerOpen(false)} onSelect={id => {
+          setIsClientPickerOpen(false); setSelectedClientId(id); setViewState('SavedMeasurements_Default'); onOpenClient?.(id);
+        }}
+      />}
 
       {/* =====================================================================
           DELETE CLIENT CONFIRMATION DIALOG
           ===================================================================== */}
       <AnimatePresence>
         {isDeleteConfirmOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-60 bg-black/50 backdrop-blur-[6px] flex items-center justify-center p-4"
-          >
-            <div
-              className="absolute inset-0"
-              onClick={() => setIsDeleteConfirmOpen(false)}
-            />
-            <motion.div
-              role="dialog"
-              aria-modal="true"
-              aria-label={`Delete ${selectedClientProfile?.name || 'Client'}`}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={springSnappy}
-              className="relative w-full max-w-sm rounded-[16px] bg-[var(--surface)] p-6 shadow-2xl z-10 flex flex-col gap-4"
+          <LegacyDialog busy={workspaceBusy} label="Delete client" onClose={()=>setIsDeleteConfirmOpen(false)}><motion.div className="relative w-full max-w-sm rounded-[16px] bg-[var(--surface)] p-6 shadow-2xl z-10 flex flex-col gap-4"
             >
               <h3 className="text-[16px] font-bold text-[var(--text)]">
                 Delete {selectedClientProfile?.name || 'Client'}?
@@ -2374,7 +2066,7 @@ export function ClientsScreen({
                 </button>
               </div>
             </motion.div>
-          </motion.div>
+          </LegacyDialog>
         )}
       </AnimatePresence>
 
@@ -2383,26 +2075,7 @@ export function ClientsScreen({
           ===================================================================== */}
       <AnimatePresence>
         {isTemplateModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50 backdrop-blur-[6px]"
-          >
-            <div
-              className="absolute inset-0"
-              onClick={() => setIsTemplateModalOpen(false)}
-            />
-            <motion.div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Garment Templates"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={springSnappy}
-              className="relative w-[435px] max-w-[calc(100vw-32px)] max-h-[90dvh] overflow-y-auto rounded-[16px] bg-[var(--surface)] p-4 sm:p-6 z-10 flex flex-col gap-5 shadow-2xl"
+          <LegacyDialog label="Garment templates" onClose={()=>setIsTemplateModalOpen(false)}><motion.div className="relative w-[435px] max-w-[calc(100vw-32px)] max-h-[90dvh] overflow-y-auto rounded-[16px] bg-[var(--surface)] p-4 sm:p-6 z-10 flex flex-col gap-5 shadow-2xl"
             >
               <div className="flex items-center justify-between">
                 <h3 className="text-[16px] font-bold text-[var(--text)]">
@@ -2486,7 +2159,7 @@ export function ClientsScreen({
                 </button>
               </div>
             </motion.div>
-          </motion.div>
+          </LegacyDialog>
         )}
       </AnimatePresence>
 
@@ -2495,29 +2168,7 @@ export function ClientsScreen({
           ===================================================================== */}
       <AnimatePresence>
         {pointModalData && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50 backdrop-blur-[8px]"
-          >
-            <div
-              className="absolute inset-0"
-              onClick={() => {
-                setPointModalData(null);
-                setPointModalError('');
-              }}
-            />
-            <motion.div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="client-point-dialog-title"
-              initial={{ opacity: 0, scale: 0.94 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.96 }}
-              transition={springSnappy}
-              className="relative w-[430px] max-w-[calc(100vw-32px)] max-h-[90dvh] overflow-y-auto rounded-[16px] bg-[var(--surface)] p-4 sm:p-6 z-10 flex flex-col gap-5 shadow-2xl"
+          <LegacyDialog label="Measurement size" onClose={()=>setPointModalData(null)}><motion.div className="relative w-[430px] max-w-[calc(100vw-32px)] max-h-[90dvh] overflow-y-auto rounded-[16px] bg-[var(--surface)] p-4 sm:p-6 z-10 flex flex-col gap-5 shadow-2xl"
             >
               <div className="flex items-center justify-between">
                 <h3
@@ -2676,7 +2327,7 @@ export function ClientsScreen({
                 </div>
               </form>
             </motion.div>
-          </motion.div>
+          </LegacyDialog>
         )}
       </AnimatePresence>
 

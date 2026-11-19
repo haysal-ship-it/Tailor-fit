@@ -6,9 +6,14 @@ import loadingStyles from "@/components/workspace/workspace-loading.module.css";
 import { useAccount } from "@/components/auth/AccountProvider";
 import { StoreProvider, useStore } from "@/lib/store";
 import { TourProvider } from "@/components/onboarding/TourProvider";
+import {requestWorkspaceNavigation} from "@/lib/workspace-confirmation";
 import { Navbar } from "@/components/Navbar";
 import { OverviewScreen } from "@/components/screens/OverviewScreen";
 import { ClientsScreen } from "@/components/screens/ClientsScreen";
+import { LegacyIntakeScreen } from "@/components/screens/LegacyIntakeScreen";
+import { OrdersScreen } from "@/components/screens/OrdersScreen";
+import { ClientDetailsDialog } from "@/components/clients/ClientDetailsDialog";
+import { orderFilters, type OrderFilter } from "@/lib/workspace-analytics";
 import { SettingsScreen } from "@/components/screens/SettingsScreen";
 import { ToastContainer, type ToastMessage } from "@/components/ui/Toasts";
 
@@ -17,6 +22,11 @@ function TailorFitApp() {
     activeScreen,
     isHydrated,
     orders,
+    selectedClientId,
+    addClient,
+    updateClient,
+    error,
+    refresh,
     setActiveScreen,
     setSelectedClientId,
     setSelectedSnapshotId,
@@ -27,21 +37,25 @@ function TailorFitApp() {
     order?: string;
     client?: string;
   }>({});
+  const [measurementOnly,setMeasurementOnly]=useState(false);
+  const [addingClient,setAddingClient]=useState(false);
+  const [list,setList]=useState<{filter:OrderFilter;query:string}|null>(null);
+  const origin=React.useRef('?tab=overview');
   const historyScroll = React.useRef(0);
   const currentUrl = React.useRef("");
   const [routeReady, setRouteReady] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const canLeave = () =>
-    window.dispatchEvent(
-      new Event("tailorfit:before-navigation", { cancelable: true }),
-    );
-  const routeOrder = (
+  const canLeave = (resume:()=>void=()=>{}) => requestWorkspaceNavigation(resume);
+  const routeOrder = React.useCallback((
     order: string | undefined,
     client: string | undefined,
     replace = false,
   ) => {
     const url = new URL(window.location.href);
     url.searchParams.set("tab", "clients");
+    url.searchParams.delete('view');url.searchParams.delete('filter');url.searchParams.delete('q');url.searchParams.delete('capture');
+    if (order) url.searchParams.set('returnTo',origin.current);else url.searchParams.delete('returnTo');
+    setList(null);
     if (order) url.searchParams.set("order", order);
     else url.searchParams.delete("order");
     if (client) url.searchParams.set("client", client);
@@ -51,10 +65,20 @@ function TailorFitApp() {
     setSelectedClientId(client || null);
     setActiveScreen("clients");
     setOrderRoute({ order, client });
+  }, [setSelectedClientId,setActiveScreen]);
+  const readFilter=(value:string|null):OrderFilter=>orderFilters.includes(value as OrderFilter)?value as OrderFilter:'all';
+  const rememberOrigin=()=>{if(!orderRoute.order){origin.current=location.search||'?tab=overview';historyScroll.current=window.scrollY;}};
+  const showOrders=(filter:OrderFilter,query='')=>{
+    if(!canLeave(()=>showOrders(filter,query)))return;const url=new URL(location.href);url.search='';url.searchParams.set('tab','clients');url.searchParams.set('view','orders');url.searchParams.set('filter',filter);if(query)url.searchParams.set('q',query);
+    history[list&&list.filter===filter?'replaceState':'pushState']({},'',url);currentUrl.current=url.toString();setSelectedClientId(null);setOrderRoute({});setList({filter,query});setActiveScreen('clients');
   };
   const backToHistory = () => {
-    if (!canLeave()) return false;
-    routeOrder(undefined, orderRoute.client, true);
+    if (!canLeave(()=>{backToHistory();})) return false;
+    const url=new URL(origin.current,location.origin+location.pathname);
+    window.history.replaceState({},'',url);currentUrl.current=url.toString();
+    const tab=url.searchParams.get('tab')||'overview';setActiveScreen(tab);
+    const client=url.searchParams.get('client')||undefined;setSelectedClientId(client||null);setOrderRoute({client});
+    setList(url.searchParams.get('view')==='orders'?{filter:readFilter(url.searchParams.get('filter')),query:url.searchParams.get('q')||''}:null);
     requestAnimationFrame(() =>
       window.scrollTo({ top: historyScroll.current, behavior: "instant" }),
     );
@@ -62,16 +86,21 @@ function TailorFitApp() {
   };
   React.useEffect(() => {
     const read = () => {
-      if (currentUrl.current && !canLeave()) {
+      const requested=location.href;
+      if (currentUrl.current && !canLeave(()=>{history.replaceState({},"",requested);read();})) {
         history.pushState({}, "", currentUrl.current);
         return;
       }
       const url = new URL(location.href);
       currentUrl.current = url.toString();
-      const tab = url.searchParams.get("tab");
-      if (tab && ["clients", "settings", "overview"].includes(tab))
+      const tab = url.searchParams.get("tab") || "overview";
+      if (tab && ["clients", "settings", "overview", "new-measurement", "edit-measurement"].includes(tab))
         setActiveScreen(tab);
+      const returnTo=url.searchParams.get('returnTo');
+      if(returnTo?.startsWith('?')&&!returnTo.includes('://'))origin.current=returnTo;
+      setList(tab==='clients'&&url.searchParams.get('view')==='orders'?{filter:readFilter(url.searchParams.get('filter')),query:url.searchParams.get('q')||''}:null);
       const client = url.searchParams.get("client") || undefined;
+      setMeasurementOnly(!!client&&url.searchParams.get('capture')!=='intake');
       const order = url.searchParams.get("order") || undefined;
       setSelectedClientId(client || null);
       setOrderRoute({ client, order });
@@ -97,7 +126,7 @@ function TailorFitApp() {
         "tailorfit:reset-clients-route",
         handleResetClients,
       );
-  }, []);
+  }, [routeOrder]);
   React.useEffect(() => {
     const handle = (event: Event) => {
       setToasts((prev) => [
@@ -120,38 +149,40 @@ function TailorFitApp() {
 
   // Handlers for cross-screen navigation
   const handleOpenClient = (clientId: string) => {
-    if (!canLeave()) return;
+    if (!canLeave(()=>handleOpenClient(clientId))) return;
     routeOrder(undefined, clientId);
     setSelectedClientId(clientId);
     setActiveScreen("clients");
   };
 
   const handleBackToClientDirectory = () => {
-    if (!canLeave()) return;
+    if (!canLeave(handleBackToClientDirectory)) return;
     routeOrder(undefined, undefined, true);
     setSelectedClientId(null);
   };
 
-  const handleOpenNewOrder = (clientId?: string) => {
-    if (!requireAccount() || !canLeave()) return;
+  const handleOpenNewOrder = () => {
+    if (!requireAccount() || !canLeave(handleOpenNewOrder)) return;
     historyScroll.current = window.scrollY;
-    routeOrder("new", clientId);
+    rememberOrigin();
+    routeOrder("new", undefined);
   };
   const handleEditOrder = (orderId: string) => {
-    if (!canLeave()) return;
+    if (!canLeave(()=>handleEditOrder(orderId))) return;
     const order = orders.find((o) => o.id === orderId);
     if (!order) return;
     historyScroll.current = window.scrollY;
+    rememberOrigin();
     routeOrder(order.id, order.clientId);
   };
 
   const handleNewMeasurement = (clientId?: string) => {
-    if (!canLeave()) return;
-    if (clientId) {
-      setSelectedClientId(clientId);
-    }
+    if (!canLeave(()=>handleNewMeasurement(clientId))) return;
+    setSelectedClientId(clientId||null);
+    setMeasurementOnly(!!clientId);
+    const captureUrl=new URL(location.href);captureUrl.searchParams.set('capture',clientId?'measurement':'intake');history.replaceState({},'',captureUrl);
     setSelectedSnapshotId(null);
-    setActiveScreen("overview");
+    setActiveScreen("new-measurement");
   };
 
   // Scroll restoration on screen navigation (A16)
@@ -166,15 +197,17 @@ function TailorFitApp() {
     const url = new URL(window.location.href);
     if (url.searchParams.get("tab") !== currentTab) {
       url.searchParams.set("tab", currentTab);
+      if(!['new-measurement','edit-measurement'].includes(currentTab))url.searchParams.delete('capture');
       if (currentTab !== "clients") {
         url.searchParams.delete("order");
-        url.searchParams.delete("client");
-        queueMicrotask(() => setOrderRoute({}));
+        if(currentTab==='new-measurement'||currentTab==='edit-measurement'){if(selectedClientId)url.searchParams.set('client',selectedClientId);else url.searchParams.delete('client');}else url.searchParams.delete("client");
+        url.searchParams.delete("view");url.searchParams.delete("filter");url.searchParams.delete("q");url.searchParams.delete("returnTo");
+        queueMicrotask(() => {setList(null);setOrderRoute({});});
       }
       window.history.replaceState({}, "", url.toString());
       currentUrl.current = url.toString();
     }
-  }, [activeScreen, routeReady]);
+  }, [activeScreen, routeReady, selectedClientId]);
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--bg)] text-[var(--text)] transition-colors">
@@ -189,24 +222,19 @@ function TailorFitApp() {
       {/* Navigation Header & Mobile Dock */}
       <Navbar />
 
+      {error&&<div role="alert" className="mx-auto mt-3 flex w-[calc(100%_-_24px)] max-w-[1216px] flex-wrap items-center justify-between gap-3 rounded-lg bg-red-50 p-4 text-sm text-red-800"><span>{error}</span><button type="button" className="min-h-11 rounded-full border border-red-200 px-4" onClick={()=>void refresh()}>Retry loading</button></div>}
       {/* Main Content Area */}
       <main id="main-content" aria-busy={!isHydrated || !routeReady} className="flex-1 w-full max-lg:pb-24">
         {!isHydrated || !routeReady ? <WorkspaceLoading embedded screen={activeScreen} stage="records" /> : <div className={loadingStyles.ready}>
-        {(activeScreen === "overview" ||
-          activeScreen === "dashboard" ||
-          activeScreen === "new-measurement" ||
-          activeScreen === "edit-measurement") && (
-          <OverviewScreen
-            onOpenClient={handleOpenClient}
-            onOpenOrder={handleEditOrder}
-          />
-        )}
+        {(activeScreen==='overview'||activeScreen==='dashboard')&&<OverviewScreen onOpenOrder={handleEditOrder} onAddClient={()=>{if(requireAccount())setAddingClient(true);}} onNewOrder={()=>handleOpenNewOrder()} onOpenOrders={showOrders} onResumeIntake={()=>handleNewMeasurement()}/>}
+        {(activeScreen==='new-measurement'||activeScreen==='edit-measurement')&&<LegacyIntakeScreen measurementOnly={measurementOnly} onOpenClient={handleOpenClient} onOpenOrder={handleEditOrder}/>}
+        {activeScreen==='clients'&&list&&<OrdersScreen filter={list.filter} query={list.query} onFilter={f=>showOrders(f,list.query)} onQuery={q=>showOrders(list.filter,q)} onEditOrder={handleEditOrder} onNewOrder={()=>handleOpenNewOrder()} onBack={()=>{setList(null);setActiveScreen('overview');}}/>}
 
-        {(activeScreen === "clients" || activeScreen === "client-profile") && (
+        {(activeScreen === "clients" || activeScreen === "client-profile") && !list && (
           <ClientsScreen
             onOpenClient={handleOpenClient}
             onNewMeasurement={handleNewMeasurement}
-            onNewOrder={(cid) => handleOpenNewOrder(cid)}
+            onNewOrder={() => handleOpenNewOrder()}
             onEditOrder={handleEditOrder}
             orderId={orderRoute.order === "new" ? undefined : orderRoute.order}
             newOrder={orderRoute.order === "new"}
@@ -224,6 +252,7 @@ function TailorFitApp() {
         </div>}
       </main>
 
+      {addingClient&&<ClientDetailsDialog target={{kind:'create'}} onCreate={addClient} onUpdate={updateClient} persistenceError={error} onClose={()=>setAddingClient(false)} onSaved={saved=>{setAddingClient(false);handleOpenClient(saved.id);}}/>}
       {/* Floating System Toasts */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>

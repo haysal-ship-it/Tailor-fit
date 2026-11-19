@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion, useReducedMotion } from 'framer-motion';
+import {requestWorkspaceNavigation} from "@/lib/workspace-confirmation";
 import { useStore } from '@/lib/store';
 import { useAccount } from '@/components/auth/AccountProvider';
 import { House, UsersRound, Settings } from 'lucide-react';
@@ -31,7 +32,7 @@ export function OrigamiTailorFitLogo({ className = 'w-[44px] h-[31px]' }: { clas
 
 export function Navbar() {
   const { activeScreen, setActiveScreen: navigate, setSelectedClientId } = useStore();
-  const setActiveScreen=(screen:string)=>{if(window.dispatchEvent(new Event('tailorfit:before-navigation',{cancelable:true})))navigate(screen);};
+  const setActiveScreen=(screen:string)=>{if(requestWorkspaceNavigation(()=>setActiveScreen(screen)))navigate(screen);};
   const { user, signOut } = useAccount();
   const shouldReduceMotion = useReducedMotion();
 
@@ -45,7 +46,7 @@ export function Navbar() {
 
   const handleNavClick = (id: string) => {
     if (id === 'clients') {
-      if (window.dispatchEvent(new Event('tailorfit:before-navigation', { cancelable: true }))) {
+      if (requestWorkspaceNavigation(()=>handleNavClick(id))) {
         setSelectedClientId(null);
         window.dispatchEvent(new Event('tailorfit:reset-clients-route'));
         navigate('clients');

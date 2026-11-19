@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { ArrowsClockwise } from "@phosphor-icons/react";
+import {useWorkspaceNavigationGuard} from "@/lib/use-workspace-navigation-guard";
 import { useStore } from "@/lib/store";
 import { useDraft } from "@/lib/drafts/use-draft";
 import { RotatableMannequin } from "@/components/mannequin/RotatableMannequin";
@@ -134,7 +135,7 @@ export function OrderWorkspace({
   const storeSnapshot =
     snapshots.find(
       (s) => s.id === order?.measurementSnapshotId && s.clientId === client?.id,
-    ) || snapshots.find((s) => s.clientId === client?.id);
+    );
   const snapshot =
     storeSnapshot ||
     (previewData?.snapshot
@@ -1073,6 +1074,10 @@ function OrderEditor({
     order?.clientId || clientId || "",
   );
   const client = store.clients.find((c) => c.id === chosenClient);
+  const [name,setName]=useState(''),[phone,setPhone]=useState(''),[email,setEmail]=useState('');
+  const [mobileView,setMobileView]=useState<'details'|'measurements'>('details');
+  const [discardOpen,setDiscardOpen]=useState(false);
+  const saving=useRef(false);
   const [garment, setGarment] = useState(order?.garmentType || ""),
     [price, setPrice] = useState(formatPriceInput(order?.price)),
     [due, setDue] = useState(order?.pickupDateTime?.slice(0, 10) || ""),
@@ -1092,12 +1097,13 @@ function OrderEditor({
     [point, setPoint] = useState<string | null>(null),
     [pointValue, setPointValue] = useState("");
   const [version, setVersion] = useState(order?.version);
-  const [currency] = useState(order?.currency || store.settings.currency || "");
+  const [currency] = useState(order ? order.currency || "" : store.settings.currency || "");
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const leaveApproved = useRef(false);
   const data = {
     chosenClient,
+    name,phone,email,
     garment,
     price,
     due,
@@ -1119,6 +1125,7 @@ function OrderEditor({
       setChosenClient(
         order?.clientId || clientId || String(d.chosenClient || ""),
       );
+      setName(String(d.name||''));setPhone(String(d.phone||''));setEmail(String(d.email||''));
       setGarment(String(d.garment || ""));
       setPrice(String(d.price || ""));
       setDue(String(d.due || ""));
@@ -1142,23 +1149,12 @@ function OrderEditor({
         e.returnValue = "";
       }
     };
-    const nav = (e: Event) => {
-      if (
-        dirty &&
-        !leaveApproved.current &&
-        !window.confirm(
-          "Leave this order with unsaved changes? Your draft will remain on this device.",
-        )
-      )
-        e.preventDefault();
-    };
     window.addEventListener("beforeunload", warn);
-    window.addEventListener("tailorfit:before-navigation", nav);
     return () => {
       window.removeEventListener("beforeunload", warn);
-      window.removeEventListener("tailorfit:before-navigation", nav);
     };
   }, [dirty]);
+  useWorkspaceNavigationGuard(dirty,'Leave this order with unsaved changes? Your draft will remain on this device.',leaveApproved);
   const chooseFitting = (id: string) => {
     setFittingId(id);
     const fitting = store.snapshots.find(
@@ -1170,26 +1166,28 @@ function OrderEditor({
   };
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (busy || !draft.loaded) return;
+    if (saving.current || !draft.loaded) return;
     setError("");
     const parsedPrice = parsePriceInput(price);
     if (
-      !client ||
+      (order ? !client : !name.trim()) ||
       !garment.trim() ||
       price.trim() === "" ||
       !Number.isFinite(parsedPrice) ||
       parsedPrice < 0
     ) {
+      setMobileView('details');
       setError(
-        "Choose a client, enter a garment, and provide a price of zero or more.",
+        "Enter a client name, garment, and price of zero or more.",
       );
       return;
     }
-    setBusy(true);
+    if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){setMobileView('details');setError('Enter a valid email address.');return;}
+    saving.current=true;setBusy(true);
     try {
       await draft.flush().catch(() => {});
       const linked = store.snapshots.find(
-        (s) => s.id === fittingId && s.clientId === client.id,
+        (s) => s.id === fittingId && s.clientId === client?.id,
       );
       const changed =
         JSON.stringify(linked?.measurements || {}) !==
@@ -1198,7 +1196,7 @@ function OrderEditor({
           (linked.unit !== unit || linked.mannequinGender !== gender));
       const result = await store.saveIntake({
         requestId: draft.getId(),
-        client,
+        client: order&&client?client:{name:name.trim(),phone:phone.trim(),email:email.trim(),notes:""},
         snapshot:
           (changed || !linked) && Object.keys(measurements).length
             ? {
@@ -1238,12 +1236,12 @@ function OrderEditor({
     } catch (e) {
       setError(e instanceof Error ? e.message : "Not saved. Please retry.");
     } finally {
-      setBusy(false);
+      saving.current=false;setBusy(false);
     }
   };
   const cancel = async () => {
-    if (dirty && !window.confirm("Discard these unsaved order changes?"))
-      return;
+    if(busy)return;
+    if(dirty){setDiscardOpen(true);return;}
     await draft.discard();
     leaveApproved.current = true;
     setOriginal(JSON.stringify(data));
@@ -1251,11 +1249,12 @@ function OrderEditor({
   };
   return (
     <form
+      noValidate
       onSubmit={save}
-      className="space-y-5"
+      className="new-order-workspace space-y-0 rounded-lg bg-white p-[2px]"
       aria-label={order ? "Edit order" : "New order"}
     >
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 p-5 sm:p-6">
         <button
           type="button"
           onClick={() => void cancel()}
@@ -1275,7 +1274,7 @@ function OrderEditor({
           <h2 className="text-lg font-semibold">
             {order ? "Edit order" : "New order"}
           </h2>
-          <div className="flex gap-2">
+          <div className={cn("flex w-full flex-col gap-2 sm:w-auto sm:flex-row",!order&&"hidden")}>
             <button
               type="button"
               className={button}
@@ -1295,25 +1294,11 @@ function OrderEditor({
           {error || draft.warning}
         </p>
       )}
-      <div className="grid gap-1 rounded-lg bg-[var(--surface)] p-1 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-        <div className="min-w-0 space-y-5 p-4 sm:p-5">
-          {!clientId && !order && (
-            <ChoiceMenu
-              label="Client"
-              placeholder="Choose a client"
-              options={store.clients.map((c) => ({
-                value: c.id,
-                label: c.name,
-              }))}
-              value={chosenClient}
-              onChoose={(id) => {
-                setChosenClient(id);
-                setFittingId("");
-                setMeasurements({});
-              }}
-            />
-          )}
-          {client && (
+      <div className="flex gap-2 bg-[var(--card)] p-3 lg:hidden" role="group" aria-label="New order sections">{(['details','measurements'] as const).map(v=><button type="button" key={v} aria-pressed={mobileView===v} onClick={()=>setMobileView(v)} className={cn('min-h-11 flex-1 rounded-full text-sm capitalize',mobileView===v?'bg-white font-semibold':'text-[var(--text-2)]')}>{v}</button>)}</div>
+      <div className="grid gap-3 rounded-md bg-[var(--card)] p-3 lg:grid-cols-2">
+        <div className={cn("min-w-0 space-y-5 rounded-md bg-white p-4 sm:p-5",mobileView!=='details'&&'hidden lg:block')}>
+          {!order&&<><Input label="Client name" maxLength={200} value={name} onChange={e=>setName(e.target.value)} placeholder="Enter client's name" required/><div className="grid gap-4 sm:grid-cols-2"><Input label="Phone number" type="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+234"/><Input label="Email address" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="client@example.com"/></div></>}
+          {order && client && (
             <ClientSummary
               client={client}
               onEdit={() => onEditClient(client.id)}
@@ -1325,6 +1310,21 @@ function OrderEditor({
             onChange={(e) => setGarment(e.target.value)}
             required
           />
+      <AnimatedFileUpload
+        images={images.map((i) => i.url)}
+        onChange={(urls) =>
+          setImages(
+            urls.map(
+              (url, i) =>
+                images.find((image) => image.url === url) || {
+                  id: crypto.randomUUID(),
+                  url,
+                  title: `Style reference ${i + 1}`,
+                },
+            ),
+          )
+        }
+      />
           <div className="grid gap-4 sm:grid-cols-2">
             <Input
               label={`Price (${currency || "currency not set"})`}
@@ -1363,7 +1363,8 @@ function OrderEditor({
             helperText="Not included in the invoice."
           />
         </div>
-        <div className="min-w-0 space-y-4 rounded-lg bg-[var(--card)] p-4 sm:p-5">
+        <div className={cn("min-w-0 space-y-4 rounded-md bg-[var(--card)] p-4 sm:p-5",mobileView!=='measurements'&&'hidden lg:block')}>
+          {order&&<>
           <ChoiceMenu
             label="Saved measurements"
             value={fittingId}
@@ -1378,6 +1379,7 @@ function OrderEditor({
             ]}
             onChoose={chooseFitting}
           />
+          </>}
           <ChoiceMenu
             label="Garment blueprint"
             placeholder="Choose measurement fields"
@@ -1455,21 +1457,6 @@ function OrderEditor({
           </p>
         </div>
       </div>
-      <AnimatedFileUpload
-        images={images.map((i) => i.url)}
-        onChange={(urls) =>
-          setImages(
-            urls.map(
-              (url, i) =>
-                images.find((image) => image.url === url) || {
-                  id: crypto.randomUUID(),
-                  url,
-                  title: `Style reference ${i + 1}`,
-                },
-            ),
-          )
-        }
-      />
       {images.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2">
           {images.map((image, index) => (
@@ -1505,6 +1492,8 @@ function OrderEditor({
           ))}
         </div>
       )}
+      {!order&&<div className="flex flex-col justify-end gap-2 p-4 sm:flex-row"><button type="button" className={button} disabled={busy} onClick={()=>void cancel()}>Cancel</button><button type="submit" className={primary} disabled={busy||!draft.loaded}>{busy?'Saving…':'Save order'}</button></div>}
+      {discardOpen&&<ConfirmDialog title="Discard unsaved order?" onClose={()=>setDiscardOpen(false)}><p className="text-sm text-[var(--text-2)]">The changes in this order draft will be removed.</p><div className="dialog-actions mt-5 flex justify-end gap-2"><button type="button" className={button} onClick={()=>setDiscardOpen(false)}>Keep editing</button><button type="button" className={primary} onClick={async()=>{await draft.discard();leaveApproved.current=true;onCancel();}}>Discard changes</button></div></ConfirmDialog>}
       {point && (
         <ConfirmDialog
           title={`Set ${store.allHotspots.find((h) => h.key === point)?.label || point}`}

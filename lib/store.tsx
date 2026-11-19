@@ -21,6 +21,7 @@ interface StoreContextType {
   error: string;
   refresh: () => Promise<void>;
   importBrowserRecords: (payload: BackupPayload) => Promise<boolean>;
+  saveFitting: (input: Omit<Intake,'order'> & {snapshot: NonNullable<Intake['snapshot']>}) => Promise<{clientId:string;snapshotId:string}|null>;
   saveIntake: (input: Intake) => Promise<{clientId:string;snapshotId?:string;orderId:string} | null>;
   clients: Client[];
   snapshots: MeasurementSnapshot[];
@@ -104,7 +105,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     try {
       const data=await readWorkspace();
       if (!alive.current || generation!==refreshGeneration.current) return;
-      setClients(data.clients);setSnapshots(data.snapshots);setOrders(data.orders);setSettings(data.settings);
+      setError('');setClients(data.clients);setSnapshots(data.snapshots);setOrders(data.orders);setSettings(data.settings);
     } catch(e) { if(alive.current)setError(e instanceof Error?e.message:'Could not load your workspace. Reconnect and retry.'); }
     finally { if(alive.current)setIsHydrated(true); }
   },[owner]);
@@ -206,6 +207,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const restoreBackupData=(data:BackupPayload)=>importData(data,true);
   const importBrowserRecords=(data:BackupPayload)=>importData(data,false);
   const clearAllData=async()=>{if(!account.requireAccount()||!window.confirm('Permanently delete all online clients, fittings and orders? A recovery backup will download first.'))return false;return importData({clients:[],snapshots:[],orders:[],settings},true);};
+  const saveFitting=async(input:Omit<Intake,'order'>&{snapshot:NonNullable<Intake['snapshot']>})=>{
+    if(!account.requireAccount()||!owner)return null;
+    const clientId=input.client.id||await stableUuid(input.requestId+':client');
+    const existing=clients.find(c=>c.id===clientId);
+    const snapshotId=input.snapshot.id||await stableUuid(input.requestId+':snapshot');
+    const ops:Operation[]=[];
+    if(!existing)ops.push({kind:'clients',action:'put',id:clientId,expected:0,data:{phone:'',email:'',notes:'',...input.client,id:clientId}});
+    ops.push({kind:'measurement_snapshots',action:'put',id:snapshotId,expected:0,data:{...input.snapshot,id:snapshotId,clientId,date:normalizeDate(input.snapshot.date)}});
+    return await execute(ops,input.requestId)?{clientId,snapshotId}:null;
+  };
   const saveIntake=async(input:Intake)=>{
     if(!account.requireAccount()||!owner)return null;
     const clientId=input.client.id||await stableUuid(`${input.requestId}:client`);
@@ -315,7 +326,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   return (
     <StoreContext.Provider
       value={{
-        isHydrated, saveStatus, error, refresh, importBrowserRecords, saveIntake,
+        isHydrated, saveStatus, error, refresh, importBrowserRecords, saveIntake, saveFitting,
         clients,
         snapshots,
         orders,

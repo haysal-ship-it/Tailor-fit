@@ -139,8 +139,11 @@ export function InvoiceDocument({ model }: { model: InvoiceModel }) {
     <Document title={`TailorFit invoice ${model.reference}`} author="TailorFit" creationDate={new Date(model.issuedAt)} modificationDate={new Date(model.issuedAt)}>
       <Page size="A4" style={s.page}>
         <Text style={{ fontSize: 14, color: "#1D49E8", marginBottom: 24 }}>
-          TailorFit
+          {model.studio?.name || "TailorFit"}
         </Text>
+        {model.studio?.address&&<Text style={s.muted}>{model.studio.address}</Text>}
+        {model.studio?.email&&<Text style={s.muted}>{model.studio.email}</Text>}
+        {model.studio?.phone&&<Text style={s.muted}>{model.studio.phone}</Text>}
         <Text style={s.title}>Invoice</Text>
         <Text style={{ fontSize: 8, color: "#595959" }}>{model.reference}</Text>
         <Text style={s.muted}>Issued {date(model.issuedAt)}</Text>

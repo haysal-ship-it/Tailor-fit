@@ -155,3 +155,22 @@ select:focus-visible {
   outline: none;
 }
 input[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--status-danger); }
+
+/* Workspace dialogs retain one form while becoming sheets below the dock breakpoint. */
+.workspace-dialog { border: 0; }
+@media (max-width:1023px) {
+ dialog.workspace-dialog { inset: auto 0 0; margin: 0 auto; width: 100%; max-width: 640px; max-height: calc(100dvh - 16px); border-radius: 20px 20px 0 0; padding-bottom: max(16px,env(safe-area-inset-bottom)); }
+ dialog.workspace-dialog::backdrop { background:rgb(0 0 0 / .45); }
+}
+@media (max-width:639px) {
+ .workspace-dialog form > .sticky, .workspace-dialog .dialog-actions { flex-direction:column; align-items:stretch; }
+ .workspace-dialog form > .sticky > button, .workspace-dialog .dialog-actions > button { width:100%; }
+}
+
+.legacy-workspace-dialog > div { width:100%; max-width:none; max-height:none; border-radius:inherit; box-shadow:none; }
+@media(max-width:639px){ .workspace-dialog [class*="justify-end"][class*="gap-2"] {flex-direction:column;align-items:stretch;} .workspace-dialog [class*="justify-end"][class*="gap-2"] > button {width:100%;min-height:44px;} }
+
+.legacy-workspace-dialog > fieldset > div {width:100%;max-width:none;max-height:none;border-radius:inherit;box-shadow:none;}
+
+.workspace-dialog {position:fixed;max-height:min(90dvh,var(--workspace-dialog-height,90dvh));}
+@media(max-width:1023px){dialog.workspace-dialog {bottom:var(--workspace-sheet-bottom,0);max-height:var(--workspace-dialog-height,calc(100dvh - 16px));}}
