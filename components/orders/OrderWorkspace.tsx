@@ -17,6 +17,8 @@ import {IntakeDraftRecovery} from './IntakeDraftRecovery';
 import {BackButton} from '@/components/ui/BackButton';
 import { useStore } from "@/lib/store";
 import { useDraft } from "@/lib/drafts/use-draft";
+import {GarmentTemplateDialog} from '@/components/mannequin/GarmentTemplateDialog';
+import {ANATOMICAL_ZONES, normalizeZoneId} from '@/lib/initial-data';
 import { RotatableMannequin } from "@/components/mannequin/RotatableMannequin";
 import { ChoiceMenu } from "@/components/ui/ChoiceMenu";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -989,6 +991,8 @@ function OrderEditor({
   const [name,setName]=useState(clientId?client?.name||'':''),[phone,setPhone]=useState(clientId?client?.phone||'':''),[email,setEmail]=useState(clientId?client?.email||'':'');
   const [mobileView,setMobileView]=useState<'details'|'measurements'>('details');
   const [measurementView,setMeasurementView]=useState<'diagram'|'list'>('diagram');
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [addingPoint, setAddingPoint] = useState(false);
   const [templateId,setTemplateId]=useState('');
   const [discardOpen,setDiscardOpen]=useState(false);
   const [recoverySource,setRecoverySource]=useState('');
@@ -1011,6 +1015,10 @@ function OrderEditor({
   const [images, setImages] = useState(order?.referenceImages || []),
     [point, setPoint] = useState<string | null>(null),
     [pointValue, setPointValue] = useState("");
+  function closePointDialog() {
+    setAddingPoint(false);
+    setPoint(null);
+  }
   const [version, setVersion] = useState(order?.version);
   const [currency] = useState(order ? order.currency || "" : store.settings.currency || "");
   const [busy, setBusy] = useState(false),
@@ -1287,10 +1295,16 @@ function OrderEditor({
           </>}
           <div><h3 className="text-sm font-bold">Mannequin</h3><p className="mt-1 text-[10px] text-[var(--text-2)]">{Object.keys(measurements).length ? Object.keys(measurements).length+' selected points' : 'All available points'} · {gender==='female'?'Feminine':'Masculine'} Form</p></div>
           <div className="flex flex-wrap items-center gap-2 rounded-[24px] bg-white p-2 xl:flex-nowrap xl:rounded-full" aria-label="Measurement toolbar">
-            <ChoiceMenu className="min-w-[140px] flex-1" placeholder="Choose Template" value={templateId} triggerClassName="flex min-h-11 w-full items-center justify-between gap-2 rounded-full bg-[var(--chip)] px-3 text-xs focus-visible:outline-2 focus-visible:outline-[var(--primary)]" options={store.settings.templates.map(t=>({value:t.id,label:t.name}))} onChoose={id=>{const t=store.settings.templates.find(t=>t.id===id);if(!t)return;setTemplateId(id);setFittingId('');setMeasurements(Object.fromEntries(t.fieldKeys.map(key=>[key,measurements[key]??''])));if(!garment.trim())setGarment(t.name);}}/>
+            <button type="button" aria-haspopup="dialog" className={button} onClick={() => setShowTemplates(true)}>
+              Choose Template
+            </button>
             <div className="flex shrink-0 gap-1 rounded-full bg-[var(--chip)] p-1" role="group" aria-label="Mannequin form">{(['male','female'] as const).map(g=><button key={g} type="button" aria-label={g==='male'?'Masculine form':'Feminine form'} aria-pressed={gender===g} onClick={()=>setGender(g)} className={cn('flex h-11 w-11 items-center justify-center rounded-full text-xs min-[1200px]:h-7 min-[1200px]:w-7',gender===g?'bg-[var(--primary)] text-white':'bg-white text-[var(--text-2)]')}>{g==='male'?'M':'F'}</button>)}</div>
             <div className="flex shrink-0 gap-1 rounded-full bg-[var(--chip)] p-1" role="group" aria-label="Measurement view">{(['diagram','list'] as const).map(v=><button key={v} type="button" aria-label={v==='diagram'?'Mannequin diagram':'Measurement list'} aria-pressed={measurementView===v} onClick={()=>setMeasurementView(v)} className={cn('flex h-11 w-11 items-center justify-center rounded-full min-[1200px]:h-7 min-[1200px]:w-7',measurementView===v?'bg-[var(--primary)]':'bg-white')}><img src={v==='diagram'?'/icons/order-details/person.svg':'/icons/order-details/clipboard-text.svg'} width={16} height={16} alt="" className={measurementView===v?'brightness-0 invert':''}/></button>)}</div>
-            <ChoiceMenu className="shrink-0" placeholder="Add Point" value="" triggerClassName="flex min-h-11 items-center justify-between gap-1 rounded-full border border-[var(--outline)] bg-[var(--chip)] px-3 text-xs focus-visible:outline-2 focus-visible:outline-[var(--primary)]" options={store.allHotspots.filter(h=>!(h.key in measurements)).map(h=>({value:h.key,label:h.label}))} onChoose={key=>{setPoint(key);setPointValue('');}}/>
+            <button type="button" aria-haspopup="dialog" className={button} onClick={() => {
+              setPoint(null);
+              setPointValue('');
+              setAddingPoint(true);
+            }}>Add Point</button>
           </div>
           <div className={measurementView==='diagram'?'flex min-h-[360px] items-center justify-center py-6':'hidden'}><RotatableMannequin gender={gender} onGenderChange={setGender} showControls={false} showGenderToggle={false} className="max-w-[450px]" measurements={measurements} activePointKeys={Object.keys(measurements)} unit={unit} onSelectPoint={key=>{setPoint(key);setPointValue(String(measurements[key]??''));}}/></div>
           <div className={cn("min-h-[360px] space-y-3 rounded-lg bg-white p-4",measurementView!=='list'&&'hidden')} aria-label="Edit measurement list">{!Object.keys(measurements).length&&<p className="text-sm text-[var(--text-2)]">Choose a template or add a point to start recording measurements.</p>}
@@ -1359,11 +1373,37 @@ function OrderEditor({
       )}
       {!order&&<div className="flex flex-col justify-end gap-2 p-4 sm:flex-row"><button type="button" className={button} disabled={busy} onClick={()=>void cancel()}>Cancel</button><button type="submit" className={primary} disabled={busy||!draft.loaded}><img src="/icons/order-details/floppy-disk.svg" width={16} height={16} alt=""/>{busy?'Saving...':'Save'}</button></div>}
       {discardOpen&&<ConfirmDialog title="Discard unsaved order?" onClose={()=>setDiscardOpen(false)}><p className="text-sm text-[var(--text-2)]">The changes in this order draft will be removed.</p><div className="dialog-actions mt-5 flex justify-end gap-2"><button type="button" className={button} onClick={()=>setDiscardOpen(false)}>Keep editing</button><button type="button" className={primary} onClick={async()=>{await draft.discard();leaveApproved.current=true;onCancel();}}>Discard changes</button></div></ConfirmDialog>}
-      {point && (
+      {showTemplates && <GarmentTemplateDialog templates={store.settings.templates} initialId={templateId}
+        onClose={() => setShowTemplates(false)} onSelect={id => {
+          const template = store.settings.templates.find(item => item.id === id);
+          if (!template) return;
+          setTemplateId(id);
+          setFittingId('');
+          setMeasurements(previous => Object.fromEntries(template.fieldKeys.map(key => [key, previous[key] ?? ''])));
+          if (!garment.trim()) setGarment(template.name);
+        }} />}
+      {(point || addingPoint) && (
         <ConfirmDialog
-          title={`Set ${store.allHotspots.find((h) => h.key === point)?.label || point}`}
-          onClose={() => setPoint(null)}
+          title={addingPoint ? "Add Measurement Point" : `Set ${store.allHotspots.find((h) => h.key === point)?.label || point}`}
+          onClose={closePointDialog}
         >
+          {addingPoint && <fieldset className="mb-4">
+            <legend className="mb-2 text-sm font-medium">Select sizing measurement</legend>
+            <div className="max-h-52 space-y-3 overflow-y-auto rounded-xl border border-[var(--outline)] p-3">
+              {ANATOMICAL_ZONES.map(zone => {
+                const available = store.allHotspots.filter(h => normalizeZoneId(h.category) === zone.id && !(h.key in measurements));
+                if (!available.length) return null;
+                return <div key={zone.id}>
+                  <p className="mb-1 text-xs text-[var(--text-2)]">{zone.label}</p>
+                  <div className="flex flex-wrap gap-1.5">{available.map(h => (
+                    <button key={h.key} type="button" aria-pressed={point === h.key}
+                      className={point === h.key ? primary : button} onClick={() => setPoint(h.key)}>{h.label}</button>
+                  ))}</div>
+                </div>;
+              })}
+              {store.allHotspots.every(h => h.key in measurements) && <p>All measurement points have been added.</p>}
+            </div>
+          </fieldset>}
           <Input
             label={`Size (${unit})`}
             type="number"
@@ -1371,17 +1411,17 @@ function OrderEditor({
             step="0.1"
             value={pointValue}
             onChange={(e) => setPointValue(e.target.value)}
-            autoFocus
+            autoFocus={!addingPoint}
           />
           <div className="mt-5 flex flex-wrap justify-end gap-2">
             <button
               type="button"
               className={button}
-              onClick={() => setPoint(null)}
+              onClick={closePointDialog}
             >
               Cancel
             </button>
-            <button
+            {point && !addingPoint && <button
               type="button"
               className={button}
               onClick={() => {
@@ -1390,28 +1430,29 @@ function OrderEditor({
                   delete next[point];
                   return next;
                 });
-                setPoint(null);
+                closePointDialog();
               }}
             >
               Remove point
-            </button>
+            </button>}
             <button
               type="button"
               className={primary}
               disabled={
-                pointValue === "" ||
+                !point || pointValue === "" ||
                 !Number.isFinite(Number(pointValue)) ||
                 Number(pointValue) < 0
               }
               onClick={() => {
+                if (!point) return;
                 setMeasurements((prev) => ({
                   ...prev,
                   [point]: Number(pointValue),
                 }));
-                setPoint(null);
+                closePointDialog();
               }}
             >
-              Apply size
+              {addingPoint ? "Add Point" : "Apply size"}
             </button>
           </div>
         </ConfirmDialog>
