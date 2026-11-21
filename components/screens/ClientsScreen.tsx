@@ -738,7 +738,7 @@ export function ClientsScreen({
     <div className={workspaceLayout.shell}>
       {/* Accessible Landmark Heading (A11, A16) */}
       <h1 className="sr-only">Client Management &amp; Measurements Atelier</h1>
-      {Boolean(orderId) || newOrder || (!selectedClientProfile && showingOrder) ? (<OrderWorkspace key={orderId||'new'} orderId={orderId} clientId={orderClientId} reuseSnapshotId={reuseSnapshotId} onBack={()=>onOrderBack?.()} onSaved={(id,cid)=>onOrderSaved?.(id,cid)} onEditClient={id=>handleOpenEditClient(id)}/>) : !selectedClientProfile && allClientList.length === 0 ? (
+      {Boolean(orderId) || newOrder || (!selectedClientProfile && showingOrder) ? (<OrderWorkspace key={orderId || `new:${orderClientId || 'generic'}:${reuseSnapshotId || ''}`} orderId={orderId} clientId={orderClientId} reuseSnapshotId={reuseSnapshotId} onBack={()=>onOrderBack?.()} onSaved={(id,cid)=>onOrderSaved?.(id,cid)} onEditClient={id=>handleOpenEditClient(id)}/>) : !selectedClientProfile && allClientList.length === 0 ? (
         <section className="w-full rounded-[8px] bg-[var(--surface)] p-[2px]">
           <header className="flex flex-col gap-2 p-6">
             <h2 className="text-[16px] font-semibold text-[var(--text)]">Client Directory</h2>

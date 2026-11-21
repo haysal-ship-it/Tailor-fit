@@ -287,6 +287,9 @@ export function OrderWorkspace({
       </div>
     );
   if(!orderId&&reuseSnapshotId&&(!client||!snapshot))return <section className="rounded-lg bg-white p-6"><h2 className="text-lg font-semibold">Saved fitting unavailable</h2><p className="mt-2 text-sm">This fitting does not belong to the selected client or is no longer available.</p><BackButton className="mt-4" onClick={onBack} aria-label="Back to client">Back</BackButton></section>;
+  if (!orderId && clientId && !client) {
+    return <section className="rounded-lg bg-white p-6"><h2>Client unavailable</h2><BackButton onClick={onBack}>Back</BackButton></section>;
+  }
   if (editing)
     return (
       <OrderEditor
@@ -1107,7 +1110,7 @@ function OrderEditor({
       );
       return;
     }
-    if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){setMobileView('details');setError('Enter a valid email address.');return;}
+    if(!order&&!clientId&&email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){setMobileView('details');setError('Enter a valid email address.');return;}
     saving.current=true;setBusy(true);
     try {
       await draft.flush().catch(() => {});
@@ -1199,7 +1202,7 @@ function OrderEditor({
           </div>
         </div>
       </div>
-      {!order&&!recoverySource&&<IntakeDraftRecovery disabled={dirty||busy} onRecover={legacy=>{const recovered=recoverIntake(legacy.data);setName(recovered.name);setPhone(recovered.phone);setEmail(recovered.email);setChosenClient(recovered.chosenClient);setGarment(recovered.garment);setPrice(recovered.price);setDue(recovered.due);setNotes(recovered.notes);setMeasurements(recovered.measurements);setGender(recovered.gender);setImages(recovered.images);setRecoverySource(legacy.id);if(recovered.dateNeedsReview)setError('Please review the recovered due date before saving.');}}/>}
+      {!order&&!clientId&&!recoverySource&&<IntakeDraftRecovery disabled={dirty||busy} onRecover={legacy=>{const recovered=recoverIntake(legacy.data);setName(recovered.name);setPhone(recovered.phone);setEmail(recovered.email);setChosenClient(recovered.chosenClient);setGarment(recovered.garment);setPrice(recovered.price);setDue(recovered.due);setNotes(recovered.notes);setMeasurements(recovered.measurements);setGender(recovered.gender);setImages(recovered.images);setRecoverySource(legacy.id);if(recovered.dateNeedsReview)setError('Please review the recovered due date before saving.');}}/>}
       {(error || draft.warning) && (
         <p role="alert" className="text-sm text-red-700">
           {error || draft.warning}
@@ -1209,30 +1212,29 @@ function OrderEditor({
       <div className="grid gap-[2px] lg:grid-cols-2">
         <div className={cn("min-w-0 rounded-md bg-[var(--card)] p-3",mobileView!=='details'&&'hidden lg:block')}>
           <div className="h-full space-y-4 rounded-lg bg-white p-4"><h3 className="text-sm font-semibold">Client Order and Details</h3>
-          {!order&&!clientId&&<><div className="grid gap-2 sm:grid-cols-2"><Input label="Client name" maxLength={200} value={name} onChange={e=>setName(e.target.value)} placeholder="Enter client's name" required/><Input label="Garment Type" value={garment} onChange={e=>setGarment(e.target.value)} required/></div><div className="grid gap-2 sm:grid-cols-2"><Input label="Phone number" type="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+234"/><Input label="Email address" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="client@example.com"/></div></>}
-          {(order||clientId) && client && (
-            <ClientSummary
-              client={client}
-              onEdit={() => onEditClient(client.id)}
-            />
-          )}
-          {(order||clientId)&&<Input
-            label="Garment"
-            value={garment}
-            onChange={(e) => setGarment(e.target.value)}
-            required
-          />}
+          {!order && <>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Input label="Client name" maxLength={200} value={clientId ? client?.name ?? '' : name} readOnly={!!clientId} onChange={e => setName(e.target.value)} placeholder="Enter client's name" required/>
+              <Input label="Garment Type" value={garment} onChange={e => setGarment(e.target.value)} required/>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Input label="Phone number" type="tel" value={clientId ? client?.phone ?? '' : phone} readOnly={!!clientId} onChange={e => setPhone(e.target.value)} placeholder={clientId ? undefined : '+234'}/>
+              <Input label="Email address" type="email" value={clientId ? client?.email ?? '' : email} readOnly={!!clientId} onChange={e => setEmail(e.target.value)} placeholder={clientId ? undefined : 'client@example.com'}/>
+            </div>
+            {clientId && client && <button type="button" className={button} onClick={() => onEditClient(client.id)}>Edit client details</button>}
+          </>}
+          {order && client && <ClientSummary client={client} onEdit={() => onEditClient(client.id)}/>}
+          {order && <Input label="Garment" value={garment} onChange={e => setGarment(e.target.value)} required/>}
           <h3 className="text-sm font-semibold">Style References</h3>
       <AnimatedFileUpload
         images={images.map((i) => i.url)}
         onChange={(urls) =>
           setImages(
             urls.map(
-              (url, i) =>
+              (url) =>
                 images.find((image) => image.url === url) || {
                   id: crypto.randomUUID(),
                   url,
-                  title: `Style reference ${i + 1}`,
                 },
             ),
           )
@@ -1294,13 +1296,13 @@ function OrderEditor({
           />
           </>}
           <div><h3 className="text-sm font-bold">Mannequin</h3><p className="mt-1 text-[10px] text-[var(--text-2)]">{Object.keys(measurements).length ? Object.keys(measurements).length+' selected points' : 'All available points'} · {gender==='female'?'Feminine':'Masculine'} Form</p></div>
-          <div className="flex flex-wrap items-center gap-2 rounded-[24px] bg-white p-2 xl:flex-nowrap xl:rounded-full" aria-label="Measurement toolbar">
-            <button type="button" aria-haspopup="dialog" className={button} onClick={() => setShowTemplates(true)}>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-[24px] bg-white p-2 md:grid-cols-[minmax(0,1fr)_auto_auto_auto] md:rounded-full" aria-label="Measurement toolbar">
+            <button type="button" aria-haspopup="dialog" className={cn(button, "w-full px-2")} onClick={() => setShowTemplates(true)}>
               Choose Template
             </button>
             <div className="flex shrink-0 gap-1 rounded-full bg-[var(--chip)] p-1" role="group" aria-label="Mannequin form">{(['male','female'] as const).map(g=><button key={g} type="button" aria-label={g==='male'?'Masculine form':'Feminine form'} aria-pressed={gender===g} onClick={()=>setGender(g)} className={cn('flex h-11 w-11 items-center justify-center rounded-full text-xs min-[1200px]:h-7 min-[1200px]:w-7',gender===g?'bg-[var(--primary)] text-white':'bg-white text-[var(--text-2)]')}>{g==='male'?'M':'F'}</button>)}</div>
-            <div className="flex shrink-0 gap-1 rounded-full bg-[var(--chip)] p-1" role="group" aria-label="Measurement view">{(['diagram','list'] as const).map(v=><button key={v} type="button" aria-label={v==='diagram'?'Mannequin diagram':'Measurement list'} aria-pressed={measurementView===v} onClick={()=>setMeasurementView(v)} className={cn('flex h-11 w-11 items-center justify-center rounded-full min-[1200px]:h-7 min-[1200px]:w-7',measurementView===v?'bg-[var(--primary)]':'bg-white')}><img src={v==='diagram'?'/icons/order-details/person.svg':'/icons/order-details/clipboard-text.svg'} width={16} height={16} alt="" className={measurementView===v?'brightness-0 invert':''}/></button>)}</div>
-            <button type="button" aria-haspopup="dialog" className={button} onClick={() => {
+            <div className="col-start-2 row-start-2 flex gap-1 rounded-full bg-[var(--chip)] p-1 md:col-start-3 md:row-start-1" role="group" aria-label="Measurement view">{(['diagram','list'] as const).map(v=><button key={v} type="button" aria-label={v==='diagram'?'Mannequin diagram':'Measurement list'} aria-pressed={measurementView===v} onClick={()=>setMeasurementView(v)} className={cn('flex h-11 w-11 items-center justify-center rounded-full min-[1200px]:h-7 min-[1200px]:w-7',measurementView===v?'bg-[var(--primary)]':'bg-white')}><img src={v==='diagram'?'/icons/order-details/person.svg':'/icons/order-details/clipboard-text.svg'} width={16} height={16} alt="" className={measurementView===v?'brightness-0 invert':''}/></button>)}</div>
+            <button type="button" aria-haspopup="dialog" className={cn(button, "col-start-1 row-start-2 whitespace-nowrap md:col-start-4 md:row-start-1")} onClick={() => {
               setPoint(null);
               setPointValue('');
               setAddingPoint(true);
@@ -1336,41 +1338,6 @@ function OrderEditor({
           </p>
         </div>
       </div>
-      {images.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {images.map((image, index) => (
-            <div key={image.id} className="space-y-3">
-              <Input
-                label={`Reference ${index + 1} title`}
-                value={image.title || ""}
-                onChange={(e) =>
-                  setImages((previous) =>
-                    previous.map((item) =>
-                      item.id === image.id
-                        ? { ...item, title: e.target.value }
-                        : item,
-                    ),
-                  )
-                }
-              />
-              <Textarea
-                label={`Reference ${index + 1} caption`}
-                value={image.note || ""}
-                onChange={(e) =>
-                  setImages((previous) =>
-                    previous.map((item) =>
-                      item.id === image.id
-                        ? { ...item, note: e.target.value }
-                        : item,
-                    ),
-                  )
-                }
-                rows={2}
-              />
-            </div>
-          ))}
-        </div>
-      )}
       {!order&&<div className="flex flex-col justify-end gap-2 p-4 sm:flex-row"><button type="button" className={button} disabled={busy} onClick={()=>void cancel()}>Cancel</button><button type="submit" className={primary} disabled={busy||!draft.loaded}><img src="/icons/order-details/floppy-disk.svg" width={16} height={16} alt=""/>{busy?'Saving...':'Save'}</button></div>}
       {discardOpen&&<ConfirmDialog title="Discard unsaved order?" onClose={()=>setDiscardOpen(false)}><p className="text-sm text-[var(--text-2)]">The changes in this order draft will be removed.</p><div className="dialog-actions mt-5 flex justify-end gap-2"><button type="button" className={button} onClick={()=>setDiscardOpen(false)}>Keep editing</button><button type="button" className={primary} onClick={async()=>{await draft.discard();leaveApproved.current=true;onCancel();}}>Discard changes</button></div></ConfirmDialog>}
       {showTemplates && <GarmentTemplateDialog templates={store.settings.templates} initialId={templateId}

@@ -169,11 +169,11 @@ function TailorFitApp() {
     setSelectedClientId(null);
   };
 
-  const handleOpenNewOrder = () => {
-    if (!requireAccount() || !canLeave(handleOpenNewOrder)) return false;
+  const handleOpenNewOrder = (clientId?: string) => {
+    if (!requireAccount() || !canLeave(() => handleOpenNewOrder(clientId))) return false;
     historyScroll.current = window.scrollY;
     rememberOrigin();
-    routeOrder("new", undefined);
+    routeOrder("new", clientId || undefined);
     return true;
   };
   const startOverviewTour=(resume:boolean)=>{
@@ -240,7 +240,7 @@ function TailorFitApp() {
         {(activeScreen === "clients" || activeScreen === "client-profile") && !list && (
           <ClientsScreen
             onOpenClient={handleOpenClient}
-            onNewOrder={() => handleOpenNewOrder()}
+            onNewOrder={handleOpenNewOrder}
             onReuseFitting={handleReuseFitting}
             reuseSnapshotId={orderRoute.fitting}
             onEditOrder={handleEditOrder}
