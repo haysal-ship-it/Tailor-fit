@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
+import { ReferenceThumbnail } from './ReferenceThumbnail';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { CloudUpload, X, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -9,6 +10,7 @@ import { springSmooth } from '@/lib/motion-tokens';
 interface AnimatedFileUploadProps {
   images?: string[];
   onChange?: (images: string[]) => void;
+  onReplace?: (index: number, url: string) => void;
   className?: string;
   label?: string;
 }
@@ -16,6 +18,7 @@ interface AnimatedFileUploadProps {
 export function AnimatedFileUpload({
   images = [],
   onChange,
+  onReplace,
   className,
   label = 'Add reference images',
 }: AnimatedFileUploadProps) {
@@ -23,12 +26,13 @@ export function AnimatedFileUpload({
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const shouldReduceMotion = useReducedMotion();
+  const reading = useRef(false);
 
   const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
   const MAX_IMAGES_COUNT = 6;
 
-  const handleFiles = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+  const handleFiles = (files: FileList | null, replaceIndex?: number) => {
+    if (reading.current || !files || files.length === 0) return;
     const fileArray = Array.from(files);
     setUploadError(null);
 
@@ -47,11 +51,12 @@ export function AnimatedFileUpload({
     }
 
     // Validate total count
-    if (images.length + fileArray.length > MAX_IMAGES_COUNT) {
+    if (replaceIndex === undefined && images.length + fileArray.length > MAX_IMAGES_COUNT) {
       setUploadError(`Maximum ${MAX_IMAGES_COUNT} style references allowed.`);
       return;
     }
 
+    reading.current = true;
     setUploadProgress(30);
 
     Promise.all(
@@ -69,17 +74,16 @@ export function AnimatedFileUpload({
       )
     )
       .then((results) => {
-        setUploadProgress(100);
-        setTimeout(() => {
-          setUploadProgress(null);
-          if (results.length > 0 && onChange) {
-            onChange([...images, ...results]);
-          }
-        }, 150);
+        if (replaceIndex === undefined) onChange?.([...images, ...results]);
+        else if (onReplace) onReplace(replaceIndex, results[0]);
+        else onChange?.(images.map((url, index) => index === replaceIndex ? results[0] : url));
       })
       .catch(() => {
-        setUploadProgress(null);
         setUploadError('Failed to process image attachment.');
+      })
+      .finally(() => {
+        reading.current = false;
+        setUploadProgress(null);
       });
   };
 
@@ -166,14 +170,19 @@ export function AnimatedFileUpload({
                 transition={springSmooth}
                 className="relative aspect-square rounded-xl overflow-hidden border border-[var(--border)] group bg-[var(--surface-2)]"
               >
-                <img
+                <ReferenceThumbnail
                   src={img}
                   alt={`Style reference ${idx + 1}`}
-                  className="w-full h-full object-cover"
+                  recovery={<label className="cursor-pointer underline focus-within:ring-2">
+                    Replace<input type="file" className="sr-only" accept="image/jpeg,image/png,image/webp"
+                      aria-label={`Replace style reference ${idx + 1}`} disabled={uploadProgress !== null}
+                      onChange={e => { handleFiles(e.target.files, idx); e.target.value = ''; }} />
+                  </label>}
                 />
                 <button
                   type="button"
                   aria-label={`Remove style reference ${idx + 1}`}
+                  disabled={uploadProgress !== null}
                   onClick={() => handleRemove(idx)}
                   className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black transition-colors cursor-pointer"
                   title="Remove reference"

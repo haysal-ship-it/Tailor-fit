@@ -1,4 +1,7 @@
 'use client';
+import { clientInitials } from '@/lib/client-initials';
+import { Pagination, usePagination } from '@/components/ui/Pagination';
+import { DialogCloseButton } from '@/components/ui/DialogCloseButton';
 import {workspaceLayout} from '@/components/workspace/layout';
 import {WorkspaceActions,workspaceSecondaryAction} from '@/components/workspace/WorkspaceActions';
 import {BackButton} from '@/components/ui/BackButton';
@@ -101,6 +104,7 @@ export function ClientsScreen({
 }: ClientsScreenProps) {
   const {
     clients,
+    snapshots,
     orders,
     saveStatus,
     settings,
@@ -275,19 +279,14 @@ export function ClientsScreen({
 
   // Enrich store clients
   const allClientList = useMemo(() => {
+    const firstOrder = new Map<string, (typeof orders)[number]>();
+    for (const order of orders) if (!firstOrder.has(order.clientId)) firstOrder.set(order.clientId, order);
+    const firstSnapshot = new Map<string, (typeof snapshots)[number]>();
+    for (const snap of snapshots) if (!firstSnapshot.has(snap.clientId)) firstSnapshot.set(snap.clientId, snap);
     return clients.map((c) => {
-      const initials =
-        c.name
-          .split(' ')
-          .filter(Boolean)
-          .map((n) => n[0])
-          .join('')
-          .slice(0, 2)
-          .toUpperCase() || 'CL';
-      const clientOrders = orders.filter((o) => o.clientId === c.id);
-      const clientSnaps = getClientSnapshots(c.id);
-      const latestSnap = clientSnaps[0];
-      const latestOrder = clientOrders[0];
+      const initials = clientInitials(c.name);
+      const latestOrder = firstOrder.get(c.id);
+      const latestSnap = firstSnapshot.get(c.id);
 
       const latestFittingGarment =
         latestSnap?.garmentType ||
@@ -318,13 +317,12 @@ export function ClientsScreen({
         phone: c.phone || '',
         email: c.email || '',
         notes: c.notes || '',
-        totalOrdersCount: clientOrders.length,
         latestFittingGarment,
         latestFittingDate,
         bodyPointsCount,
       };
     });
-  }, [clients, orders, getClientSnapshots]);
+  }, [clients, orders, snapshots]);
 
   const activeClientId = orderClientId || selectedClientId || null;
   const selectedClientProfile = useMemo(() => {
@@ -343,6 +341,8 @@ export function ClientsScreen({
         c.notes.toLowerCase().includes(q)
     );
   }, [allClientList, directorySearch]);
+
+  const directoryPage = usePagination(filteredDirectoryClients, directorySearch);
 
   // Client's saved snapshots from store
   const clientSnapshots = useMemo(() => {
@@ -815,7 +815,7 @@ export function ClientsScreen({
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[16px] items-start w-full">
-                {filteredDirectoryClients.map((client, index) => (
+                {directoryPage.items.map((client, index) => (
                   <div
                     key={client.id}
                     onClick={() => {setSelectedClientId(client.id);onOpenClient?.(client.id);}}
@@ -869,7 +869,7 @@ export function ClientsScreen({
 
                         <div className="flex items-center justify-between font-normal text-[#4f4f4f] w-full whitespace-nowrap tabular-nums">
                           <span>{client.latestFittingDate}</span>
-                          <span>{client.bodyPointsCount} body points</span>
+                          <span>{client.bodyPointsCount} body {client.bodyPointsCount === 1 ? 'point' : 'points'}</span>
                         </div>
                       </div>
                     </div>
@@ -884,6 +884,7 @@ export function ClientsScreen({
                 ))}
               </div>
             )}
+            <Pagination {...directoryPage} />
           </div>
         </div>
       ) : (
@@ -1884,9 +1885,12 @@ export function ClientsScreen({
         {isDeleteConfirmOpen && (
           <LegacyDialog busy={workspaceBusy} label="Delete client" onClose={()=>setIsDeleteConfirmOpen(false)}><motion.div className="relative w-full max-w-sm rounded-[16px] bg-[var(--surface)] p-6 shadow-2xl z-10 flex flex-col gap-4"
             >
-              <h3 className="text-[16px] font-bold text-[var(--text)]">
-                Delete {selectedClientProfile?.name || 'Client'}?
-              </h3>
+              <div className="flex items-center justify-between gap-4">
+                <h3 className="text-[16px] font-bold text-[var(--text)]">
+                  Delete {selectedClientProfile?.name || 'Client'}?
+                </h3>
+                <DialogCloseButton label="Close delete client dialog" disabled={workspaceBusy} onClose={() => setIsDeleteConfirmOpen(false)} />
+              </div>
               <p className="text-[12px] text-[var(--text-2)] leading-relaxed">
                 This will remove {selectedClientProfile?.name || 'this client'}&apos;s profile,
                 saved measurements, and order history from your workspace.
@@ -1938,17 +1942,10 @@ export function ClientsScreen({
                     ? `Update ${pointModalData.name}`
                     : 'Add Measurement Point'}
                 </h3>
-                <button
-                  type="button"
-                  aria-label="Close point dialog"
-                  onClick={() => {
+                <DialogCloseButton label="Close point dialog" onClose={() => {
                     setPointModalData(null);
                     setPointModalError('');
-                  }}
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-[var(--text)] transition-colors cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                  }} />
               </div>
 
               <form

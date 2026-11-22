@@ -1,6 +1,7 @@
 'use client';
+import { DialogCloseButton } from '@/components/ui/DialogCloseButton';
 import {useState} from 'react';
-import {Check, X} from 'lucide-react';
+import {Check} from 'lucide-react';
 import {LegacyDialog} from '@/components/ui/LegacyDialog';
 import {cn} from '@/lib/utils';
 import type {GarmentTemplate} from '@/types';
@@ -19,14 +20,7 @@ export function GarmentTemplateDialog({templates: storeTemplates, initialId, onS
                 <h3 className="text-[16px] font-bold text-[var(--text)]">
                   Garment Templates
                 </h3>
-                <button
-                  type="button"
-                  aria-label="Close templates modal"
-                  onClick={onClose}
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-[var(--text)] cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                <DialogCloseButton label="Close garment templates" onClose={onClose} />
               </div>
 
               <div className="flex flex-col gap-2.5 max-h-[360px] overflow-y-auto">

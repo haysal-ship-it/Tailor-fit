@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
+import { ReferenceThumbnail } from '@/components/ui/ReferenceThumbnail';
 import {workspaceLayout} from '@/components/workspace/layout';
 import {
   Check,
@@ -69,7 +69,7 @@ function formatOrderPrice(amount: number | undefined, currency?: string): string
 }
 
 const SELECTABLE_STATUSES: {
-  value: "Pending" | "Paused" | "Completed";
+  value: OrderStatus;
   label: string;
   description: string;
   dotClass: string;
@@ -81,6 +81,15 @@ const SELECTABLE_STATUSES: {
     description: "Order is active and queued or underway in the workroom.",
     dotClass: "bg-[#D97706]",
     badgeBg: "bg-[#FEF3C7] text-[#92400E]",
+  },
+  {
+    value: "In Progress", label: "In progress", description: "Work has started on this order.", dotClass: "bg-blue-600", badgeBg: "bg-blue-50 text-blue-700",
+  },
+  {
+    value: "Ready", label: "Ready for pickup", description: "The garment is ready for collection.", dotClass: "bg-emerald-600", badgeBg: "bg-emerald-50 text-emerald-700",
+  },
+  {
+    value: "Picked Up", label: "Collected", description: "The client has collected the garment.", dotClass: "bg-green-700", badgeBg: "bg-green-50 text-green-700",
   },
   {
     value: "Paused",
@@ -163,23 +172,7 @@ export function OrderWorkspace({
     [notice, setNotice] = useState("");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const normalizeSelectableStatus = (
-    s?: OrderStatus | string,
-  ): "Pending" | "Paused" | "Completed" => {
-    if (s === "Paused") return "Paused";
-    if (s === "Completed" || s === "Ready" || s === "Picked Up")
-      return "Completed";
-    return "Pending";
-  };
-  const [selectedStatus, setSelectedStatus] = useState<
-    "Pending" | "Paused" | "Completed"
-  >(() => normalizeSelectableStatus(order?.status));
-
-  useEffect(() => {
-    if (order?.status) {
-      setSelectedStatus(normalizeSelectableStatus(order.status));
-    }
-  }, [order?.status]);
+  const [selectedStatus, setSelectedStatus] = useState<OrderStatus>(order?.status ?? "Pending");
 
   useEffect(() => {
     if (!isMenuOpen) return;
@@ -405,7 +398,7 @@ export function OrderWorkspace({
                       setIsMenuOpen(false);
                       setError("");
                       setNotice("");
-                      setSelectedStatus(normalizeSelectableStatus(order.status));
+                      setSelectedStatus(order.status);
                       setDialog("status");
                     },"2":() => {
                       setIsMenuOpen(false);
@@ -492,12 +485,10 @@ export function OrderWorkspace({
                         key={image.id || i}
                         className="bg-[#d9d9d9] h-[100px] rounded-[16px] overflow-hidden relative"
                       >
-                        <Image
-                          unoptimized
-                          fill
+                        <ReferenceThumbnail
                           src={image.url}
                           alt={image.title || `Style reference ${i + 1}`}
-                          className="object-cover"
+                          recovery={!isClientPreview && <button type="button" className="underline" onClick={() => setEditing(true)}>Edit references</button>}
                         />
                       </div>
                     ))}
@@ -684,8 +675,9 @@ export function OrderWorkspace({
             </button>
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || selectedStatus === order.status}
               onClick={async () => {
+                if (busy || selectedStatus === order.status) return;
                 setBusy(true);
                 setError("");
                 try {
@@ -1147,7 +1139,9 @@ function OrderEditor({
           price: parsedPrice,
           currency,
           status,
-          pickupDateTime: due ? `${due}T12:00:00Z` : "",
+          pickupDateTime: order && due === order.pickupDateTime?.slice(0, 10)
+            ? order.pickupDateTime
+            : due ? `${due}T12:00:00Z` : "",
           notes,
         },
       });
@@ -1228,6 +1222,9 @@ function OrderEditor({
           <h3 className="text-sm font-semibold">Style References</h3>
       <AnimatedFileUpload
         images={images.map((i) => i.url)}
+          onReplace={(index, url) => setImages(current => current.map((image, i) =>
+            i === index ? {id: image.id, title: image.title, note: image.note, url} : image
+          ))}
         onChange={(urls) =>
           setImages(
             urls.map(
@@ -1295,7 +1292,7 @@ function OrderEditor({
             onChoose={chooseFitting}
           />
           </>}
-          <div><h3 className="text-sm font-bold">Mannequin</h3><p className="mt-1 text-[10px] text-[var(--text-2)]">{Object.keys(measurements).length ? Object.keys(measurements).length+' selected points' : 'All available points'} · {gender==='female'?'Feminine':'Masculine'} Form</p></div>
+          <div><h3 className="text-sm font-bold">Mannequin</h3><p className="mt-1 text-[10px] text-[var(--text-2)]">{Object.keys(measurements).length ? Object.keys(measurements).length+(Object.keys(measurements).length===1?' selected point':' selected points') : 'All available points'} · {gender==='female'?'Feminine':'Masculine'} Form</p></div>
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-[24px] bg-white p-2 md:grid-cols-[minmax(0,1fr)_auto_auto_auto] md:rounded-full" aria-label="Measurement toolbar">
             <button type="button" aria-haspopup="dialog" className={cn(button, "w-full px-2")} onClick={() => setShowTemplates(true)}>
               Choose Template
@@ -1308,7 +1305,7 @@ function OrderEditor({
               setAddingPoint(true);
             }}>Add Point</button>
           </div>
-          <div className={measurementView==='diagram'?'flex min-h-[360px] items-center justify-center py-6':'hidden'}><RotatableMannequin gender={gender} onGenderChange={setGender} showControls={false} showGenderToggle={false} className="max-w-[450px]" measurements={measurements} activePointKeys={Object.keys(measurements)} unit={unit} onSelectPoint={key=>{setPoint(key);setPointValue(String(measurements[key]??''));}}/></div>
+          <div className={measurementView==='diagram'?'flex min-h-[360px] items-center justify-center py-6':'hidden'}><RotatableMannequin gender={gender} onGenderChange={setGender} showControls showGenderToggle={false} className="max-w-[450px]" measurements={measurements} activePointKeys={Object.keys(measurements)} unit={unit} onSelectPoint={key=>{setPoint(key);setPointValue(String(measurements[key]??''));}}/></div>
           <div className={cn("min-h-[360px] space-y-3 rounded-lg bg-white p-4",measurementView!=='list'&&'hidden')} aria-label="Edit measurement list">{!Object.keys(measurements).length&&<p className="text-sm text-[var(--text-2)]">Choose a template or add a point to start recording measurements.</p>}
             {Object.entries(measurements).map(([key, value]) => (
               <div

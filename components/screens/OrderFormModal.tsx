@@ -1,4 +1,5 @@
 'use client';
+import { DialogCloseButton } from '@/components/ui/DialogCloseButton';
 import {BackButton} from '@/components/ui/BackButton';
 import {SelectMenu} from '@/components/ui/SelectMenu';
 
@@ -823,14 +824,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                 >
                   {existingOrder ? 'Edit Bespoke Order' : 'New Bespoke Order'}
                 </h2>
-                <button
-                  type="button"
-                  onClick={handleRequestClose}
-                  className="w-7 h-7 rounded-full bg-[var(--card)] flex items-center justify-center text-[var(--muted)] hover:text-black cursor-pointer"
-                  aria-label="Close order sheet"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                <DialogCloseButton label="Close order sheet" onClose={handleRequestClose} />
               </div>
 
               <div className="flex flex-col gap-4">
@@ -1250,14 +1244,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                 >
                   {existingOrder ? 'Edit Bespoke Order' : 'New Bespoke Order'}
                 </h2>
-                <button
-                  type="button"
-                  onClick={handleRequestClose}
-                  aria-label="Close order sheet"
-                  className="w-7 h-7 rounded-full bg-[#F2F2F2] flex items-center justify-center text-[var(--muted)] hover:text-black cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                <DialogCloseButton label="Close order sheet" onClose={handleRequestClose} />
               </div>
             ) : (
               <div className="flex items-center gap-3">
@@ -1278,6 +1265,7 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                     </span>
                   </div>
                 </div>
+                <DialogCloseButton label="Close order sheet" onClose={handleRequestClose} />
               </div>
             )}
           </div>
@@ -1799,16 +1787,10 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
                     ? `Update ${pointModalData.name}`
                     : 'Add Measurement Point'}
                 </h3>
-                <button
-                  type="button"
-                  onClick={() => {
+                <DialogCloseButton label="Close point dialog" onClose={() => {
                     setPointModalData(null);
                     setPointModalError('');
-                  }}
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-black transition-colors cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                  }} />
               </div>
 
               <form
@@ -1946,9 +1928,12 @@ export function OrderFormModal({ orderId, initialClientId, onClose }: OrderFormM
               exit={{ opacity: 0, scale: 0.95 }}
               className="w-full max-w-xs rounded-[16px] bg-white p-5 shadow-2xl flex flex-col gap-4 text-center"
             >
-              <h4 className="text-[16px] font-bold text-black leading-tight">
-                Discard changes?
-              </h4>
+              <div className="flex items-center justify-between gap-3 text-left">
+                <h4 className="text-[16px] font-bold text-black leading-tight">
+                  Discard changes?
+                </h4>
+                <DialogCloseButton label="Close discard confirmation" onClose={() => setShowDiscardConfirm(false)} />
+              </div>
               <p className="text-[12px] text-[var(--muted)] leading-normal">
                 You have unsaved changes. Are you sure you want to discard them?
               </p>

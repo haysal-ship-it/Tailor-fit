@@ -1,4 +1,5 @@
 'use client';
+import {clientInitials} from '@/lib/client-initials';
 import {useState,useMemo} from 'react';
 import {AnimatePresence,motion} from 'framer-motion';
 import {ChevronLeft,ChevronRight,X,ClipboardList} from 'lucide-react';
@@ -78,13 +79,7 @@ const {orders,clients}=useStore();
     return sorted.slice(0, 4).map((ord) => {
       const cl = clients.find((c) => c.id === ord.clientId);
       const clientFullName = cl?.name || 'Client';
-      const initials =
-        clientFullName
-          .split(' ')
-          .map((p) => p[0])
-          .join('')
-          .slice(0, 2)
-          .toUpperCase() || 'CL';
+      const initials = clientInitials(clientFullName);
       return {
         id: ord.id,
         client: clientFullName,

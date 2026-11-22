@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { ModalDialog } from '@/components/ui/ModalDialog';
-import { emptyClientDetails,hasClientDetailsChanges,saveClientDetails,validateClientDetails,type ClientDetails,type ClientDetailsErrors,type ClientDetailsTarget } from '@/lib/client-details';
+import { CLIENT_NAME_LIMIT,emptyClientDetails,hasClientDetailsChanges,saveClientDetails,validateClientDetails,type ClientDetails,type ClientDetailsErrors,type ClientDetailsTarget } from '@/lib/client-details';
 
 type SavedClient={id:string;name:string;created:boolean};
 export function ClientDetailsDialog({target,onCreate,onUpdate,onSaved,onClose,persistenceError=''}:{
@@ -35,8 +35,8 @@ export function ClientDetailsDialog({target,onCreate,onUpdate,onSaved,onClose,pe
   return <ModalDialog title={creating?'Add client':`Edit ${session.client.name}`} description={creating?'Save their details now. Add measurements and orders when ready.':"Update this client's contact details and notes."} busy={busy} onRequestClose={requestClose}>
     <form noValidate onSubmit={submit}>
       <fieldset disabled={busy} className="m-0 grid gap-4 border-0 px-5 py-5 sm:px-6">
-        <div><label htmlFor={`${id}-name`} className="mb-1.5 block text-sm font-medium">Full name <span className="text-[var(--text-2)]">(required)</span></label>
-          <input id={`${id}-name`} ref={nameRef} data-autofocus autoComplete="name" required value={values.name} onChange={e=>change('name',e.target.value)} placeholder="Client’s full name" aria-invalid={!!errors.name} aria-describedby={errors.name?`${id}-name-error`:undefined} className={fieldClass}/>
+        <div><label htmlFor={`${id}-name`} className="mb-1.5 block text-sm font-medium">Full name <span className="text-[var(--text-2)]">(required, up to {CLIENT_NAME_LIMIT} characters)</span></label>
+          <input id={`${id}-name`} ref={nameRef} data-autofocus autoComplete="name" maxLength={CLIENT_NAME_LIMIT} required value={values.name} onChange={e=>change('name',e.target.value)} placeholder="Client’s full name" aria-invalid={!!errors.name} aria-describedby={errors.name?`${id}-name-error`:undefined} className={fieldClass}/>
           {errors.name&&<p id={`${id}-name-error`} role="alert" className="mt-2 text-sm text-red-700">{errors.name}</p>}</div>
         <div><label htmlFor={`${id}-phone`} className="mb-1.5 block text-sm font-medium">Phone <span className="font-normal text-[var(--text-2)]">(optional)</span></label>
           <input id={`${id}-phone`} type="tel" autoComplete="tel" value={values.phone} onChange={e=>change('phone',e.target.value)} placeholder="+234 800 000 0000" className={fieldClass}/></div>

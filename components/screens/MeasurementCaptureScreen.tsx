@@ -1,4 +1,5 @@
 'use client';
+import { DialogCloseButton } from '@/components/ui/DialogCloseButton';
 import {workspaceLayout} from '@/components/workspace/layout';
 import {BackButton} from '@/components/ui/BackButton';
 import {SelectMenu} from '@/components/ui/SelectMenu';
@@ -20,7 +21,6 @@ import {
   RotateCcw, 
   Save, 
   User, 
-  X, 
   ArrowUpDown,
   Calendar
 } from 'lucide-react';
@@ -287,13 +287,7 @@ export function MeasurementCaptureScreen() {
                     <span className="text-[12px] font-mono text-[#a59f97] uppercase tracking-wider">
                       Fitting Options
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowMoreMenu(false)}
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-[#777169] hover:bg-[#f5f3f1]"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                    <DialogCloseButton label="Close fitting options" onClose={() => setShowMoreMenu(false)} />
                   </div>
 
                   {/* 1. Unit Toggle */}
@@ -413,13 +407,7 @@ export function MeasurementCaptureScreen() {
 
             <div className="flex items-center justify-between pb-2 border-b border-[#ebe8e4]">
               <h4 className="text-[15px] font-medium text-[#000000]">Fitting Options</h4>
-              <button
-                type="button"
-                onClick={() => setShowMoreMenu(false)}
-                className="w-7 h-7 rounded-full flex items-center justify-center text-[#777169] hover:bg-[#f5f3f1]"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <DialogCloseButton label="Close fitting options" onClose={() => setShowMoreMenu(false)} />
             </div>
 
             {/* 1. Unit Toggle */}
@@ -716,13 +704,7 @@ export function MeasurementCaptureScreen() {
                   Filters landmarks to required tailoring points
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowTemplatePicker(false)}
-                className="w-8 h-8 rounded-full border border-[#ebe8e4] flex items-center justify-center text-[#44403b] hover:bg-[#f5f3f1]"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <DialogCloseButton label="Close garment template picker" onClose={() => setShowTemplatePicker(false)} />
             </div>
 
             <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
@@ -803,13 +785,7 @@ export function MeasurementCaptureScreen() {
                   Inspecting alterations against prior client visit
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowCompareModal(false)}
-                className="w-8 h-8 rounded-full border border-[#ebe8e4] flex items-center justify-center text-[#44403b] hover:bg-[#f5f3f1]"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <DialogCloseButton label="Close snapshot comparison" onClose={() => setShowCompareModal(false)} />
             </div>
 
             {/* Prior Snapshot Selector if multiple exist */}

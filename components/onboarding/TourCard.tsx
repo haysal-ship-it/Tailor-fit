@@ -1,5 +1,6 @@
+import { DialogCloseButton } from '@/components/ui/DialogCloseButton';
 import React, { useEffect, useRef } from 'react';
-import { X, ArrowRight, ArrowLeft, Check } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check } from 'lucide-react';
 import { TourStepDefinition } from '@/lib/onboarding/steps';
 import { cn } from '@/lib/utils';
 
@@ -55,14 +56,7 @@ export function TourCard({
           <h2 id="tour-missing-title" className="text-[15px] font-semibold text-black leading-snug">
             This part of the workspace isn&apos;t available right now.
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close tour"
-            className="w-7 h-7 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-black hover:bg-neutral-100 transition-colors cursor-pointer shrink-0"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <DialogCloseButton label="Close tour" onClose={onClose} />
         </div>
 
         <p className="text-[13px] text-[var(--text-2)] leading-relaxed">
@@ -107,16 +101,9 @@ export function TourCard({
       )}
     >
       {/* Header: Visual Example + Close Button */}
-      <div className="relative w-full">
-        <p className="pr-8 text-xs font-medium text-[var(--primary)]">Overview guide</p>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close tour"
-          className="absolute -top-1 right-0 w-7 h-7 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center text-[var(--muted)] hover:text-black hover:bg-white shadow-2xs transition-colors cursor-pointer"
-        >
-          <X className="w-4 h-4" />
-        </button>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium text-[var(--primary)]">Overview guide</p>
+        <DialogCloseButton label="Close tour" onClose={onClose} />
       </div>
 
       {/* Title & Body */}

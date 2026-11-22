@@ -1,3 +1,4 @@
+export const CLIENT_NAME_LIMIT = 200;
 export type ClientDetails = { name: string; phone: string; email: string; notes: string };
 export type ClientDetailsTarget = { kind: 'create' } | { kind: 'edit'; client: ClientDetails & { id: string } };
 export type ClientDetailsErrors = Partial<Record<keyof ClientDetails, string>>;
@@ -9,6 +10,7 @@ export function validateClientDetails(values: ClientDetails): ClientDetailsError
   const data = normalizeClientDetails(values);
   const errors: ClientDetailsErrors = {};
   if (!data.name) errors.name = "Enter the client's full name.";
+  else if (data.name.length > CLIENT_NAME_LIMIT) errors.name = `Use ${CLIENT_NAME_LIMIT} characters or fewer for the client name.`;
   if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) errors.email = 'Enter a valid email address, or leave it blank.';
   return errors;
 }

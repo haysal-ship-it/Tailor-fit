@@ -768,6 +768,7 @@ export function RotatableMannequin({
               return (
                 <button
                   key={v.angle}
+                  aria-pressed={isActive}
                   type="button"
                   onClick={() => animateToAngle(v.angle)}
                   className={cn(
