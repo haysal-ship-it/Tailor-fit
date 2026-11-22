@@ -19,8 +19,9 @@
 .body { font-size: 1rem; line-height: 1.55; font-weight: 400; color: var(--landing-muted); max-width: 65ch; }
 .skip { position: fixed; top: 8px; left: 20px; z-index: 100; padding: 12px 20px; background: white; border-radius: 12px; transform: translateY(-150%); }
 .skip:focus { transform: translateY(0); }
-.header { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 50; width: min(calc(100% - 32px), 793px); }
-.navPill { min-height: 64px; padding: 8px 10px 8px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-radius: 100px; background: white; box-shadow: 0 4px 24px rgb(0 0 0 / 8%); }
+.header { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 50; width: min(calc(100% - 32px), 793px); border-radius: 32px; background: white; box-shadow: 0 4px 24px rgb(0 0 0 / 8%); transition: border-radius 180ms var(--landing-ease); }
+.header[data-open="true"] { border-radius: 24px; }
+.navPill { min-height: 64px; padding: 8px 10px 8px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .logo { flex-shrink: 0; display: flex; align-items: center; min-height: 44px; }
 .logo img { width: 125px; height: auto; }
 .desktopNav, .desktopActions { display: none; }
@@ -34,7 +35,16 @@
 .button { display: inline-flex; justify-content: center; align-items: center; gap: 8px; min-height: 48px; padding: 12px 24px; border-radius: 100px; background: #080808; color: white; font-size: 1rem; font-weight: 600; text-align: center; white-space: nowrap; transition: transform 120ms var(--landing-ease), background-color 150ms ease; }
 .button:active { transform: scale(0.98); }
 .smallButton { min-height: 44px; padding: 10px 16px; }
-.mobileMenu { margin-top: 8px; padding: 16px 20px; border-radius: 24px; background: white; box-shadow: 0 12px 30px rgb(0 0 0 / 12%); display: flex; flex-direction: column; max-height: calc(100dvh - 108px - env(safe-area-inset-bottom, 0px)); overflow-y: auto; overscroll-behavior: contain; }
+.menuGlyph { position: relative; width: 18px; height: 18px; }
+.menuGlyph i { position: absolute; left: 0; top: 8px; width: 100%; height: 2px; border-radius: 2px; background: currentColor; transition: transform 180ms var(--landing-ease), opacity 120ms ease; }
+.menuGlyph i:first-child { transform: translateY(-5px); }
+.menuGlyph i:last-child { transform: translateY(5px); }
+.menuButton[aria-expanded="true"] .menuGlyph i:first-child { transform: rotate(45deg); }
+.menuButton[aria-expanded="true"] .menuGlyph i:nth-child(2) { opacity: 0; }
+.menuButton[aria-expanded="true"] .menuGlyph i:last-child { transform: rotate(-45deg); }
+.menuReveal { overflow: hidden; border-radius: 0 0 24px 24px; }
+.mobileMenu { opacity: 0; transform: translateY(-4px); transition: opacity 80ms ease, transform 160ms var(--landing-ease); padding: 0 20px 16px; display: flex; flex-direction: column; max-height: calc(100dvh - 108px - env(safe-area-inset-bottom, 0px)); overflow-y: auto; overscroll-behavior: contain; }
+.header[data-open="true"] .mobileMenu { opacity: 1; transform: translateY(0); transition-duration: 160ms, 220ms; }
 .mobileMenu > a { flex-shrink: 0; border-bottom: 1px solid #ededed; padding-block: 12px; }
 .menuActions { flex-shrink: 0; display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding-top: 12px; }
 .menuActions > a { min-height: 44px; display: flex; align-items: center; justify-content: center; }
@@ -208,7 +218,8 @@
 @media (min-width: 1100px) {
   .desktopNav, .desktopActions { display: flex; align-items: center; gap: 24px; }
   .desktopActions { gap: 16px; }
-  .mobileActions, .mobileMenu { display: none; }
+  .mobileActions, .menuReveal { display: none; }
+  .header { border-radius: 100px; }
   .logo img { width: 142px; }
   .navPill { min-height: 69px; padding-left: 24px; }
 }
