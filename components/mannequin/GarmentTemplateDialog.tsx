@@ -14,7 +14,7 @@ export function GarmentTemplateDialog({templates: storeTemplates, initialId, onS
 }) {
   const [dialogSelectedTemplateId, setDialogSelectedTemplateId] = useState(initialId || storeTemplates[0]?.id || '');
   return (
-    <LegacyDialog label="Garment templates" onClose={onClose}><div className="relative w-full max-w-[calc(100vw-32px)] max-h-[90dvh] overflow-y-auto rounded-[16px] bg-[var(--surface)] p-4 sm:p-6 z-10 flex flex-col gap-5 shadow-2xl"
+    <LegacyDialog label="Garment templates" onClose={onClose}><div className="relative w-full max-w-[calc(100vw-32px)] rounded-[16px] bg-[var(--surface)] p-4 sm:p-6 z-10 flex flex-col gap-5 shadow-2xl"
             >
               <div className="flex items-center justify-between">
                 <h3 className="text-[16px] font-bold text-[var(--text)]">
@@ -23,7 +23,7 @@ export function GarmentTemplateDialog({templates: storeTemplates, initialId, onS
                 <DialogCloseButton label="Close garment templates" onClose={onClose} />
               </div>
 
-              <div className="flex flex-col gap-2.5 max-h-[360px] overflow-y-auto">
+              <div className="flex flex-col gap-2.5">
                 {!storeTemplates.length && <p>No templates available.</p>}
                 {storeTemplates.map((tmpl) => {
                   const isSelected = dialogSelectedTemplateId === tmpl.id;

@@ -790,14 +790,14 @@ export function MeasurementCaptureScreen() {
 
             {/* Prior Snapshot Selector if multiple exist */}
             {priorSnapshots.length > 1 && (
-              <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              <div className="flex flex-wrap items-center gap-2 pb-1">
                 <span className="text-[12px] font-medium text-[#777169] shrink-0">Compare with:</span>
                 {priorSnapshots.map((snap) => (
                   <button
                     key={snap.id}
                     type="button"
                     onClick={() => setSelectedCompareId(snap.id)}
-                    className={`px-3 py-1 rounded-full text-[12px] font-medium border transition-colors shrink-0 ${
+                    className={`max-w-full break-words px-3 py-1 rounded-full text-[12px] font-medium border transition-colors ${
                       snap.id === activeCompareSnapshot.id
                         ? 'bg-[#000000] text-white border-[#000000]'
                         : 'bg-[#f5f3f1] text-[#44403b] border-[#ebe8e4] hover:bg-[#ebe8e4]'

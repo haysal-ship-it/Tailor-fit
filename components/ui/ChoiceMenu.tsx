@@ -55,27 +55,46 @@ export function ChoiceMenu({
   const openMenu=()=>{setPortalHost(trigger.current?.closest('dialog')||document.body);setOpen(true);};
   useLayoutEffect(() => {
     if (!open) return;
+    const button = trigger.current!;
+    const list = panel.current!;
+    const container = button.closest('[data-menu-boundary], dialog');
     const place = () => {
-      const viewport=window.visualViewport;
-      const bounds={left:viewport?.offsetLeft||0,top:viewport?.offsetTop||0,width:viewport?.width||window.innerWidth,height:viewport?.height||window.innerHeight};
-      const rect=trigger.current!.getBoundingClientRect();
-      setPosition(menuPosition(rect,bounds,kind==='menu'?190:0));
+      const viewport = window.visualViewport;
+      const x = viewport?.offsetLeft ?? 0;
+      const y = viewport?.offsetTop ?? 0;
+      const box = container?.getBoundingClientRect();
+      const left = Math.max(x, box?.left ?? x);
+      const top = Math.max(y, box?.top ?? y);
+      const right = Math.min(x + (viewport?.width ?? document.documentElement.clientWidth), box?.right ?? Infinity);
+      const bottom = Math.min(y + (viewport?.height ?? window.innerHeight), box?.bottom ?? Infinity);
+      const rect = button.getBoundingClientRect();
+      if (rect.bottom <= top || rect.top >= bottom || right <= left) {
+        setOpen(false);
+        return;
+      }
+      const bounds = { left, top, width: right - left, height: bottom - top };
+      const minimum = kind === 'menu' ? 190 : 0;
+      // Measure wrapped labels at their final width before choosing above or below.
+      list.style.width = menuPosition(rect, bounds, minimum).width + 'px';
+      setPosition(menuPosition(rect, bounds, minimum, list.scrollHeight + list.offsetHeight - list.clientHeight, iconOnly));
     };
-    const initialRect=trigger.current!.getBoundingClientRect();
-    const viewportBottom=(window.visualViewport?.offsetTop||0)+(window.visualViewport?.height||window.innerHeight);
-    if(viewportBottom-initialRect.bottom<100)trigger.current!.scrollIntoView({block:'center',behavior:'instant'});
     place();
+    const observer = new ResizeObserver(place);
+    observer.observe(button);
+    if (container) observer.observe(container);
+    for (const item of Array.from(list.children)) observer.observe(item);
     window.visualViewport?.addEventListener("resize",place);
     window.visualViewport?.addEventListener("scroll",place);
     window.addEventListener("resize", place);
     window.addEventListener("scroll", place, true);
     return () => {
+      observer.disconnect();
       window.visualViewport?.removeEventListener("resize",place);
       window.visualViewport?.removeEventListener("scroll",place);
       window.removeEventListener("resize", place);
       window.removeEventListener("scroll", place, true);
     };
-  }, [open, kind]);
+  }, [open, kind, iconOnly]);
   useEffect(() => {
     if (!open) return;
     const chosen = panel.current?.querySelector<HTMLButtonElement>(
@@ -149,7 +168,7 @@ export function ChoiceMenu({
             ref={panel}
             role={kind}
             aria-label={label || placeholder}
-            className="fixed z-[250] overflow-y-auto rounded-xl border border-[var(--outline)] bg-[var(--surface)] p-1 shadow-lg"
+            className="fixed z-[250] overflow-y-auto overscroll-contain rounded-xl border border-[var(--outline)] bg-[var(--surface)] p-1 shadow-lg"
             style={position}
             onKeyDown={(e) => {
               const items = Array.from(
@@ -204,7 +223,7 @@ export function ChoiceMenu({
                     onChoose(o.value);
                   }}
                 >
-                  <span>
+                  <span className="min-w-0 [overflow-wrap:anywhere]">
                     {o.label}
                     {o.description && (
                       <span className="mt-1 block text-xs text-[var(--muted)]">

@@ -124,20 +124,10 @@ html, body, button, input, select, textarea, a {
   }
 }
 
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--outline);
-  border-radius: 9999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--muted);
+/* Use the platform's overlay behavior on touchscreens and its contrast settings. */
+@media (pointer: fine) and (forced-colors: none) and (prefers-contrast: no-preference) {
+  :root { scrollbar-color: #808080 transparent; }
+  * { scrollbar-width: thin; }
 }
 
 /* Shared field colours; component-specific shape and sizing are preserved. */

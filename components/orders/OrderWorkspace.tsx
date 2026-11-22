@@ -315,6 +315,7 @@ export function OrderWorkspace({
 
   return (
     <section
+      data-menu-boundary
       aria-label="Order details"
       className="w-full bg-white rounded-[8px] p-[2px] flex flex-col gap-[2px]"
     >
@@ -1173,6 +1174,7 @@ function OrderEditor({
   return (
     <form
       noValidate
+      data-menu-boundary
       onSubmit={save}
       className={"new-order-workspace space-y-0 "+workspaceLayout.frame}
       aria-label={order ? "Edit order" : "New order"}
