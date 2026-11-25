@@ -1,4 +1,5 @@
 'use client';
+import {EmptyState} from '@/components/empty-states/EmptyState';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
@@ -160,17 +161,7 @@ export function NotificationDropdown() {
 
             <div className="py-2 space-y-2 max-h-72 overflow-y-auto">
               {notifications.length === 0 ? (
-                <div className="py-8 text-center flex flex-col items-center justify-center gap-2">
-                  <div className="w-10 h-10 rounded-full bg-[var(--surface-2)] flex items-center justify-center text-[var(--text-muted)] mb-0.5">
-                    <CheckCircle2 className="w-5 h-5 text-[var(--completed)]" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-[var(--text)]">All Caught Up</p>
-                    <p className="text-[11px] text-[var(--text-muted)] mt-1 max-w-[200px] leading-snug">
-                      No pending fittings, overdue collections, or studio alerts at this time.
-                    </p>
-                  </div>
-                </div>
+                <EmptyState kind="notifications" compact title="You’re all caught up" description="Your studio updates will appear here."/>
               ) : (
                 notifications.map((n) => (
                   <div

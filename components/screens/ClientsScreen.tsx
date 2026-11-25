@@ -2,6 +2,7 @@
 import { clientInitials } from '@/lib/client-initials';
 import { Pagination, usePagination } from '@/components/ui/Pagination';
 import { DialogCloseButton } from '@/components/ui/DialogCloseButton';
+import {EmptyState} from '@/components/empty-states/EmptyState';
 import {workspaceLayout} from '@/components/workspace/layout';
 import {WorkspaceActions,workspaceSecondaryAction} from '@/components/workspace/WorkspaceActions';
 import {BackButton} from '@/components/ui/BackButton';
@@ -28,9 +29,6 @@ import {
   Check,
   Plus,
   Search,
-  Users,
-  Ruler,
-  Package,
   ArrowLeft,
 } from 'lucide-react';
 import { ToastContainer, type ToastMessage } from '@/components/ui/Toasts';
@@ -744,15 +742,8 @@ export function ClientsScreen({
             <h2 className="text-[16px] font-semibold text-[var(--text)]">Client Directory</h2>
             <p className="text-[12px] leading-normal text-[var(--text-2)]">Versioned anatomical measurements across customer visits.</p>
           </header>
-          <div className="flex min-h-[502px] items-center rounded-[6px] bg-[var(--card)] p-4 lg:p-6">
-            <div className="flex w-full flex-col items-center justify-center gap-3 rounded-[8px] border border-[var(--outline)] bg-[var(--surface)] p-8 text-center sm:p-12">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--chip)] text-[var(--text-2)]"><Users className="h-6 w-6" aria-hidden="true"/></div>
-              <div>
-                <h3 className="text-[15px] font-semibold text-[var(--text)]">No clients yet</h3>
-                <p className="mt-1.5 max-w-sm text-[12px] leading-relaxed text-[var(--muted)]">Add a client to keep their contact details, measurements and orders together.</p>
-              </div>
-              <div className="mt-2 w-full sm:w-auto"><WorkspaceActions firstClient onAddClient={handleOpenCreateClient} onNewOrder={()=>onNewOrder?.('')}/></div>
-            </div>
+          <div className="rounded-md bg-[var(--card)] p-4">
+            <EmptyState kind="clients" title="Your first client starts here" description="Keep their details, fittings and orders together." actionLabel="Add client" onAction={handleOpenCreateClient}/>
           </div>
         </section>
       ) : !selectedClientProfile ? (
@@ -801,18 +792,7 @@ export function ClientsScreen({
           {/* Clients Cards Grid Container */}
           <div className="w-full bg-[#f8f8f8] rounded-[6px] p-3 min-h-[502px]">
             {filteredDirectoryClients.length === 0 ? (
-              <div className="py-16 text-center flex flex-col items-center justify-center gap-2">
-                <p className="text-[14px] text-[#595959]">
-                  No clients match &ldquo;{directorySearch}&rdquo;
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setDirectorySearch('')}
-                  className="text-[13px] text-[#1d49e8] font-medium hover:underline cursor-pointer"
-                >
-                  Clear search
-                </button>
-              </div>
+              <EmptyState kind="search" title="No matching clients" description="Try another name or clear your search." actionLabel="Clear search" onAction={()=>setDirectorySearch('')}/>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[16px] items-start w-full">
                 {directoryPage.items.map((client, index) => (
@@ -1115,29 +1095,7 @@ export function ClientsScreen({
                     {/* Right Measurement Cards Grid OR Empty State */}
                     <div className="lg:col-span-7">
                       {clientSnapshots.length === 0 ? (
-                        <div className="w-full bg-[var(--surface)] rounded-[12px] p-8 sm:p-12 border border-[var(--outline)] flex flex-col items-center justify-center text-center gap-3">
-                          <div className="w-12 h-12 rounded-full bg-[var(--chip)] flex items-center justify-center text-[var(--text-2)]">
-                            <Ruler className="w-6 h-6 text-[var(--text-strong)]" />
-                          </div>
-                          <div>
-                            <h3 className="text-[15px] font-semibold text-[var(--text)]">
-                              No Saved Measurements
-                            </h3>
-                            <p className="text-[12px] text-[var(--muted)] max-w-sm mt-1.5 leading-relaxed">
-                              No anatomical measurements have been recorded for {selectedClientProfile.name} yet. Use the 3D mannequin here to record their first fitting.
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setViewState('SavedMeasurements_Default');handleOpenAddPoint();
-                            }}
-                            className="mt-2 h-9 px-5 rounded-[24px] bg-[var(--primary)] text-white text-[12px] font-medium hover:bg-[var(--primary)]/90 transition-colors cursor-pointer flex items-center gap-1.5"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>Capture Measurements</span>
-                          </button>
-                        </div>
+                        <EmptyState kind="fittings" title="Save their first fitting" description="Record measurements to use for their next order." actionLabel="Record measurements" onAction={()=>{setViewState('SavedMeasurements_Default');handleOpenAddPoint();}}/>
                       ) : (
                         <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5">
                           {visibleMeasurementFields.map((field) => (
@@ -1406,31 +1364,7 @@ export function ClientsScreen({
               {!showingOrder && viewState === 'OrderHistory_Grid' && (
                 <div className="pt-1">
                   {orderHistoryCards.length === 0 ? (
-                    <div className="w-full bg-[var(--surface)] rounded-[12px] p-10 sm:p-14 border border-[var(--outline)] flex flex-col items-center justify-center text-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-[var(--chip)] flex items-center justify-center text-[var(--text-2)]">
-                        <Package className="w-6 h-6 text-[var(--text-strong)]" />
-                      </div>
-                      <div>
-                        <h3 className="text-[15px] font-semibold text-[var(--text)]">
-                          No Garment Orders Yet
-                        </h3>
-                        <p className="text-[12px] text-[var(--muted)] max-w-sm mt-1.5 leading-relaxed">
-                          There are no orders recorded for {selectedClientProfile.name}. Create an order to track garment specifications, pricing, fabric swatches, and pickup schedules.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (onNewOrder) {
-                            onNewOrder(selectedClientProfile.id);
-                          }
-                        }}
-                        className="mt-2 h-9 px-5 rounded-[24px] bg-[var(--primary)] text-white text-[12px] font-medium hover:bg-[var(--primary)]/90 transition-colors cursor-pointer flex items-center gap-1.5"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Create First Order</span>
-                      </button>
-                    </div>
+                    <EmptyState kind="orders" title="No orders for this client yet" description="Create an order with their details already filled in." actionLabel={onNewOrder?"New order":undefined} onAction={()=>onNewOrder?.(selectedClientProfile.id)}/>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       {orderHistoryCards.map((card) => (

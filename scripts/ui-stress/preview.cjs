@@ -16,7 +16,7 @@ function build(server){
     output:{path:out,filename:'review.js',...(server?{library:{type:'commonjs2'}}:{})},
     resolve:{extensions:['.tsx','.ts','.js','.jsx'],alias:{...aliases,'@':root}},
     externals:server?[({request},cb)=>request&&!request.startsWith('.')&&!request.startsWith('@/')&&!path.isAbsolute(request)?cb(null,'commonjs '+request):cb()]:[],
-    module:{rules:[{test:/\.(tsx?|jsx)$/,use:path.join(root,'scripts/faux-ui-ts-loader.cjs')}]},
+    module:{rules:[{test:/\.(tsx?|jsx)$/,use:path.join(root,'scripts/faux-ui-ts-loader.cjs')},{test:/\.css$/,use:path.join(root,'scripts/faux-ui-css-loader.cjs')}]},
     plugins:server?[]:[new compiled.webpack.DefinePlugin({'process.env.__NEXT_IMAGE_OPTS':'undefined'}),new compiled.webpack.ProvidePlugin({process:require.resolve('next/dist/build/polyfills/process')})],
     optimization:{minimize:false}
   },(err,stats)=>err||stats.hasErrors()?reject(err||Error(stats.toString({all:false,errors:true}))):resolve()));

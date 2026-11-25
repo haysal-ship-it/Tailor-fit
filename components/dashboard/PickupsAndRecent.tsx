@@ -1,4 +1,5 @@
 'use client';
+import {EmptyState} from '@/components/empty-states/EmptyState';
 import {clientInitials} from '@/lib/client-initials';
 import {useState,useMemo} from 'react';
 import {AnimatePresence,motion} from 'framer-motion';
@@ -254,9 +255,7 @@ const {orders,clients}=useStore();
               </div>
             ) : (
               <div className="py-3 text-center flex flex-col items-center justify-center gap-1.5">
-                <p className="text-[12px] text-[var(--muted)]">
-                  No pickups or fittings scheduled for this date.
-                </p>
+                <EmptyState kind="calendar" compact title="No pickups for this date" description="Choose another day to see what’s coming up."/>
                 
               </div>
             )}
@@ -292,17 +291,7 @@ const {orders,clients}=useStore();
       </h3>
 
       {recentOrdersList.length === 0 ? (
-        <div className="bg-[var(--surface)] rounded-[8px] p-6 text-center flex flex-col items-center justify-center gap-2 border border-[var(--outline)]">
-          <div className="w-10 h-10 rounded-full bg-[var(--chip)] flex items-center justify-center text-[var(--muted)] mb-0.5">
-            <ClipboardList className="w-5 h-5 text-[var(--text-2)]" />
-          </div>
-          <span className="text-[13px] font-semibold text-[var(--text-strong)]">
-            No Recent Orders
-          </span>
-          <p className="text-[11px] text-[var(--muted)] max-w-xs leading-relaxed">
-            Active fittings and garment orders will appear here automatically as you create client orders.
-          </p>
-        </div>
+        <EmptyState kind="orders" compact title="Your next order belongs here" description="Create an order using New order at the top of Overview."/>
       ) : (
         <div className="bg-[var(--surface)] p-[2px] rounded-[8px] flex flex-col gap-[2px]">
           {recentOrdersList.map((order) => (
