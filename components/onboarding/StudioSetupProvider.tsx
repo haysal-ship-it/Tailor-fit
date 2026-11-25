@@ -10,7 +10,7 @@ import {workspacePrimaryAction,workspaceSecondaryAction} from '@/components/work
 import {useTour} from './TourProvider';
 import {StudioSetupContext} from './StudioSetupContext';
 import {StudioSetupScreen} from './StudioSetupScreen';
-export function StudioSetupProvider({children}:{children:ReactNode}){
+export function StudioSetupProvider({children,loadingScreen='workspace'}:{children:ReactNode;loadingScreen?:string}){
  const store=useStore(),account=useAccount(),tour=useTour(),owner=account.user?.id;
  const [state,setState]=useState<StudioSetupState|null>(null),[phase,setPhase]=useState<'loading'|'ready'|'error'>(owner?'loading':'ready'),[error,setError]=useState('');
  const [manual,setManual]=useState(false),[started,setStarted]=useState(false),[suppressed,setSuppressed]=useState(false),[bypassed,setBypassed]=useState(false);
@@ -50,7 +50,7 @@ export function StudioSetupProvider({children}:{children:ReactNode}){
  const close=()=>{setManual(false);setStarted(false);setSuppressed(true);};
  const retry=()=>{setBypassed(false);void Promise.all([reload(),store.refresh()]);};
  let content=children;
- if(owner&&!bypassed&&!open&&(!store.isHydrated||phase==='loading'))content=<WorkspaceLoading screen="overview"/>;
+ if(owner&&!bypassed&&!open&&(!store.isHydrated||phase==='loading'))content=<WorkspaceLoading screen={loadingScreen} stage="records"/>;
  else if(owner&&!bypassed&&!open&&(phase==='error'||store.error))content=<main className="mx-auto mt-12 w-[calc(100%_-_24px)] max-w-md rounded-xl bg-white p-6"><h1 className="text-lg font-semibold">Let’s check your studio setup</h1><p role="alert" className="mt-3 text-sm leading-relaxed text-[var(--text-2)]">{error||store.error}</p><div className="mt-6 flex flex-col gap-2"><button type="button" className={workspacePrimaryAction} onClick={retry}>Retry setup check</button><button type="button" className={workspaceSecondaryAction} onClick={()=>{setBypassed(true);setSuppressed(true);}}>Continue without setup</button></div></main>;
  else if(open)content=<StudioSetupScreen onClose={close}/>;
  return <StudioSetupContext.Provider value={{state,participant,openSetup,setChecklistHidden,saveProgress,reload}}>{bypassed&&phase==='error'&&<div role="status" className="mx-auto mt-3 flex max-w-[1216px] flex-wrap items-center justify-between gap-2 rounded-lg bg-white p-3 text-xs text-[var(--text-2)]"><span>Setup status could not be checked. You can keep working and retry later.</span><button type="button" className="min-h-11 px-3 underline" onClick={retry}>Retry setup check</button></div>}{content}</StudioSetupContext.Provider>;

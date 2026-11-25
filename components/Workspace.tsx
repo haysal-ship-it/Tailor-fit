@@ -19,7 +19,7 @@ import { orderFilters, type OrderFilter } from "@/lib/workspace-analytics";
 import { SettingsScreen } from "@/components/screens/SettingsScreen";
 import { ToastContainer, type ToastMessage } from "@/components/ui/Toasts";
 
-function TailorFitApp() {
+function TailorFitApp({ initialScreen }: { initialScreen: string }) {
   const {
     activeScreen,
     isHydrated,
@@ -233,7 +233,7 @@ function TailorFitApp() {
       {error&&<div role="alert" className="mx-auto mt-3 flex w-[calc(100%_-_24px)] max-w-[1216px] flex-wrap items-center justify-between gap-3 rounded-lg bg-red-50 p-4 text-sm text-red-800"><span>{error}</span><button type="button" className="min-h-11 rounded-full border border-red-200 px-4" onClick={()=>void refresh()}>Retry loading</button></div>}
       {/* Main Content Area */}
       <main id="main-content" aria-busy={!isHydrated || !routeReady} className="flex-1 w-full max-lg:pb-24">
-        {!isHydrated || !routeReady ? <WorkspaceLoading embedded screen={activeScreen} stage="records" /> : <div className={loadingStyles.ready}>
+        {!isHydrated || !routeReady ? <WorkspaceLoading embedded screen={initialScreen} stage="records" /> : <div className={loadingStyles.ready}>
         {(activeScreen==='overview'||activeScreen==='dashboard')&&<OverviewScreen onOpenOrder={handleEditOrder} onAddClient={()=>{if(requireAccount())setAddingClient(true);}} onNewOrder={()=>handleOpenNewOrder()} onOpenOrders={showOrders} onOpenClients={()=>{routeOrder(undefined,undefined);}}/>}
         {activeScreen==='clients'&&list&&<OrdersScreen filter={list.filter} query={list.query} onFilter={f=>showOrders(f,list.query)} onQuery={q=>showOrders(list.filter,q)} onEditOrder={handleEditOrder} onNewOrder={()=>handleOpenNewOrder()} onBack={()=>{setList(null);setActiveScreen('overview');}}/>}
 
@@ -273,7 +273,7 @@ export default function Workspace({ initialScreen = 'overview' }: { initialScree
   return (
     <StoreProvider key={user?.id || "guest"}>
       <TourProvider>
-        <StudioSetupProvider><TailorFitApp /></StudioSetupProvider>
+        <StudioSetupProvider loadingScreen={initialScreen}><TailorFitApp initialScreen={initialScreen} /></StudioSetupProvider>
       </TourProvider>
     </StoreProvider>
   );
