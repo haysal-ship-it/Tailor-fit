@@ -743,7 +743,7 @@ export function ClientsScreen({
             <p className="text-[12px] leading-normal text-[var(--text-2)]">Versioned anatomical measurements across customer visits.</p>
           </header>
           <div className="rounded-md bg-[var(--card)] p-4">
-            <EmptyState kind="clients" title="Your first client starts here" description="Keep their details, fittings and orders together." actionLabel="Add client" onAction={handleOpenCreateClient}/>
+            <EmptyState kind="clients" title="Your first client starts here" description="Keep their details, fittings and orders together." actionLabel="Add client" onAction={handleOpenCreateClient} secondaryActionLabel={onNewOrder?"New order":undefined} onSecondaryAction={()=>onNewOrder?.('')}/>
           </div>
         </section>
       ) : !selectedClientProfile ? (

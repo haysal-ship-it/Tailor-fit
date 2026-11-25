@@ -18,3 +18,10 @@
 }
 .tf-empty .art[data-visible="false"] *,.tf-empty .art[data-paused="true"] *{animation-play-state:paused!important}
 @keyframes tf-empty-back-settle{from{transform:translate(7px,4px) rotate(0)}to{transform:rotate(-12deg)}}@keyframes tf-empty-front-settle{from{transform:translate(-7px,5px) rotate(0)}to{transform:rotate(10deg)}}@keyframes tf-empty-slip{from{transform:translate(-4px,7px) rotate(1deg)}to{transform:rotate(9deg)}}@keyframes tf-empty-badge{from{transform:scale(.7) translateY(4px)}to{transform:scale(1)}}@keyframes tf-empty-tape{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0)}}@keyframes tf-empty-sheet{0%{transform:translateY(5px) rotate(0)}55%{transform:translateY(-2px) rotate(-8deg)}100%{transform:rotate(-6deg)}}@keyframes tf-empty-bar{from{transform:scaleY(.1)}to{transform:scaleY(1)}}
+
+.tf-empty-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:22px;}
+.tf-empty-actions .tf-empty-action{margin-top:0;}
+.tf-empty-secondary{border-color:var(--outline);background:var(--surface);color:var(--text);}
+.tf-empty-secondary:hover{filter:none;background:var(--card);}
+.tf-empty-compact .tf-empty-actions{margin-top:16px;}
+.tf-empty-compact .tf-empty-actions .tf-empty-action{margin-top:0;}

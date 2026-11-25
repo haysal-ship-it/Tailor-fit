@@ -33,14 +33,17 @@ export function EmptyArtwork({kind,replay}:{kind:EmptyKind;replay:number}) {
   </div>;
 }
 
-export function EmptyState({kind,title,description,actionLabel,onAction,compact=false,headingLevel=3}:{
- kind:EmptyKind;title:string;description:string;actionLabel?:string;onAction?:()=>void;compact?:boolean;headingLevel?:2|3;
+export function EmptyState({kind,title,description,actionLabel,onAction,secondaryActionLabel,onSecondaryAction,compact=false,headingLevel=3}:{
+ kind:EmptyKind;title:string;description:string;actionLabel?:string;onAction?:()=>void;secondaryActionLabel?:string;onSecondaryAction?:()=>void;compact?:boolean;headingLevel?:2|3;
 }){
  const [replay,setReplay]=useState(0);
  const Heading=headingLevel===2?'h2':'h3';
  return <div className={'tf-empty'+(compact?' tf-empty-compact':'')}>
    <EmptyArtwork kind={kind} replay={replay}/>
    <Heading>{title}</Heading><p>{description}</p>
+   {((actionLabel&&onAction)||(secondaryActionLabel&&onSecondaryAction))&&<div className="tf-empty-actions">
    {actionLabel&&onAction&&<button type="button" className="tf-empty-action" onFocus={()=>setReplay(n=>n+1)} onMouseEnter={()=>setReplay(n=>n+1)} onClick={onAction}>{actionLabel}</button>}
+   {secondaryActionLabel&&onSecondaryAction&&<button type="button" className="tf-empty-action tf-empty-secondary" onClick={onSecondaryAction}>{secondaryActionLabel}</button>}
+   </div>}
  </div>;
 }

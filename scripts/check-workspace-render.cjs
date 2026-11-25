@@ -37,7 +37,18 @@ for(const target of ['overview-analytics','overview-chart','overview-calendar','
 const {StudioSetupContext}=load('components/onboarding/StudioSetupContext.ts');const context={state:{version:1,revision:1,status:"deferred",lastStep:1,updatedAt:new Date().toISOString(),checklistDismissed:false},participant:true,openSetup:()=>{},setChecklistHidden:async()=>true};
 store.settings.onboarding={studioSetup:{version:1,status:'deferred',lastStep:1,updatedAt:new Date().toISOString()}};
 const gettingStarted=renderToStaticMarkup(React.createElement(StudioSetupContext.Provider,{value:context},React.createElement(OverviewScreen,callbacks)));assert.ok(gettingStarted.includes('Get your studio ready'));assert.ok(gettingStarted.includes('2 of 3 complete'));assert.ok(gettingStarted.indexOf('Get your studio ready')<gettingStarted.indexOf('overview-analytics'));assert.ok(gettingStarted.includes('Show me around'));console.log('PASS Main Overview renders the account checklist above analytics from real client/order counts');
-context.state.status='completed';const done=renderToStaticMarkup(React.createElement(StudioSetupContext.Provider,{value:context},React.createElement(OverviewScreen,callbacks)));assert.ok(done.includes('You’re ready for what'));assert.ok(!done.includes('<details open'));console.log('PASS Main checklist collapses when settings, client and order milestones are complete');
+context.state.status='completed';const done=renderToStaticMarkup(React.createElement(StudioSetupContext.Provider,{value:context},React.createElement(OverviewScreen,callbacks)));assert.ok(!done.includes('aria-label="Getting started"'));assert.ok(!done.includes('Show me around'));console.log('PASS Completed milestones hide the checklist and tour shortcut');
+context.state.checklistDismissed=true;
+const dismissed=renderToStaticMarkup(React.createElement(StudioSetupContext.Provider,{value:context},React.createElement(OverviewScreen,callbacks)));
+assert.ok(!dismissed.includes('ob-guide-shortcut'));
+context.state.checklistDismissed=false;
+const savedOrders=store.orders,savedClients=store.clients;store.orders=[];store.clients=[];
+mocks['@/components/onboarding/TourProvider'].useTour=()=>({status:'completed',contextualTipsEnabled:true});
+const toured=renderToStaticMarkup(React.createElement(StudioSetupContext.Provider,{value:context},React.createElement(OverviewScreen,callbacks)));
+assert.ok(!toured.includes('aria-label="Getting started"'));
+store.orders=savedOrders;store.clients=savedClients;
+mocks['@/components/onboarding/TourProvider'].useTour=()=>({status:'unseen',contextualTipsEnabled:true});
+console.log('PASS Completed setup and tour stay hidden even without current client/order records');
 const {StudioSetupScreen}=load('components/onboarding/StudioSetupScreen.tsx');const setupScreen=renderToStaticMarkup(React.createElement(StudioSetupScreen,{onClose:()=>{}}));assert.ok(setupScreen.includes('Make Tailorfit yours.'));assert.ok(setupScreen.includes('Step 1 of 2'));assert.ok(setupScreen.includes('Example measurements'));assert.ok(!setupScreen.includes('Independent design preview'));console.log('PASS Main setup uses the approved screens and shared animated mannequin without review controls');
 const profileOrder = renderToStaticMarkup(React.createElement(OrderWorkspace, {clientId:client.id}));
 for (const [field, expected] of [['client-name', client.name], ['phone-number', client.phone], ['email-address', client.email]]) {
